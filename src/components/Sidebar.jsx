@@ -5,7 +5,7 @@
 
 import { ACTIONS } from '../store/index.js';
 import { useDispatch } from '../hooks/useStore.js';
-import { ConfirmModal } from '../ui/index.jsx';
+import { ConfirmModal } from './ui/index.jsx';
 import { useState } from 'react';
 
 const NAV_ITEMS = [
