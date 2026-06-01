@@ -3,8 +3,8 @@
  * Purely presentational: receives state as props, calls onNavigate.
  */
 
-import { ACTIONS } from '../../store/index.js';
-import { useDispatch } from '../../hooks/useStore.js';
+import { ACTIONS } from '../store/index.js';
+import { useDispatch } from '../hooks/useStore.js';
 import { ConfirmModal } from '../ui/index.jsx';
 import { useState } from 'react';
 
