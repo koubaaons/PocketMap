@@ -1,18 +1,7 @@
 /**
  * @fileoverview Pure reducer — all state transitions live here.
- *
- * WHY A REDUCER:
- * - Every state change is an explicit, named action
- * - All business logic is in one place, not scattered across components
- * - State transitions are pure functions: easy to test, trace, and debug
- * - Trivially adds undo/redo: just keep an action log
- *
- * RULE: No side effects here. No localStorage, no DOM, no fetch.
- * This file can be unit-tested in Node with zero dependencies.
+ * No side effects. No localStorage, no DOM, no fetch.
  */
-
-// ─── Action Types ─────────────────────────────────────────────────────────────
-// Enum-style constants prevent typo bugs in dispatch calls.
 
 export const ACTIONS = Object.freeze({
   // Binders
@@ -23,43 +12,45 @@ export const ACTIONS = Object.freeze({
   // Cards
   CARD_ADD:      'CARD_ADD',
   CARD_UPDATE:   'CARD_UPDATE',
-  CARD_DELETE:   'CARD_DELETE',   // → moves to bin
+  CARD_DELETE:   'CARD_DELETE',
 
   // Bin
   BIN_RESTORE:   'BIN_RESTORE',
-  BIN_DELETE:    'BIN_DELETE',    // permanent
+  BIN_DELETE:    'BIN_DELETE',
   BIN_EMPTY:     'BIN_EMPTY',
 
   // Navigation
   NAV_SET:       'NAV_SET',
+
+  
+  COLLECTION_ADD:              'COLLECTION_ADD',
+  COLLECTION_UPDATE:           'COLLECTION_UPDATE',
+  COLLECTION_DELETE:           'COLLECTION_DELETE',   // full cascade
+  TEMPLATE_FIELD_ADD:          'TEMPLATE_FIELD_ADD',
+  TEMPLATE_FIELD_BULK_ADD:     'TEMPLATE_FIELD_BULK_ADD',
+  CARD_DEFINITION_ADD:         'CARD_DEFINITION_ADD',
+  CARD_DEFINITION_BULK_ADD:    'CARD_DEFINITION_BULK_ADD',
+  CARD_DEFINITION_UPDATE:      'CARD_DEFINITION_UPDATE',
+  CARD_DEFINITION_DELETE:      'CARD_DEFINITION_DELETE',
+  TEMPLATE_FIELD_UPDATE:       'TEMPLATE_FIELD_UPDATE',
+  
 });
 
-// ─── Pure Reducer ─────────────────────────────────────────────────────────────
-
-/**
- * @param {object} state
- * @param {{ type: string, payload?: any }} action
- * @returns {object} Next state (never mutates the input)
- */
 export function reducer(state, action) {
   switch (action.type) {
 
     // ── Binders ──────────────────────────────────────────────────────────────
 
     case ACTIONS.BINDER_ADD:
-      return {
-        ...state,
-        binders: [...state.binders, action.payload],
-      };
+      return { ...state, binders: [...state.binders, action.payload] };
 
-    case ACTIONS.BINDER_UPDATE: {
+    case ACTIONS.BINDER_UPDATE:
       return {
         ...state,
         binders: state.binders.map(b =>
           b.id === action.payload.id ? { ...b, ...action.payload } : b
         ),
       };
-    }
 
     case ACTIONS.BINDER_DELETE: {
       const { binderId } = action.payload;
@@ -79,10 +70,7 @@ export function reducer(state, action) {
     // ── Cards ─────────────────────────────────────────────────────────────────
 
     case ACTIONS.CARD_ADD:
-      return {
-        ...state,
-        cards: [...state.cards, action.payload],
-      };
+      return { ...state, cards: [...state.cards, action.payload] };
 
     case ACTIONS.CARD_UPDATE:
       return {
@@ -109,14 +97,12 @@ export function reducer(state, action) {
       const item = state.bin.find(c => c.id === cardId);
       if (!item) return state;
       const { deletedAt, ...card } = item;
-      // Check the binder still exists
       const binderExists = state.binders.some(b => b.id === card.binderId);
-      if (!binderExists) return state; // caller should handle this error case
-      // Check for slot conflict
+      if (!binderExists) return state;
       const conflict = state.cards.some(
         c => c.binderId === card.binderId && c.page === card.page && c.slot === card.slot
       );
-      if (conflict) return state; // caller should handle this error case
+      if (conflict) return state;
       return {
         ...state,
         cards: [...state.cards, card],
@@ -125,10 +111,7 @@ export function reducer(state, action) {
     }
 
     case ACTIONS.BIN_DELETE:
-      return {
-        ...state,
-        bin: state.bin.filter(c => c.id !== action.payload.cardId),
-      };
+      return { ...state, bin: state.bin.filter(c => c.id !== action.payload.cardId) };
 
     case ACTIONS.BIN_EMPTY:
       return { ...state, bin: [] };
@@ -136,10 +119,124 @@ export function reducer(state, action) {
     // ── Navigation ────────────────────────────────────────────────────────────
 
     case ACTIONS.NAV_SET:
+      return { ...state, nav: { ...state.nav, ...action.payload } };
+
+    // ── Collections ───────────────────────────────────────────────────────────
+
+    case ACTIONS.COLLECTION_ADD:
       return {
         ...state,
-        nav: { ...state.nav, ...action.payload },
+        collections: [...state.collections, action.payload],
       };
+
+    case ACTIONS.COLLECTION_UPDATE:
+      return {
+        ...state,
+        collections: state.collections.map(c =>
+          c.id === action.payload.id
+            ? { ...c, ...action.payload, updatedAt: Date.now() }
+            : c
+        ),
+      };
+
+    case ACTIONS.COLLECTION_DELETE: {
+      const { collectionId } = action.payload;
+
+      const affectedCardDefIds = new Set(
+        state.cardDefinitions
+          .filter(cd => cd.collectionId === collectionId)
+          .map(cd => cd.id)
+      );
+
+      return {
+        ...state,
+        collections: state.collections.filter(c => c.id !== collectionId),
+        templateFields: state.templateFields.filter(
+          f => f.collectionId !== collectionId
+        ),
+        cardDefinitions: state.cardDefinitions.filter(
+          cd => cd.collectionId !== collectionId
+        ),
+        inventory: state.inventory.filter(
+          inv => !affectedCardDefIds.has(inv.cardDefId)
+        ),
+        nav:
+          state.nav.currentView === 'collection' &&
+          state.nav.currentCollectionId === collectionId
+            ? {
+                ...state.nav,
+                currentView: 'collections',
+                currentCollectionId: null,
+              }
+            : state.nav,
+      };
+    }
+
+    // ── Template Fields ───────────────────────────────────────────────────────
+
+    case ACTIONS.TEMPLATE_FIELD_ADD:
+      return {
+        ...state,
+        templateFields: [...state.templateFields, action.payload],
+      };
+
+    case ACTIONS.TEMPLATE_FIELD_BULK_ADD:
+      return {
+        ...state,
+        templateFields: [...state.templateFields, ...action.payload],
+      };
+
+    case ACTIONS.TEMPLATE_FIELD_UPDATE:
+      return {
+        ...state,
+        templateFields: state.templateFields.map(field =>
+          field.id === action.payload.id
+            ? { ...field, ...action.payload }
+            : field
+        ),
+      };
+
+    // ── Card Definitions ──────────────────────────────────────────────────────
+
+    case ACTIONS.CARD_DEFINITION_ADD:
+      return {
+        ...state,
+        cardDefinitions: [...state.cardDefinitions, action.payload],
+      };
+
+    case ACTIONS.CARD_DEFINITION_BULK_ADD:
+      return {
+        ...state,
+        cardDefinitions: [...state.cardDefinitions, ...action.payload],
+      };
+
+    case ACTIONS.CARD_DEFINITION_UPDATE:
+      return {
+        ...state,
+        cardDefinitions: state.cardDefinitions.map(cd =>
+          cd.id === action.payload.id
+            ? {
+                ...cd,
+                ...action.payload,
+                updatedAt: Date.now(),
+              }
+            : cd
+        ),
+      };
+
+    case ACTIONS.CARD_DEFINITION_DELETE: {
+      const { cardDefId } = action.payload;
+
+      return {
+        ...state,
+        inventory: state.inventory.filter(
+          inv => inv.cardDefId !== cardDefId
+        ),
+        cardDefinitions: state.cardDefinitions.filter(
+          cd => cd.id !== cardDefId
+        ),
+      };
+    }
 
     default:
       console.warn('[BinderVault] Unknown action type:', action.type);
