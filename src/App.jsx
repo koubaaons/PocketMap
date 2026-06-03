@@ -11,7 +11,7 @@
  * It delegates everything to views, which delegate to the store.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useStore, useDispatch } from './hooks/useStore.js';
 import { useToast } from './hooks/useToast.js';
 import { ACTIONS } from './store/index.js';
@@ -47,12 +47,10 @@ export default function App() {
 
   const currentBinder = binders.find(b => b.id === nav.currentBinderId) ?? null;
 
-  // Determine topbar title
   const pageTitle = nav.currentView === 'binder'
     ? (currentBinder?.name ?? 'Binder')
     : (VIEW_TITLES[nav.currentView] ?? '');
 
-  // Render active view
   const renderView = () => {
     switch (nav.currentView) {
       case 'home':
@@ -88,13 +86,12 @@ export default function App() {
       <Sidebar nav={nav} binders={binders} bin={bin} onNavigate={navigate} />
 
       <div className="main-area">
-        {/* Topbar */}
         <header className="topbar">
           <h2 className="topbar-title">{pageTitle}</h2>
+
           <div className="topbar-actions">
             {nav.currentView === 'home' && (
               <Button variant="primary" size="sm" onClick={() => navigate('home')}>
-                {/* handled in HomeView, this just keeps topbar clean */}
               </Button>
             )}
             {nav.currentView === 'binder' && currentBinder && (
@@ -103,7 +100,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Page content */}
         <main className="main-content" id="main-content">
           {renderView()}
         </main>
@@ -119,11 +115,7 @@ export default function App() {
  * Has its own local modal state so it doesn't pollute App.
  */
 function AddCardButton({ binder, cards, toast, dispatch }) {
-  const [open, setOpen] = useCallback(
-    // eslint-disable-next-line
-    (() => { const { useState } = require('react'); return useState(false); })(),
-    []
-  );
+  const [open, setOpen] = useState(false);
 
   const handleAdd = (card) => {
     dispatch({ type: ACTIONS.CARD_ADD, payload: card });
@@ -133,7 +125,10 @@ function AddCardButton({ binder, cards, toast, dispatch }) {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>+ Add Card</Button>
+      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+        + Add Card
+      </Button>
+
       {open && (
         <AddCardModal
           binder={binder}
