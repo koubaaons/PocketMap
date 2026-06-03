@@ -1,6 +1,9 @@
+/**
+ * @fileoverview Storage Repository — abstracts all persistence concerns.
+ * Swap localStorage for AsyncStorage (React Native) by changing only this file.
+ */
 
-
-import { validateBinder, validateCard, validateBinItem } from '../types/index.js';
+import { validateBinder, validateCard, validateBinItem, validateCollection, validateTemplateField, validateCardDefinition } from '../types/index.js';
 
 const STORAGE_KEY = 'bindervault';
 const SCHEMA_VERSION = 1;
@@ -12,11 +15,13 @@ const DEFAULT_STATE = {
   binders: [],
   cards: [],
   bin: [],
+  collections: [],
+  templateFields: [],
+  cardDefinitions: [],
+  inventory: [],
 };
 
 // ─── Migration registry ───────────────────────────────────────────────────────
-// Add a function here for each version bump, e.g.:
-//   2: (state) => ({ ...state, newField: defaultValue, version: 2 })
 
 const MIGRATIONS = {
   // 2: (state) => ({ ...state, version: 2 }),
@@ -33,8 +38,7 @@ function applyMigrations(state) {
   return current;
 }
 
-// Sanitize loaded data ─────────────────────────────────────────────────────
-// Filters out corrupt records so one bad entry never breaks the whole app.
+// ─── Sanitize loaded data ─────────────────────────────────────────────────────
 
 function sanitizeState(raw) {
   const binders = (raw.binders ?? []).filter(b => {
@@ -48,7 +52,7 @@ function sanitizeState(raw) {
   const cards = (raw.cards ?? []).filter(c => {
     const { valid, errors } = validateCard(c);
     if (!valid) { console.warn('[BinderVault] Dropping corrupt card:', errors, c); return false; }
-    if (!binderIds.has(c.binderId)) { console.warn('[BinderVault] Dropping orphan card (no binder):', c.id); return false; }
+    if (!binderIds.has(c.binderId)) { console.warn('[BinderVault] Dropping orphan card:', c.id); return false; }
     return true;
   });
 
@@ -58,15 +62,42 @@ function sanitizeState(raw) {
     return true;
   });
 
-  return { ...raw, binders, cards, bin };
+  const collections = (raw.collections ?? []).filter(c => {
+    const { valid, errors } = validateCollection(c);
+    if (!valid) console.warn('[BinderVault] Dropping corrupt collection:', errors, c);
+    return valid;
+  });
+
+  const collectionIds = new Set(collections.map(c => c.id));
+
+  const templateFields = (raw.templateFields ?? []).filter(f => {
+    const { valid, errors } = validateTemplateField(f);
+    if (!valid) { console.warn('[BinderVault] Dropping corrupt template field:', errors, f); return false; }
+    if (!collectionIds.has(f.collectionId)) { console.warn('[BinderVault] Dropping orphan template field:', f.id); return false; }
+    return true;
+  });
+
+  const cardDefinitions = (raw.cardDefinitions ?? []).filter(cd => {
+    const { valid, errors } = validateCardDefinition(cd);
+    if (!valid) { console.warn('[BinderVault] Dropping corrupt card definition:', errors, cd); return false; }
+    if (!collectionIds.has(cd.collectionId)) { console.warn('[BinderVault] Dropping orphan card definition:', cd.id); return false; }
+    return true;
+  });
+
+  const cardDefIds = new Set(cardDefinitions.map(cd => cd.id));
+
+  const inventory = (raw.inventory ?? []).filter(inv => {
+    if (!inv.id || !inv.cardDefId) { console.warn('[BinderVault] Dropping corrupt inventory item:', inv); return false; }
+    if (!cardDefIds.has(inv.cardDefId)) { console.warn('[BinderVault] Dropping orphan inventory item:', inv.id); return false; }
+    return true;
+  });
+
+
+  return { ...raw, binders, cards, bin, collections, templateFields, cardDefinitions, inventory };
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/**
- * Loads state from storage. Returns DEFAULT_STATE on any failure.
- * @returns {{ version: number, binders: object[], cards: object[], bin: object[] }}
- */
 export function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -80,11 +111,6 @@ export function loadState() {
   }
 }
 
-/**
- * Persists state to storage.
- * @param {object} state
- * @returns {{ success: boolean, error?: Error }}
- */
 export function saveState(state) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, version: SCHEMA_VERSION }));
@@ -95,26 +121,14 @@ export function saveState(state) {
   }
 }
 
-/**
- * Wipes all stored data. Used for testing or user-requested reset.
- */
 export function clearState() {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err };
-  }
+  try { localStorage.removeItem(STORAGE_KEY); return { success: true }; }
+  catch (err) { return { success: false, error: err }; }
 }
 
-/**
- * Returns estimated storage usage in KB.
- */
 export function getStorageUsage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY) ?? '';
-    return Math.round((raw.length * 2) / 1024); // UTF-16 = 2 bytes/char
-  } catch {
-    return 0;
-  }
+    return Math.round((raw.length * 2) / 1024);
+  } catch { return 0; }
 }
