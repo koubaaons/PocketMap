@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '../ui/index.jsx';
-import { AddCardModal, EditCardModal, CardDetailModal } from '../modals/index.jsx';
+import { AddCardModal, EditCardModal, CardDetailModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
 import { binderCapacity, cardsOnPage } from '../../utils/index.js';

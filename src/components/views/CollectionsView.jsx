@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
-import { CreateCollectionModal, EditCollectionModal } from '../modals/index.jsx';
+import { CreateCollectionModal, EditCollectionModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
 import { debounce } from '../../utils/index.js';

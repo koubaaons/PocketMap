@@ -14,7 +14,7 @@ import { useToast } from './hooks/useToast.js';
 import { ACTIONS } from './store/index.js';
 import { Sidebar } from './components/Sidebar.jsx';
 import { ToastContainer, Button } from './components/ui/index.jsx';
-import { AddCardModal } from './components/modals/index.jsx';
+import { AddCardModal } from './components/modals/index.js';
 
 // === ISSUE #1 START: Split Views — import from individual view files ===
 import { HomeView } from './components/views/HomeView.jsx';
@@ -24,9 +24,7 @@ import { FavoritesView } from './components/views/FavoritesView.jsx';
 import { BinView } from './components/views/BinView.jsx';
 import { CollectionsView } from './components/views/CollectionsView.jsx';
 import { AccountView } from './components/views/AccountView.jsx';
-// === ISSUE #1 END: Split Views — import from individual view files ===
 
-// === ISSUE #1 START: Split Views — updated VIEW_TITLES ===
 const VIEW_TITLES = {
   home:        'Home',
   collections: 'Collections',
