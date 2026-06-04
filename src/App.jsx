@@ -6,42 +6,63 @@
  * - Routes between views based on nav state
  * - Provides toast notifications
  * - Renders the Sidebar + main content area
- *
- * This component deliberately has NO business logic.
- * It delegates everything to views, which delegate to the store.
  */
 
-import { useCallback, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useStore, useDispatch } from './hooks/useStore.js';
 import { useToast } from './hooks/useToast.js';
 import { ACTIONS } from './store/index.js';
 import { Sidebar } from './components/Sidebar.jsx';
 import { ToastContainer, Button } from './components/ui/index.jsx';
 import { AddCardModal } from './components/modals/index.jsx';
-import {
-  HomeView, BinderView, SearchView, FavoritesView, BinView
-} from './components/views/index.jsx';
 
+// === ISSUE #1 START: Split Views — import from individual view files ===
+import { HomeView } from './components/views/HomeView.jsx';
+import { BinderView } from './components/views/BinderView.jsx';
+import { SearchView } from './components/views/SearchView.jsx';
+import { FavoritesView } from './components/views/FavoritesView.jsx';
+import { BinView } from './components/views/BinView.jsx';
+import { CollectionsView } from './components/views/CollectionsView.jsx';
+import { AccountView } from './components/views/AccountView.jsx';
+// === ISSUE #1 END: Split Views — import from individual view files ===
+
+// === ISSUE #1 START: Split Views — updated VIEW_TITLES ===
 const VIEW_TITLES = {
-  home:      'All Binders',
-  search:    'Search Cards',
-  favorites: 'Favorites',
-  bin:       'Trash Bin',
+  home:        'Home',
+  collections: 'Collections',
+  search:      'Search Cards',
+  favorites:   'Favorites',
+  bin:         'Trash Bin',
+  account:     'Account',
 };
+// === ISSUE #1 END: Split Views — updated VIEW_TITLES ===
 
 export default function App() {
   const dispatch = useDispatch();
   const { toasts, toast, dismiss } = useToast();
 
-  const binders = useStore(s => s.binders);
-  const cards   = useStore(s => s.cards);
-  const bin     = useStore(s => s.bin);
-  const nav     = useStore(s => s.nav);
+  const binders         = useStore(s => s.binders);
+  const cards           = useStore(s => s.cards);
+  const bin             = useStore(s => s.bin);
+  const nav             = useStore(s => s.nav);
 
-  const navigate = useCallback((view, binderId = null) => {
+  // === ISSUE #3 START: Collection Entity — read collection state ===
+  const collections     = useStore(s => s.collections);
+  const cardDefinitions = useStore(s => s.cardDefinitions);
+  const inventory       = useStore(s => s.inventory);
+  // === ISSUE #3 END: Collection Entity — read collection state ===
+
+  const navigate = useCallback((view, id = null) => {
     dispatch({
       type: ACTIONS.NAV_SET,
-      payload: { currentView: view, currentBinderId: binderId, currentPage: 1 },
+      payload: {
+        currentView: view,
+        currentBinderId: view === 'binder' ? id : null,
+        // === ISSUE #3 START: Collection Entity — track currentCollectionId ===
+        currentCollectionId: view === 'collection' ? id : null,
+        // === ISSUE #3 END: Collection Entity — track currentCollectionId ===
+        currentPage: 1,
+      },
     });
   }, [dispatch]);
 
@@ -53,8 +74,17 @@ export default function App() {
 
   const renderView = () => {
     switch (nav.currentView) {
+
       case 'home':
-        return <HomeView binders={binders} cards={cards} bin={bin} toast={toast} onNavigate={navigate} />;
+        return (
+          <HomeView
+            binders={binders}
+            cards={cards}
+            bin={bin}
+            toast={toast}
+            onNavigate={navigate}
+          />
+        );
 
       case 'binder':
         if (!currentBinder) { navigate('home'); return null; }
@@ -68,7 +98,14 @@ export default function App() {
         );
 
       case 'search':
-        return <SearchView cards={cards} binders={binders} toast={toast} onNavigateToBinder={(id) => navigate('binder', id)} />;
+        return (
+          <SearchView
+            cards={cards}
+            binders={binders}
+            toast={toast}
+            onNavigateToBinder={(id) => navigate('binder', id)}
+          />
+        );
 
       case 'favorites':
         return <FavoritesView cards={cards} binders={binders} toast={toast} />;
@@ -76,8 +113,32 @@ export default function App() {
       case 'bin':
         return <BinView bin={bin} binders={binders} toast={toast} />;
 
+      // === ISSUE #1 START: Split Views — new route cases ===
+      case 'collections':
+        return (
+          <CollectionsView
+            collections={collections}
+            cardDefinitions={cardDefinitions}
+            inventory={inventory}
+            toast={toast}
+            onNavigate={navigate}
+          />
+        );
+
+      case 'account':
+        return <AccountView toast={toast} />;
+      // === ISSUE #1 END: Split Views — new route cases ===
+
       default:
-        return <HomeView binders={binders} cards={cards} bin={bin} toast={toast} onNavigate={navigate} />;
+        return (
+          <HomeView
+            binders={binders}
+            cards={cards}
+            bin={bin}
+            toast={toast}
+            onNavigate={navigate}
+          />
+        );
     }
   };
 
@@ -88,14 +149,14 @@ export default function App() {
       <div className="main-area">
         <header className="topbar">
           <h2 className="topbar-title">{pageTitle}</h2>
-
           <div className="topbar-actions">
-            {nav.currentView === 'home' && (
-              <Button variant="primary" size="sm" onClick={() => navigate('home')}>
-              </Button>
-            )}
             {nav.currentView === 'binder' && currentBinder && (
-              <AddCardButton binder={currentBinder} cards={cards} toast={toast} dispatch={dispatch} />
+              <AddCardButton
+                binder={currentBinder}
+                cards={cards}
+                toast={toast}
+                dispatch={dispatch}
+              />
             )}
           </div>
         </header>
@@ -112,7 +173,6 @@ export default function App() {
 
 /**
  * Isolated "Add Card" button for the topbar in binder view.
- * Has its own local modal state so it doesn't pollute App.
  */
 function AddCardButton({ binder, cards, toast, dispatch }) {
   const [open, setOpen] = useState(false);
@@ -125,10 +185,7 @@ function AddCardButton({ binder, cards, toast, dispatch }) {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
-        + Add Card
-      </Button>
-
+      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>+ Add Card</Button>
       {open && (
         <AddCardModal
           binder={binder}
