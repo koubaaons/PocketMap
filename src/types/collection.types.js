@@ -7,10 +7,12 @@ import { generateId } from './utils.js';
 
 // ─── Collection ───────────────────────────────────────────────────────────────
 
+// === MILESTONE 2: userId added to validator ===
 export function validateCollection(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
   if (!data.id || typeof data.id !== 'string') errors.push('id must be a non-empty string');
+  if (!data.userId || typeof data.userId !== 'string') errors.push('userId must be a non-empty string');
   if (!data.name || typeof data.name !== 'string' || !data.name.trim()) errors.push('name must be a non-empty string');
   if (typeof data.is_custom !== 'boolean') errors.push('is_custom must be a boolean');
   if (data.import_source !== null && typeof data.import_source !== 'string') errors.push('import_source must be a string or null');
@@ -19,11 +21,14 @@ export function validateCollection(data) {
   if (typeof data.updatedAt !== 'number') errors.push('updatedAt must be a timestamp');
   return { valid: errors.length === 0, errors };
 }
+// === END: userId added to validator ===
 
-export function createCollection({ name, is_custom, import_source = null, cover_image_url = null }) {
+// === MILESTONE 2: userId added to factory, defaults to local user ===
+export function createCollection({ name, is_custom, import_source = null, cover_image_url = null, userId = 'local-user-1' }) {
   const now = Date.now();
   const collection = {
     id: generateId(),
+    userId,
     name: (name || '').trim(),
     is_custom: Boolean(is_custom),
     import_source: import_source ?? null,
@@ -34,8 +39,11 @@ export function createCollection({ name, is_custom, import_source = null, cover_
   const { valid, errors } = validateCollection(collection);
   return valid ? { collection, errors: [] } : { collection: null, errors };
 }
+// === END: userId added to factory ===
 
 // ─── TemplateField ────────────────────────────────────────────────────────────
+// TemplateField belongs to a collection, not directly to a user.
+// No userId needed here — cascade delete via collection handles cleanup.
 
 export function validateTemplateField(data) {
   const errors = [];
@@ -61,6 +69,8 @@ export function createTemplateField({ collectionId, field_name, field_type = 'te
 }
 
 // ─── CardDefinition ───────────────────────────────────────────────────────────
+// CardDefinition belongs to a collection, not directly to a user.
+// No userId needed here — ownership is tracked via USER_INVENTORY.
 
 export function validateCardDefinition(data) {
   const errors = [];
