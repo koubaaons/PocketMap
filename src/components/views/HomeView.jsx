@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Button, EmptyState, StatCard } from '../ui/index.jsx';
-import { CreateBinderModal } from '../modals/index.jsx';
+import { CreateBinderModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
 import { binderCapacity, binderCardCount } from '../../utils/index.js';

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
-import { EditCardModal, CardDetailModal } from '../modals/index.jsx';
+import { EditCardModal, CardDetailModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
 
