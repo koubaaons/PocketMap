@@ -12,7 +12,7 @@ function buildInitialState() {
     nav: {
       currentView: 'home',
       currentBinderId: null,
-      currentCollectionId: null, 
+      currentCollectionId: null,
       currentPage: 1,
     },
   };
@@ -27,11 +27,9 @@ function createStore(reducerFn, initialState) {
     ACTIONS.CARD_ADD, ACTIONS.CARD_UPDATE, ACTIONS.CARD_DELETE,
     ACTIONS.BIN_RESTORE, ACTIONS.BIN_DELETE, ACTIONS.BIN_EMPTY,
     ACTIONS.COLLECTION_ADD, ACTIONS.COLLECTION_UPDATE, ACTIONS.COLLECTION_DELETE,
-    ACTIONS.TEMPLATE_FIELD_ADD, ACTIONS.TEMPLATE_FIELD_BULK_ADD,
+    ACTIONS.TEMPLATE_FIELD_ADD, ACTIONS.TEMPLATE_FIELD_BULK_ADD, ACTIONS.TEMPLATE_FIELD_UPDATE,
     ACTIONS.CARD_DEFINITION_ADD, ACTIONS.CARD_DEFINITION_BULK_ADD,
-    ACTIONS.TEMPLATE_FIELD_UPDATE,
-    ACTIONS.CARD_DEFINITION_UPDATE,
-    ACTIONS.CARD_DEFINITION_DELETE,
+    ACTIONS.CARD_DEFINITION_UPDATE, ACTIONS.CARD_DEFINITION_DELETE,
   ]);
 
   return {
@@ -48,6 +46,9 @@ function createStore(reducerFn, initialState) {
       if (PERSISTED_ACTIONS.has(action.type)) {
         const { success } = saveState({
           version: state.version,
+          // === MILESTONE 2: persist local user ===
+          user: state.user,
+          // === END: persist local user ===
           binders: state.binders,
           cards: state.cards,
           bin: state.bin,

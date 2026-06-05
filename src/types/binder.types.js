@@ -4,10 +4,14 @@
 
 import { generateId } from './utils.js';
 
+// === MILESTONE 2: userId added to validator ===
+// Not strictly validated yet — just checked for presence.
+// In Milestone 9 this becomes a real FK check against the auth user.
 export function validateBinder(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
   if (!data.id || typeof data.id !== 'string') errors.push('id must be a non-empty string');
+  if (!data.userId || typeof data.userId !== 'string') errors.push('userId must be a non-empty string');
   if (!data.name || typeof data.name !== 'string' || !data.name.trim()) errors.push('name must be a non-empty string');
   if (!Number.isInteger(data.cols) || data.cols < 1 || data.cols > 10) errors.push('cols must be integer 1–10');
   if (!Number.isInteger(data.rows) || data.rows < 1 || data.rows > 10) errors.push('rows must be integer 1–10');
@@ -16,9 +20,10 @@ export function validateBinder(data) {
   return { valid: errors.length === 0, errors };
 }
 
-export function createBinder({ name, cols, rows, pages }) {
+export function createBinder({ name, cols, rows, pages, userId = 'local-user-1' }) {
   const binder = {
     id: generateId(),
+    userId,
     name: (name || '').trim(),
     cols: Number(cols),
     rows: Number(rows),

@@ -5,10 +5,12 @@
 
 import { generateId } from './utils.js';
 
+// === MILESTONE 2: userId added to validator ===
 export function validateCard(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
   if (!data.id || typeof data.id !== 'string') errors.push('id must be a non-empty string');
+  if (!data.userId || typeof data.userId !== 'string') errors.push('userId must be a non-empty string');
   if (!data.binderId || typeof data.binderId !== 'string') errors.push('binderId must be a non-empty string');
   if (!data.name || typeof data.name !== 'string' || !data.name.trim()) errors.push('name must be a non-empty string');
   if (data.character !== undefined && typeof data.character !== 'string') errors.push('character must be a string');
@@ -19,6 +21,7 @@ export function validateCard(data) {
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   return { valid: errors.length === 0, errors };
 }
+// === END: userId added to validator ===
 
 export function validateBinItem(data) {
   const cardResult = validateCard(data);
@@ -28,9 +31,11 @@ export function validateBinItem(data) {
   return { valid: errors.length === 0, errors };
 }
 
-export function createCard({ binderId, name, character = '', series = '', page, slot, favorite = false }) {
+// === MILESTONE 2: userId added to factory, defaults to local user ===
+export function createCard({ binderId, name, character = '', series = '', page, slot, favorite = false, userId = 'local-user-1' }) {
   const card = {
     id: generateId(),
+    userId,
     binderId,
     name: (name || '').trim(),
     character: (character || '').trim(),
@@ -43,3 +48,4 @@ export function createCard({ binderId, name, character = '', series = '', page, 
   const { valid, errors } = validateCard(card);
   return valid ? { card, errors: [] } : { card: null, errors };
 }
+// === END: userId added to factory ===

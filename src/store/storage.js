@@ -3,7 +3,10 @@
  * Swap localStorage for AsyncStorage (React Native) by changing only this file.
  */
 
-import { validateBinder, validateCard, validateBinItem, validateCollection, validateTemplateField, validateCardDefinition } from '../types/index.js';
+import {
+  validateBinder, validateCard, validateBinItem,
+  validateCollection, validateTemplateField, validateCardDefinition,
+} from '../types/index.js';
 
 const STORAGE_KEY = 'bindervault';
 const SCHEMA_VERSION = 1;
@@ -12,6 +15,15 @@ const SCHEMA_VERSION = 1;
 
 const DEFAULT_STATE = {
   version: SCHEMA_VERSION,
+
+  // === MILESTONE 2: Local user — replaced with real auth in Milestone 9 ===
+  user: {
+    id: 'local-user-1',
+    username: 'Collector',
+    createdAt: Date.now(),
+  },
+  // === END: Local user ===
+
   binders: [],
   cards: [],
   bin: [],
@@ -22,9 +34,10 @@ const DEFAULT_STATE = {
 };
 
 // ─── Migration registry ───────────────────────────────────────────────────────
+// Add a function here for each version bump.
 
 const MIGRATIONS = {
-  // 2: (state) => ({ ...state, version: 2 }),
+  // 2: (state) => ({ ...state, newField: defaultValue, version: 2 }),
 };
 
 function applyMigrations(state) {
@@ -41,6 +54,12 @@ function applyMigrations(state) {
 // ─── Sanitize loaded data ─────────────────────────────────────────────────────
 
 function sanitizeState(raw) {
+  // === MILESTONE 2: Restore user or fall back to default local user ===
+  const user = (raw.user && raw.user.id && raw.user.username)
+    ? raw.user
+    : DEFAULT_STATE.user;
+  // === END: Restore user ===
+
   const binders = (raw.binders ?? []).filter(b => {
     const { valid, errors } = validateBinder(b);
     if (!valid) console.warn('[BinderVault] Dropping corrupt binder:', errors, b);
@@ -92,8 +111,17 @@ function sanitizeState(raw) {
     return true;
   });
 
-
-  return { ...raw, binders, cards, bin, collections, templateFields, cardDefinitions, inventory };
+  return {
+    ...raw,
+    user,
+    binders,
+    cards,
+    bin,
+    collections,
+    templateFields,
+    cardDefinitions,
+    inventory,
+  };
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
