@@ -45,6 +45,7 @@ export function createCollection({ name, is_custom, import_source = null, cover_
 // TemplateField belongs to a collection, not directly to a user.
 // No userId needed here — cascade delete via collection handles cleanup.
 
+// === ISSUE #9 START: Template Management — add order field to validator ===
 export function validateTemplateField(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
@@ -53,20 +54,26 @@ export function validateTemplateField(data) {
   if (!data.field_name || typeof data.field_name !== 'string' || !data.field_name.trim()) errors.push('field_name must be a non-empty string');
   if (!['text', 'number', 'boolean', 'select'].includes(data.field_type)) errors.push('field_type must be text | number | boolean | select');
   if (typeof data.is_required !== 'boolean') errors.push('is_required must be a boolean');
+  // order determines display position — required, must be a non-negative integer
+  if (!Number.isInteger(data.order) || data.order < 0) errors.push('order must be a non-negative integer');
   return { valid: errors.length === 0, errors };
 }
 
-export function createTemplateField({ collectionId, field_name, field_type = 'text', is_required = false }) {
+// order is now required — assigned at creation time based on existing field count
+export function createTemplateField({ collectionId, field_name, field_type = 'text', is_required = false, order = 0 }) {
   const field = {
     id: generateId(),
     collectionId,
     field_name: (field_name || '').trim(),
     field_type,
     is_required: Boolean(is_required),
+    order: Number(order),
   };
   const { valid, errors } = validateTemplateField(field);
   return valid ? { field, errors: [] } : { field: null, errors };
 }
+// === ISSUE #9 END: Template Management — add order field to validator ===
+
 
 // ─── CardDefinition ───────────────────────────────────────────────────────────
 // CardDefinition belongs to a collection, not directly to a user.
