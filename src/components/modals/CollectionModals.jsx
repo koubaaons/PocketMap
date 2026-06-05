@@ -14,6 +14,11 @@ import { useState } from 'react';
 import { Modal, ModalActions, Button, Input } from '../ui/index.jsx';
 import { createCollection, createTemplateField } from '../../types/index.js';
 
+// === ISSUE #10 START: Template Builder UI — import shared builder and preview ===
+import { TemplateBuilder } from '../collections/TemplateBuilder.jsx';
+import { TemplatePreview } from '../collections/TemplatePreview.jsx';
+// === ISSUE #10 END: Template Builder UI ===
+
 // ─── Mock API sources ─────────────────────────────────────────────────────────
 // Replace with real API calls in Milestone 10.
 
@@ -75,6 +80,38 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   const [collectionName, setCollectionName] = useState('');
   const [nameError, setNameError] = useState('');
 
+  // === ISSUE #10 START: Template Builder UI — fields now have order ===
+  const [templateFields, setTemplateFields] = useState([
+    { id: Date.now(), field_name: '', field_type: 'text', is_required: false, order: 0 },
+  ]);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const handleAddField = () => {
+    const nextOrder = templateFields.length;
+    setTemplateFields(f => [
+      ...f,
+      { id: Date.now(), field_name: '', field_type: 'text', is_required: false, order: nextOrder },
+    ]);
+  };
+
+  const handleChangeField = (id, key, val) => {
+    setTemplateFields(f => f.map(field => field.id === id ? { ...field, [key]: val } : field));
+  };
+
+  const handleReorderField = (id, direction) => {
+    const sorted = [...templateFields].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex(f => f.id === id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const orderA = sorted[idx].order;
+    const orderB = sorted[swapIdx].order;
+    setTemplateFields(f => f.map(field => {
+      if (field.id === sorted[idx].id) return { ...field, order: orderB };
+      if (field.id === sorted[swapIdx].id) return { ...field, order: orderA };
+      return field;
+    }));
+  };
+  // === ISSUE #10 END: Template Builder UI ===
 
   // ── Custom flow ─────────────────────────────────────────────────────────────
 
@@ -94,7 +131,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     });
     if (!collection) { console.error('Collection creation failed:', cErrors); return; }
 
-    // === ISSUE #9 START: Template Management — pass order when creating fields ===
+
     const fields = templateFields
       .sort((a, b) => a.order - b.order)
       .map((f, idx) => createTemplateField({
@@ -105,7 +142,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         order: idx,
       }).field)
       .filter(Boolean);
-    // === ISSUE #9 END: Template Management ===
+
 
     onSubmit({ collection, templateFields: fields, cardDefinitions: [] });
   };
@@ -122,7 +159,6 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     });
     if (!collection) { console.error('Collection creation failed:', cErrors); return; }
 
-    // === ISSUE #9 START: Template Management — pass order for API fields ===
     const fields = selectedSource.templateFields
       .map((f, idx) => createTemplateField({
         collectionId: collection.id,
@@ -132,7 +168,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         order: idx,
       }).field)
       .filter(Boolean);
-    // === ISSUE #9 END: Template Management ===
+
 
     const cardDefs = selectedSource.sampleCards.map(c => ({
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
@@ -230,7 +266,27 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   // ── Step: Custom template ───────────────────────────────────────────────────
 
   if (step === 'custom-template') {
-
+    // === ISSUE #10 START: Template Builder UI — use TemplateBuilder component ===
+    return (
+      <Modal title="Build Your Template" onClose={onClose}>
+        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
+          Define the fields every card in <strong>{collectionName}</strong> will have.
+          Fields cannot be deleted later, only added.
+        </p>
+        <TemplateBuilder
+          fields={templateFields}
+          errors={fieldErrors}
+          onChange={handleChangeField}
+          onAdd={handleAddField}
+          onReorder={handleReorderField}
+        />
+        <ModalActions>
+          <Button variant="ghost" onClick={() => setStep('custom-name')}>← Back</Button>
+          <Button variant="primary" onClick={handleCustomTemplateNext}>Next →</Button>
+        </ModalActions>
+      </Modal>
+    );
+    // === ISSUE #10 END: Template Builder UI ===
   }
 
   // ── Step: Custom review ─────────────────────────────────────────────────────
