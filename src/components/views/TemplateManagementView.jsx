@@ -12,8 +12,6 @@
  *   - New fields are added via TEMPLATE_FIELD_ADD
  */
 
-// === ISSUE #9 START: Template Management ===
-
 import { useState, useMemo } from 'react';
 import { Button } from '../ui/index.jsx';
 import { TemplateBuilder } from '../collections/TemplateBuilder.jsx';
@@ -64,8 +62,6 @@ export function TemplateManagementView({ collection, templateFields, toast }) {
     }));
     setHasChanges(true);
   };
-
-  // === ISSUE #9: Add a new field to an existing collection's schema ===
   const handleAddField = () => {
     const nextOrder = editFields.length;
     const { field, errors } = createTemplateField({
@@ -150,7 +146,6 @@ export function TemplateManagementView({ collection, templateFields, toast }) {
           </p>
         </div>
 
-        {/* === ISSUE #9: Edit / Preview toggle === */}
         {mode === 'preview' ? (
           <Button variant="ghost" size="sm" onClick={() => setMode('edit')}>
             Edit Fields
@@ -165,9 +160,28 @@ export function TemplateManagementView({ collection, templateFields, toast }) {
         )}
       </div>
 
-      
+      {/* === ISSUE #12: Preview mode shows TemplatePreview === */}
+      {mode === 'preview' && (
+        <TemplatePreview
+          fields={collectionFields}
+          showValidation={false}
+        />
+      )}
+      {mode === 'edit' && (
+        <>
+          <p className="template-no-delete-hint">
+            ℹ Fields cannot be deleted — only added or edited.
+          </p>
+          <TemplateBuilder
+            fields={editFields}
+            errors={fieldErrors}
+            onChange={handleChange}
+            onAdd={handleAddField}
+            onReorder={handleReorder}
+          />
+        </>
+      )}
+
     </div>
   );
 }
-
-// === ISSUE #9 END: Template Management ===
