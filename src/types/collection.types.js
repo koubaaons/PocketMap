@@ -45,7 +45,6 @@ export function createCollection({ name, is_custom, import_source = null, cover_
 // TemplateField belongs to a collection, not directly to a user.
 // No userId needed here — cascade delete via collection handles cleanup.
 
-// === ISSUE #9 START: Template Management — add order field to validator ===
 export function validateTemplateField(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
@@ -72,8 +71,28 @@ export function createTemplateField({ collectionId, field_name, field_type = 'te
   const { valid, errors } = validateTemplateField(field);
   return valid ? { field, errors: [] } : { field: null, errors };
 }
-// === ISSUE #9 END: Template Management — add order field to validator ===
 
+// === ISSUE #11 START: Restrict To One Template Per Collection — collection-level validation ===
+/**
+ * Validates that a collection does not already have template fields.
+ * Used in the reducer before TEMPLATE_FIELD_BULK_ADD to enforce
+ * the one-template-per-collection rule at the data layer.
+ *
+ * @param {string} collectionId
+ * @param {object[]} existingFields - current templateFields from state
+ * @returns {{ valid: boolean, error?: string }}
+ */
+export function validateOneTemplatePerCollection(collectionId, existingFields) {
+  const alreadyHasFields = existingFields.some(f => f.collectionId === collectionId);
+  if (alreadyHasFields) {
+    return {
+      valid: false,
+      error: 'This collection already has fields configured. Each collection can only have one field schema.',
+    };
+  }
+  return { valid: true };
+}
+// === ISSUE #11 END: Restrict To One Template Per Collection ===
 
 // ─── CardDefinition ───────────────────────────────────────────────────────────
 // CardDefinition belongs to a collection, not directly to a user.

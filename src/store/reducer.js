@@ -3,6 +3,8 @@
  * No side effects. No localStorage, no DOM, no fetch.
  */
 
+import { validateOneTemplatePerCollection } from '../types/index.js';
+
 export const ACTIONS = Object.freeze({
   // Binders
   BINDER_ADD:    'BINDER_ADD',
@@ -20,20 +22,26 @@ export const ACTIONS = Object.freeze({
   BIN_EMPTY:     'BIN_EMPTY',
 
   // Navigation
-  NAV_SET:       'NAV_SET',
+  NAV_SET: 'NAV_SET',
 
-  
-  COLLECTION_ADD:              'COLLECTION_ADD',
-  COLLECTION_UPDATE:           'COLLECTION_UPDATE',
-  COLLECTION_DELETE:           'COLLECTION_DELETE',   // full cascade
-  TEMPLATE_FIELD_ADD:          'TEMPLATE_FIELD_ADD',
-  TEMPLATE_FIELD_BULK_ADD:     'TEMPLATE_FIELD_BULK_ADD',
-  CARD_DEFINITION_ADD:         'CARD_DEFINITION_ADD',
-  CARD_DEFINITION_BULK_ADD:    'CARD_DEFINITION_BULK_ADD',
-  CARD_DEFINITION_UPDATE:      'CARD_DEFINITION_UPDATE',
-  CARD_DEFINITION_DELETE:      'CARD_DEFINITION_DELETE',
-  TEMPLATE_FIELD_UPDATE:       'TEMPLATE_FIELD_UPDATE',
-  
+  // Collections
+  COLLECTION_ADD:           'COLLECTION_ADD',
+  COLLECTION_UPDATE:        'COLLECTION_UPDATE',
+  COLLECTION_DELETE:        'COLLECTION_DELETE',
+
+  // Template Fields
+  TEMPLATE_FIELD_ADD:       'TEMPLATE_FIELD_ADD',
+  TEMPLATE_FIELD_BULK_ADD:  'TEMPLATE_FIELD_BULK_ADD',
+  TEMPLATE_FIELD_UPDATE:    'TEMPLATE_FIELD_UPDATE',
+
+  TEMPLATE_FIELD_REORDER:   'TEMPLATE_FIELD_REORDER',
+
+
+  // Card Definitions
+  CARD_DEFINITION_ADD:      'CARD_DEFINITION_ADD',
+  CARD_DEFINITION_BULK_ADD: 'CARD_DEFINITION_BULK_ADD',
+  CARD_DEFINITION_UPDATE:   'CARD_DEFINITION_UPDATE',
+  CARD_DEFINITION_DELETE:   'CARD_DEFINITION_DELETE',
 });
 
 export function reducer(state, action) {
@@ -124,10 +132,7 @@ export function reducer(state, action) {
     // ── Collections ───────────────────────────────────────────────────────────
 
     case ACTIONS.COLLECTION_ADD:
-      return {
-        ...state,
-        collections: [...state.collections, action.payload],
-      };
+      return { ...state, collections: [...state.collections, action.payload] };
 
     case ACTIONS.COLLECTION_UPDATE:
       return {
@@ -141,34 +146,20 @@ export function reducer(state, action) {
 
     case ACTIONS.COLLECTION_DELETE: {
       const { collectionId } = action.payload;
-
       const affectedCardDefIds = new Set(
         state.cardDefinitions
           .filter(cd => cd.collectionId === collectionId)
           .map(cd => cd.id)
       );
-
       return {
         ...state,
         collections: state.collections.filter(c => c.id !== collectionId),
-        templateFields: state.templateFields.filter(
-          f => f.collectionId !== collectionId
-        ),
-        cardDefinitions: state.cardDefinitions.filter(
-          cd => cd.collectionId !== collectionId
-        ),
-        inventory: state.inventory.filter(
-          inv => !affectedCardDefIds.has(inv.cardDefId)
-        ),
-        nav:
-          state.nav.currentView === 'collection' &&
-          state.nav.currentCollectionId === collectionId
-            ? {
-                ...state.nav,
-                currentView: 'collections',
-                currentCollectionId: null,
-              }
-            : state.nav,
+        templateFields: state.templateFields.filter(f => f.collectionId !== collectionId),
+        cardDefinitions: state.cardDefinitions.filter(cd => cd.collectionId !== collectionId),
+        inventory: state.inventory.filter(inv => !affectedCardDefIds.has(inv.cardDefId)),
+        nav: state.nav.currentView === 'collection' && state.nav.currentCollectionId === collectionId
+          ? { ...state.nav, currentView: 'collections', currentCollectionId: null }
+          : state.nav,
       };
     }
 
@@ -180,61 +171,89 @@ export function reducer(state, action) {
         templateFields: [...state.templateFields, action.payload],
       };
 
-    case ACTIONS.TEMPLATE_FIELD_BULK_ADD:
+    // === ISSUE #11 START: Restrict To One Template Per Collection — enforce in reducer ===
+    case ACTIONS.TEMPLATE_FIELD_BULK_ADD: {
+      // payload is an array of template fields, all sharing the same collectionId
+      const collectionId = action.payload[0]?.collectionId;
+      if (!collectionId) {
+        console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD: missing collectionId in payload');
+        return state;
+      }
+      const { valid, error } = validateOneTemplatePerCollection(collectionId, state.templateFields);
+      if (!valid) {
+        // Reject silently — the UI should never allow this but we protect at the data layer
+        console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD rejected:', error);
+        return state;
+      }
       return {
         ...state,
         templateFields: [...state.templateFields, ...action.payload],
       };
+    }
+    // === ISSUE #11 END: Restrict To One Template Per Collection ===
 
     case ACTIONS.TEMPLATE_FIELD_UPDATE:
       return {
         ...state,
-        templateFields: state.templateFields.map(field =>
-          field.id === action.payload.id
-            ? { ...field, ...action.payload }
-            : field
+        templateFields: state.templateFields.map(f =>
+          f.id === action.payload.id ? { ...f, ...action.payload } : f
         ),
       };
+
+    case ACTIONS.TEMPLATE_FIELD_REORDER: {
+      // payload: { collectionId, fieldId, direction: 'up' | 'down' }
+      const { collectionId, fieldId, direction } = action.payload;
+
+      // Get only this collection's fields sorted by order
+      const collectionFields = state.templateFields
+        .filter(f => f.collectionId === collectionId)
+        .sort((a, b) => a.order - b.order);
+
+      const idx = collectionFields.findIndex(f => f.id === fieldId);
+      if (idx === -1) return state;
+
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= collectionFields.length) return state;
+
+      // Swap order values between the two fields
+      const fieldA = collectionFields[idx];
+      const fieldB = collectionFields[swapIdx];
+
+      return {
+        ...state,
+        templateFields: state.templateFields.map(f => {
+          if (f.id === fieldA.id) return { ...f, order: fieldB.order };
+          if (f.id === fieldB.id) return { ...f, order: fieldA.order };
+          return f;
+        }),
+      };
+    }
+
 
     // ── Card Definitions ──────────────────────────────────────────────────────
 
     case ACTIONS.CARD_DEFINITION_ADD:
-      return {
-        ...state,
-        cardDefinitions: [...state.cardDefinitions, action.payload],
-      };
+      return { ...state, cardDefinitions: [...state.cardDefinitions, action.payload] };
 
     case ACTIONS.CARD_DEFINITION_BULK_ADD:
-      return {
-        ...state,
-        cardDefinitions: [...state.cardDefinitions, ...action.payload],
-      };
+      return { ...state, cardDefinitions: [...state.cardDefinitions, ...action.payload] };
 
     case ACTIONS.CARD_DEFINITION_UPDATE:
       return {
         ...state,
         cardDefinitions: state.cardDefinitions.map(cd =>
           cd.id === action.payload.id
-            ? {
-                ...cd,
-                ...action.payload,
-                updatedAt: Date.now(),
-              }
+            ? { ...cd, ...action.payload, updatedAt: Date.now() }
             : cd
         ),
       };
 
     case ACTIONS.CARD_DEFINITION_DELETE: {
       const { cardDefId } = action.payload;
-
       return {
         ...state,
-        inventory: state.inventory.filter(
-          inv => inv.cardDefId !== cardDefId
-        ),
-        cardDefinitions: state.cardDefinitions.filter(
-          cd => cd.id !== cardDefId
-        ),
+        inventory: state.inventory.filter(inv => inv.cardDefId !== cardDefId),
+        cardDefinitions: state.cardDefinitions.filter(cd => cd.id !== cardDefId),
       };
     }
 
