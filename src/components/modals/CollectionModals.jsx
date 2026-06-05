@@ -13,11 +13,8 @@
 import { useState } from 'react';
 import { Modal, ModalActions, Button, Input } from '../ui/index.jsx';
 import { createCollection, createTemplateField } from '../../types/index.js';
-
-// === ISSUE #10 START: Template Builder UI — import shared builder and preview ===
 import { TemplateBuilder } from '../collections/TemplateBuilder.jsx';
 import { TemplatePreview } from '../collections/TemplatePreview.jsx';
-// === ISSUE #10 END: Template Builder UI ===
 
 // ─── Mock API sources ─────────────────────────────────────────────────────────
 // Replace with real API calls in Milestone 10.
@@ -79,8 +76,6 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   const [selectedSource, setSelectedSource] = useState(null);
   const [collectionName, setCollectionName] = useState('');
   const [nameError, setNameError] = useState('');
-
-  // === ISSUE #10 START: Template Builder UI — fields now have order ===
   const [templateFields, setTemplateFields] = useState([
     { id: Date.now(), field_name: '', field_type: 'text', is_required: false, order: 0 },
   ]);
@@ -111,7 +106,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
       return field;
     }));
   };
-  // === ISSUE #10 END: Template Builder UI ===
+
 
   // ── Custom flow ─────────────────────────────────────────────────────────────
 
@@ -121,7 +116,18 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     setStep('custom-template');
   };
 
-
+  // === ISSUE #12 START: Template Review & Preview — validate before advancing ===
+  const handleCustomTemplateNext = () => {
+    const errors = {};
+    templateFields.forEach(f => {
+      if (!f.field_name.trim()) errors[f.id] = 'Field name is required';
+    });
+    if (Object.keys(errors).length) { setFieldErrors(errors); return; }
+    if (templateFields.length === 0) { return; } // builder prevents this but safety check
+    setFieldErrors({});
+    setStep('custom-review');
+  };
+  // === ISSUE #12 END: Template Review & Preview ===
 
   const handleCustomConfirm = () => {
     const { collection, errors: cErrors } = createCollection({
@@ -142,7 +148,6 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         order: idx,
       }).field)
       .filter(Boolean);
-
 
     onSubmit({ collection, templateFields: fields, cardDefinitions: [] });
   };
@@ -244,7 +249,28 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   // ── Step: API confirm ───────────────────────────────────────────────────────
 
   if (step === 'api-confirm') {
-
+    // === ISSUE #12 START: Template Review & Preview — use TemplatePreview for API confirm ===
+    const previewFields = selectedSource.templateFields.map((f, idx) => ({
+      id: idx, collectionId: '', ...f, order: idx,
+    }));
+    return (
+      <Modal title={`Import "${selectedSource.name}"`} onClose={onClose}>
+        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
+          This will create the collection with the following field schema:
+        </p>
+        <TemplatePreview fields={previewFields} showValidation={false} />
+        <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 12 }}>
+          {selectedSource.sampleCards.length > 0
+            ? `${selectedSource.sampleCards.length} sample cards will be imported.`
+            : 'Card definitions will be imported from the API.'}
+        </p>
+        <ModalActions>
+          <Button variant="ghost" onClick={() => setStep('api-select')}>← Back</Button>
+          <Button variant="primary" onClick={handleApiConfirm}>Create Collection</Button>
+        </ModalActions>
+      </Modal>
+    );
+    // === ISSUE #12 END: Template Review & Preview ===
   }
 
   // ── Step: Custom name ───────────────────────────────────────────────────────
@@ -266,7 +292,6 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   // ── Step: Custom template ───────────────────────────────────────────────────
 
   if (step === 'custom-template') {
-    // === ISSUE #10 START: Template Builder UI — use TemplateBuilder component ===
     return (
       <Modal title="Build Your Template" onClose={onClose}>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
@@ -286,13 +311,39 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         </ModalActions>
       </Modal>
     );
-    // === ISSUE #10 END: Template Builder UI ===
+
   }
 
   // ── Step: Custom review ─────────────────────────────────────────────────────
 
   if (step === 'custom-review') {
-
+    // === ISSUE #12 START: Template Review & Preview — use TemplatePreview with validation ===
+    return (
+      <Modal title="Review & Create" onClose={onClose}>
+        <div className="review-section">
+          <div className="review-label">Collection Name</div>
+          <div className="review-value">{collectionName}</div>
+        </div>
+        <div className="review-section">
+          <div className="review-label">Field Schema</div>
+          <TemplatePreview fields={templateFields} showValidation={true} />
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
+          No cards yet — you'll add them after creating the collection.
+        </p>
+        <ModalActions>
+          <Button variant="ghost" onClick={() => setStep('custom-template')}>← Back</Button>
+          <Button
+            variant="primary"
+            onClick={handleCustomConfirm}
+            disabled={templateFields.length === 0}
+          >
+            Create Collection
+          </Button>
+        </ModalActions>
+      </Modal>
+    );
+    // === ISSUE #12 END: Template Review & Preview ===
   }
 
   return null;
