@@ -15,7 +15,7 @@ import { Modal, ModalActions, Button, Input } from '../ui/index.jsx';
 import { createCollection, createTemplateField } from '../../types/index.js';
 
 // ─── Mock API sources ─────────────────────────────────────────────────────────
-// Replace with real API calls in a future issue.
+// Replace with real API calls in Milestone 10.
 
 const MOCK_API_SOURCES = [
   {
@@ -24,11 +24,11 @@ const MOCK_API_SOURCES = [
     category: 'Anime',
     cardCount: 406,
     templateFields: [
-      { field_name: 'Character',       field_type: 'text',   is_required: true  },
-      { field_name: 'Season',          field_type: 'text',   is_required: false },
-      { field_name: 'Transformation',  field_type: 'text',   is_required: false },
-      { field_name: 'Rarity',          field_type: 'select', is_required: true  },
-      { field_name: 'Card Number',     field_type: 'text',   is_required: true  },
+      { field_name: 'Character',      field_type: 'text',   is_required: true  },
+      { field_name: 'Season',         field_type: 'text',   is_required: false },
+      { field_name: 'Transformation', field_type: 'text',   is_required: false },
+      { field_name: 'Rarity',         field_type: 'select', is_required: true  },
+      { field_name: 'Card Number',    field_type: 'text',   is_required: true  },
     ],
     sampleCards: [
       { name: 'Bloom Believix',  attributes: { Character: 'Bloom', Season: 'Season 4', Transformation: 'Believix',  Rarity: 'Rare',       'Card Number': 'WC-001' } },
@@ -67,67 +67,6 @@ const MOCK_API_SOURCES = [
   },
 ];
 
-const FIELD_TYPES = [
-  { value: 'text',    label: 'Text'      },
-  { value: 'number',  label: 'Number'    },
-  { value: 'boolean', label: 'Yes / No'  },
-  { value: 'select',  label: 'Dropdown'  },
-];
-
-// ─── Shared helper: TemplateFieldRow ─────────────────────────────────────────
-
-function TemplateFieldRow({ field, error, onChange, onRemove, removable }) {
-  return (
-    <div className="template-field-row">
-      <div style={{ flex: 1 }}>
-        <Input
-          id={`field-name-${field.id}`}
-          placeholder="Field name e.g. Rarity"
-          value={field.field_name}
-          onChange={e => onChange(field.id, 'field_name', e.target.value)}
-          error={error}
-        />
-      </div>
-      <select
-        className="field-type-select"
-        value={field.field_type}
-        onChange={e => onChange(field.id, 'field_type', e.target.value)}
-      >
-        {FIELD_TYPES.map(t => (
-          <option key={t.value} value={t.value}>{t.label}</option>
-        ))}
-      </select>
-      <label className="field-required-label" title="Required">
-        <input
-          type="checkbox"
-          checked={field.is_required}
-          onChange={e => onChange(field.id, 'is_required', e.target.checked)}
-        />
-        <span style={{ fontSize: 11 }}>Req</span>
-      </label>
-      {removable && (
-        <button className="field-remove-btn" onClick={() => onRemove(field.id)} title="Remove field">×</button>
-      )}
-    </div>
-  );
-}
-
-// ─── Shared helper: ReviewFieldList ──────────────────────────────────────────
-
-function ReviewFieldList({ fields }) {
-  return (
-    <div className="review-fields">
-      {fields.map((f, i) => (
-        <div key={i} className="review-field-row">
-          <span className="review-field-name">{f.field_name}</span>
-          <span className="review-field-type">{f.field_type}</span>
-          {f.is_required && <span className="review-field-required">required</span>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── CreateCollectionModal ────────────────────────────────────────────────────
 
 export function CreateCollectionModal({ onSubmit, onClose }) {
@@ -135,24 +74,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   const [selectedSource, setSelectedSource] = useState(null);
   const [collectionName, setCollectionName] = useState('');
   const [nameError, setNameError] = useState('');
-  const [templateFields, setTemplateFields] = useState([
-    { id: Date.now(), field_name: '', field_type: 'text', is_required: false },
-  ]);
-  const [fieldErrors, setFieldErrors] = useState({});
 
-  // ── Template field helpers ──────────────────────────────────────────────────
-
-  const addField = () => {
-    setTemplateFields(f => [...f, { id: Date.now(), field_name: '', field_type: 'text', is_required: false }]);
-  };
-
-  const updateField = (id, key, val) => {
-    setTemplateFields(f => f.map(field => field.id === id ? { ...field, [key]: val } : field));
-  };
-
-  const removeField = (id) => {
-    setTemplateFields(f => f.filter(field => field.id !== id));
-  };
 
   // ── Custom flow ─────────────────────────────────────────────────────────────
 
@@ -162,15 +84,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     setStep('custom-template');
   };
 
-  const handleCustomTemplateNext = () => {
-    const errors = {};
-    templateFields.forEach(f => {
-      if (!f.field_name.trim()) errors[f.id] = 'Field name is required';
-    });
-    if (Object.keys(errors).length) { setFieldErrors(errors); return; }
-    setFieldErrors({});
-    setStep('custom-review');
-  };
+
 
   const handleCustomConfirm = () => {
     const { collection, errors: cErrors } = createCollection({
@@ -180,11 +94,19 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     });
     if (!collection) { console.error('Collection creation failed:', cErrors); return; }
 
+    // === ISSUE #9 START: Template Management — pass order when creating fields ===
     const fields = templateFields
-      .map(f => createTemplateField({ collectionId: collection.id, field_name: f.field_name, field_type: f.field_type, is_required: f.is_required }).field)
+      .sort((a, b) => a.order - b.order)
+      .map((f, idx) => createTemplateField({
+        collectionId: collection.id,
+        field_name: f.field_name,
+        field_type: f.field_type,
+        is_required: f.is_required,
+        order: idx,
+      }).field)
       .filter(Boolean);
+    // === ISSUE #9 END: Template Management ===
 
-    // Custom collections start with no card definitions — added manually later
     onSubmit({ collection, templateFields: fields, cardDefinitions: [] });
   };
 
@@ -200,11 +122,18 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     });
     if (!collection) { console.error('Collection creation failed:', cErrors); return; }
 
+    // === ISSUE #9 START: Template Management — pass order for API fields ===
     const fields = selectedSource.templateFields
-      .map(f => createTemplateField({ collectionId: collection.id, field_name: f.field_name, field_type: f.field_type, is_required: f.is_required }).field)
+      .map((f, idx) => createTemplateField({
+        collectionId: collection.id,
+        field_name: f.field_name,
+        field_type: f.field_type,
+        is_required: f.is_required,
+        order: idx,
+      }).field)
       .filter(Boolean);
+    // === ISSUE #9 END: Template Management ===
 
-    // In a future issue, replace sampleCards with a real API response
     const cardDefs = selectedSource.sampleCards.map(c => ({
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
       collectionId: collection.id,
@@ -279,23 +208,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   // ── Step: API confirm ───────────────────────────────────────────────────────
 
   if (step === 'api-confirm') {
-    return (
-      <Modal title={`Import "${selectedSource.name}"`} onClose={onClose}>
-        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
-          This will create the collection with the following template fields:
-        </p>
-        <ReviewFieldList fields={selectedSource.templateFields} />
-        <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 12 }}>
-          {selectedSource.sampleCards.length > 0
-            ? `${selectedSource.sampleCards.length} sample cards will be imported.`
-            : 'Card definitions will be imported from the API.'}
-        </p>
-        <ModalActions>
-          <Button variant="ghost" onClick={() => setStep('api-select')}>← Back</Button>
-          <Button variant="primary" onClick={handleApiConfirm}>Create Collection</Button>
-        </ModalActions>
-      </Modal>
-    );
+
   }
 
   // ── Step: Custom name ───────────────────────────────────────────────────────
@@ -317,57 +230,13 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   // ── Step: Custom template ───────────────────────────────────────────────────
 
   if (step === 'custom-template') {
-    return (
-      <Modal title="Build Your Template" onClose={onClose}>
-        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
-          Define the fields every card in <strong>{collectionName}</strong> will have.
-          Fields cannot be deleted later, only added.
-        </p>
-        <div className="template-fields-list">
-          {templateFields.map(field => (
-            <TemplateFieldRow
-              key={field.id}
-              field={field}
-              error={fieldErrors[field.id]}
-              onChange={updateField}
-              onRemove={removeField}
-              removable={templateFields.length > 1}
-            />
-          ))}
-        </div>
-        <Button variant="ghost" size="sm" onClick={addField} style={{ marginTop: 8 }}>
-          + Add Field
-        </Button>
-        <ModalActions>
-          <Button variant="ghost" onClick={() => setStep('custom-name')}>← Back</Button>
-          <Button variant="primary" onClick={handleCustomTemplateNext}>Next →</Button>
-        </ModalActions>
-      </Modal>
-    );
+
   }
 
   // ── Step: Custom review ─────────────────────────────────────────────────────
 
   if (step === 'custom-review') {
-    return (
-      <Modal title="Review & Create" onClose={onClose}>
-        <div className="review-section">
-          <div className="review-label">Collection Name</div>
-          <div className="review-value">{collectionName}</div>
-        </div>
-        <div className="review-section">
-          <div className="review-label">Template Fields ({templateFields.length})</div>
-          <ReviewFieldList fields={templateFields} />
-        </div>
-        <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
-          No cards yet — you'll add them manually after creating the collection.
-        </p>
-        <ModalActions>
-          <Button variant="ghost" onClick={() => setStep('custom-template')}>← Back</Button>
-          <Button variant="primary" onClick={handleCustomConfirm}>Create Collection</Button>
-        </ModalActions>
-      </Modal>
-    );
+
   }
 
   return null;
