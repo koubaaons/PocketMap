@@ -20,10 +20,14 @@ import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
 import { createTemplateField } from '../../types/index.js';
 
+// === REFACTOR3a START: use useTemplateEditor hook ===
+import { useTemplateEditor } from '../../hooks/useTemplateEditor.js';
+// === REFACTOR3a END ===
+
 export function TemplateManagementView({ collection, templateFields, toast }) {
   const dispatch = useDispatch();
+  const [mode, setMode] = useState('preview'); // 'preview' | 'edit'
 
-  // Fields belonging to this collection sorted by order
   const collectionFields = useMemo(
     () => templateFields
       .filter(f => f.collectionId === collection.id)
@@ -31,103 +35,57 @@ export function TemplateManagementView({ collection, templateFields, toast }) {
     [templateFields, collection.id]
   );
 
-  // Local edit state — we stage changes here before dispatching
-  const [editFields, setEditFields] = useState(() =>
-    collectionFields.map(f => ({ ...f }))
-  );
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [mode, setMode] = useState('preview'); // 'preview' | 'edit'
-  const [hasChanges, setHasChanges] = useState(false);
+  // === REFACTOR3a START: replace duplicated field logic with hook ===
+  const {
+    fields: editFields,
+    errors: fieldErrors,
+    hasChanges,
+    handleAdd,
+    handleChange,
+    handleReorder,
+    validate,
+    reset,
+  } = useTemplateEditor(collectionFields);
+  // === REFACTOR3a END ===
 
-  // ── Field change handlers ──────────────────────────────────────────────────
-
-  const handleChange = (id, key, val) => {
-    setEditFields(fields => fields.map(f => f.id === id ? { ...f, [key]: val } : f));
-    setHasChanges(true);
-    // Clear error on change
-    if (fieldErrors[id]) setFieldErrors(e => { const n = { ...e }; delete n[id]; return n; });
-  };
-
-  const handleReorder = (id, direction) => {
-    const sorted = [...editFields].sort((a, b) => a.order - b.order);
-    const idx = sorted.findIndex(f => f.id === id);
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= sorted.length) return;
-    const orderA = sorted[idx].order;
-    const orderB = sorted[swapIdx].order;
-    setEditFields(fields => fields.map(f => {
-      if (f.id === sorted[idx].id) return { ...f, order: orderB };
-      if (f.id === sorted[swapIdx].id) return { ...f, order: orderA };
-      return f;
-    }));
-    setHasChanges(true);
-  };
-  const handleAddField = () => {
-    const nextOrder = editFields.length;
-    const { field, errors } = createTemplateField({
-      collectionId: collection.id,
-      field_name: '',
-      field_type: 'text',
-      is_required: false,
-      order: nextOrder,
-    });
-    // createTemplateField will fail validation because field_name is empty —
-    // that's fine, we just need the shape. Build it manually for local state.
-    const newField = {
-      id: `temp-${Date.now()}`,
-      collectionId: collection.id,
-      field_name: '',
-      field_type: 'text',
-      is_required: false,
-      order: nextOrder,
-      _isNew: true, // flag so we know to dispatch ADD not UPDATE
-    };
-    setEditFields(f => [...f, newField]);
-    setHasChanges(true);
-  };
+  // === REFACTOR3c START: separate existingFields and newFields — no _isNew flag ===
+  // New fields have ids starting with 'new-' assigned by useTemplateEditor.handleAdd
+  // Existing fields have real persisted ids from the store
+  const existingFields = editFields.filter(f => !f.id.startsWith('new-'));
+  const newFields = editFields.filter(f => f.id.startsWith('new-'));
+  // === REFACTOR3c END ===
 
   // ── Save changes ───────────────────────────────────────────────────────────
 
   const handleSave = () => {
-    // Validate all fields
-    const errors = {};
-    editFields.forEach(f => {
-      if (!f.field_name.trim()) errors[f.id] = 'Field name is required';
-    });
-    if (Object.keys(errors).length) { setFieldErrors(errors); return; }
+    if (!validate()) return;
 
-    // Dispatch updates and adds
-    editFields.forEach((f, idx) => {
-      const normalized = { ...f, order: idx }; // normalize order on save
-
-      if (f._isNew) {
-        // New field — create properly and dispatch ADD
-        const { field } = createTemplateField({
-          collectionId: collection.id,
-          field_name: f.field_name,
-          field_type: f.field_type,
-          is_required: f.is_required,
-          order: idx,
-        });
-        if (field) dispatch({ type: ACTIONS.TEMPLATE_FIELD_ADD, payload: field });
-      } else {
-        // Existing field — dispatch UPDATE
-        dispatch({
-          type: ACTIONS.TEMPLATE_FIELD_UPDATE,
-          payload: { ...normalized, order: idx },
-        });
-      }
+    // === REFACTOR3c START: dispatch ADD for new, UPDATE for existing — no _isNew flag needed ===
+    existingFields.forEach((f) => {
+      dispatch({
+        type: ACTIONS.TEMPLATE_FIELD_UPDATE,
+        payload: { ...f },
+      });
     });
+
+    newFields.forEach((f) => {
+      const { field } = createTemplateField({
+        collectionId: collection.id,
+        field_name: f.field_name,
+        field_type: f.field_type,
+        is_required: f.is_required,
+        order: f.order,
+      });
+      if (field) dispatch({ type: ACTIONS.TEMPLATE_FIELD_ADD, payload: field });
+    });
+    // === REFACTOR3c END ===
 
     toast('Fields saved');
-    setHasChanges(false);
     setMode('preview');
   };
 
   const handleDiscard = () => {
-    setEditFields(collectionFields.map(f => ({ ...f })));
-    setFieldErrors({});
-    setHasChanges(false);
+    reset(collectionFields);
     setMode('preview');
   };
 
@@ -160,13 +118,10 @@ export function TemplateManagementView({ collection, templateFields, toast }) {
         )}
       </div>
 
-      {/* === ISSUE #12: Preview mode shows TemplatePreview === */}
       {mode === 'preview' && (
-        <TemplatePreview
-          fields={collectionFields}
-          showValidation={false}
-        />
+        <TemplatePreview fields={collectionFields} showValidation={false} />
       )}
+
       {mode === 'edit' && (
         <>
           <p className="template-no-delete-hint">
@@ -176,7 +131,7 @@ export function TemplateManagementView({ collection, templateFields, toast }) {
             fields={editFields}
             errors={fieldErrors}
             onChange={handleChange}
-            onAdd={handleAddField}
+            onAdd={handleAdd}
             onReorder={handleReorder}
           />
         </>

@@ -16,58 +16,13 @@ import { createCollection, createTemplateField } from '../../types/index.js';
 import { TemplateBuilder } from '../collections/TemplateBuilder.jsx';
 import { TemplatePreview } from '../collections/TemplatePreview.jsx';
 
-// ─── Mock API sources ─────────────────────────────────────────────────────────
-// Replace with real API calls in Milestone 10.
+// === REFACTOR3a START: use useTemplateEditor hook ===
+import { useTemplateEditor } from '../../hooks/useTemplateEditor.js';
+// === REFACTOR3a END ===
 
-const MOCK_API_SOURCES = [
-  {
-    id: 'winx-api',
-    name: 'Winx Club Cards',
-    category: 'Anime',
-    cardCount: 406,
-    templateFields: [
-      { field_name: 'Character',      field_type: 'text',   is_required: true  },
-      { field_name: 'Season',         field_type: 'text',   is_required: false },
-      { field_name: 'Transformation', field_type: 'text',   is_required: false },
-      { field_name: 'Rarity',         field_type: 'select', is_required: true  },
-      { field_name: 'Card Number',    field_type: 'text',   is_required: true  },
-    ],
-    sampleCards: [
-      { name: 'Bloom Believix',  attributes: { Character: 'Bloom', Season: 'Season 4', Transformation: 'Believix',  Rarity: 'Rare',       'Card Number': 'WC-001' } },
-      { name: 'Flora Enchantix', attributes: { Character: 'Flora', Season: 'Season 3', Transformation: 'Enchantix', Rarity: 'Ultra Rare', 'Card Number': 'WC-002' } },
-      { name: 'Musa Concert',    attributes: { Character: 'Musa',  Season: 'Season 2', Transformation: 'Charmix',   Rarity: 'Common',     'Card Number': 'WC-003' } },
-    ],
-  },
-  {
-    id: 'yugioh-api',
-    name: 'Yu-Gi-Oh! TCG',
-    category: 'Trading Cards',
-    cardCount: 12458,
-    templateFields: [
-      { field_name: 'Type',       field_type: 'select', is_required: true  },
-      { field_name: 'Attribute',  field_type: 'select', is_required: false },
-      { field_name: 'ATK',        field_type: 'number', is_required: false },
-      { field_name: 'DEF',        field_type: 'number', is_required: false },
-      { field_name: 'Rarity',     field_type: 'select', is_required: true  },
-      { field_name: 'Set Number', field_type: 'text',   is_required: true  },
-    ],
-    sampleCards: [],
-  },
-  {
-    id: 'pokemon-api',
-    name: 'Pokémon TCG',
-    category: 'Trading Cards',
-    cardCount: 16192,
-    templateFields: [
-      { field_name: 'Pokémon',     field_type: 'text',   is_required: true  },
-      { field_name: 'Set',         field_type: 'text',   is_required: true  },
-      { field_name: 'HP',          field_type: 'number', is_required: false },
-      { field_name: 'Rarity',      field_type: 'select', is_required: true  },
-      { field_name: 'Card Number', field_type: 'text',   is_required: true  },
-    ],
-    sampleCards: [],
-  },
-];
+// === REFACTOR3b START: import API sources from services layer ===
+import { getApiSources } from '../../services/apiSources.js';
+// === REFACTOR3b END ===
 
 // ─── CreateCollectionModal ────────────────────────────────────────────────────
 
@@ -76,37 +31,20 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   const [selectedSource, setSelectedSource] = useState(null);
   const [collectionName, setCollectionName] = useState('');
   const [nameError, setNameError] = useState('');
-  const [templateFields, setTemplateFields] = useState([
-    { id: Date.now(), field_name: '', field_type: 'text', is_required: false, order: 0 },
+
+  // === REFACTOR3a START: replace duplicated field logic with hook ===
+  const {
+    fields: templateFields,
+    errors: fieldErrors,
+    handleAdd: handleAddField,
+    handleChange: handleChangeField,
+    handleReorder: handleReorderField,
+    validate: validateFields,
+    clearErrors,
+  } = useTemplateEditor([
+    { id: `new-${Date.now()}`, field_name: '', field_type: 'text', is_required: false, order: 0, _isNew: true },
   ]);
-  const [fieldErrors, setFieldErrors] = useState({});
-
-  const handleAddField = () => {
-    const nextOrder = templateFields.length;
-    setTemplateFields(f => [
-      ...f,
-      { id: Date.now(), field_name: '', field_type: 'text', is_required: false, order: nextOrder },
-    ]);
-  };
-
-  const handleChangeField = (id, key, val) => {
-    setTemplateFields(f => f.map(field => field.id === id ? { ...field, [key]: val } : field));
-  };
-
-  const handleReorderField = (id, direction) => {
-    const sorted = [...templateFields].sort((a, b) => a.order - b.order);
-    const idx = sorted.findIndex(f => f.id === id);
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= sorted.length) return;
-    const orderA = sorted[idx].order;
-    const orderB = sorted[swapIdx].order;
-    setTemplateFields(f => f.map(field => {
-      if (field.id === sorted[idx].id) return { ...field, order: orderB };
-      if (field.id === sorted[swapIdx].id) return { ...field, order: orderA };
-      return field;
-    }));
-  };
-
+  // === REFACTOR3a END ===
 
   // ── Custom flow ─────────────────────────────────────────────────────────────
 
@@ -116,18 +54,12 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     setStep('custom-template');
   };
 
-  // === ISSUE #12 START: Template Review & Preview — validate before advancing ===
   const handleCustomTemplateNext = () => {
-    const errors = {};
-    templateFields.forEach(f => {
-      if (!f.field_name.trim()) errors[f.id] = 'Field name is required';
-    });
-    if (Object.keys(errors).length) { setFieldErrors(errors); return; }
-    if (templateFields.length === 0) { return; } // builder prevents this but safety check
-    setFieldErrors({});
+    if (!validateFields()) return;
+    if (templateFields.length === 0) return;
+    clearErrors();
     setStep('custom-review');
   };
-  // === ISSUE #12 END: Template Review & Preview ===
 
   const handleCustomConfirm = () => {
     const { collection, errors: cErrors } = createCollection({
@@ -137,9 +69,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     });
     if (!collection) { console.error('Collection creation failed:', cErrors); return; }
 
-
     const fields = templateFields
-      .sort((a, b) => a.order - b.order)
       .map((f, idx) => createTemplateField({
         collectionId: collection.id,
         field_name: f.field_name,
@@ -173,7 +103,6 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         order: idx,
       }).field)
       .filter(Boolean);
-
 
     const cardDefs = selectedSource.sampleCards.map(c => ({
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
@@ -218,13 +147,16 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   // ── Step: API select ────────────────────────────────────────────────────────
 
   if (step === 'api-select') {
+    // === REFACTOR3b START: use getApiSources() instead of MOCK_API_SOURCES ===
+    const apiSources = getApiSources();
+    // === REFACTOR3b END ===
     return (
       <Modal title="Import Collection from API" onClose={onClose}>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
           Choose a collection to import and confirm the template.
         </p>
         <div className="api-sources-grid">
-          {MOCK_API_SOURCES.map(source => (
+          {apiSources.map(source => (
             <button
               key={source.id}
               className={`api-source-card ${selectedSource?.id === source.id ? 'selected' : ''}`}
@@ -249,10 +181,14 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   // ── Step: API confirm ───────────────────────────────────────────────────────
 
   if (step === 'api-confirm') {
-    // === ISSUE #12 START: Template Review & Preview — use TemplatePreview for API confirm ===
+    // === REFACTOR3d START: normalize preview field IDs to strings ===
     const previewFields = selectedSource.templateFields.map((f, idx) => ({
-      id: idx, collectionId: '', ...f, order: idx,
+      id: String(idx),
+      collectionId: '',
+      ...f,
+      order: idx,
     }));
+    // === REFACTOR3d END ===
     return (
       <Modal title={`Import "${selectedSource.name}"`} onClose={onClose}>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
@@ -270,7 +206,6 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         </ModalActions>
       </Modal>
     );
-    // === ISSUE #12 END: Template Review & Preview ===
   }
 
   // ── Step: Custom name ───────────────────────────────────────────────────────
@@ -311,13 +246,11 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         </ModalActions>
       </Modal>
     );
-
   }
 
   // ── Step: Custom review ─────────────────────────────────────────────────────
 
   if (step === 'custom-review') {
-    // === ISSUE #12 START: Template Review & Preview — use TemplatePreview with validation ===
     return (
       <Modal title="Review & Create" onClose={onClose}>
         <div className="review-section">
@@ -333,17 +266,12 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         </p>
         <ModalActions>
           <Button variant="ghost" onClick={() => setStep('custom-template')}>← Back</Button>
-          <Button
-            variant="primary"
-            onClick={handleCustomConfirm}
-            disabled={templateFields.length === 0}
-          >
+          <Button variant="primary" onClick={handleCustomConfirm} disabled={templateFields.length === 0}>
             Create Collection
           </Button>
         </ModalActions>
       </Modal>
     );
-    // === ISSUE #12 END: Template Review & Preview ===
   }
 
   return null;
