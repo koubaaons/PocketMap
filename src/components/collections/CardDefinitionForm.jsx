@@ -13,98 +13,30 @@
 
 // === ISSUE #14 START: Card Definition Form ===
 
-import { useState } from 'react';
 import { Button, Modal, ModalActions } from '../ui/index.jsx';
-import { createCardDefinition } from '../../types/index.js';
 
-/**
- * @param {{
- *   collection: object,
- *   templateFields: object[],
- *   initialCard?: object,        — provided in edit mode
- *   mode: 'create' | 'edit',
- *   onSubmit: (cardDef) => void,
- *   onClose: () => void,
- * }} props
- */
+// === REFACTOR4b START: use useCardDefinitionForm hook ===
+import { useCardDefinitionForm } from '../../hooks/useCardDefinitionForm.js';
+// === REFACTOR4b END ===
+
 export function CardDefinitionForm({ collection, templateFields, initialCard, mode = 'create', onSubmit, onClose }) {
   const sortedFields = [...templateFields]
     .filter(f => f.collectionId === collection.id)
     .sort((a, b) => a.order - b.order);
 
-  // Build initial form values
-  const buildInitialValues = () => {
-    const values = { name: '' };
-    sortedFields.forEach(f => {
-      const existing = initialCard?.attributes?.[f.field_name];
-      if (existing !== undefined) {
-        values[f.field_name] = existing;
-      } else {
-        // Sensible defaults per type
-        switch (f.field_type) {
-          case 'boolean': values[f.field_name] = false; break;
-          case 'number':  values[f.field_name] = ''; break;
-          default:        values[f.field_name] = '';
-        }
-      }
-    });
-    return values;
-  };
-
-  const [values, setValues] = useState(buildInitialValues);
-  const [errors, setErrors] = useState({});
-
-  const set = (key, val) => {
-    setValues(prev => ({ ...prev, [key]: val }));
-    if (errors[key]) setErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
-  };
-
-  // === ISSUE #14: Validation — required field enforcement ===
-  const validate = () => {
-    const newErrors = {};
-    if (!values.name.trim()) newErrors.name = 'Card name is required';
-    sortedFields.forEach(f => {
-      if (!f.is_required) return;
-      const val = values[f.field_name];
-      if (val === undefined || val === null || String(val).trim() === '') {
-        newErrors[f.field_name] = `${f.field_name} is required`;
-      }
-    });
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = () => {
-    if (!validate()) return;
-
-    // Build attributes from dynamic fields
-    const attributes = {};
-    sortedFields.forEach(f => {
-      attributes[f.field_name] = values[f.field_name];
-    });
-
-    if (mode === 'create') {
-      const { cardDef, errors: createErrors } = createCardDefinition({
-        collectionId: collection.id,
-        name: values.name.trim(),
-        attributes,
-      });
-      if (!cardDef) { console.error('Card creation failed:', createErrors); return; }
-      onSubmit(cardDef);
-    } else {
-      // Edit mode — merge attributes onto existing card
-      onSubmit({
-        ...initialCard,
-        name: values.name.trim(),
-        attributes,
-        updatedAt: Date.now(),
-      });
-    }
-  };
+  // === REFACTOR4b START: form logic in hook, component only renders ===
+  const { values, errors, set, handleSubmit } = useCardDefinitionForm({
+    collection,
+    sortedFields,
+    initialCard,
+    mode,
+    onSubmit,
+  });
+  // === REFACTOR4b END ===
 
   const title = mode === 'create'
     ? `Add Card to ${collection.name}`
-    : `Edit Card`;
+    : 'Edit Card';
 
   return (
     <Modal title={title} onClose={onClose}>
@@ -133,7 +65,6 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
           onChange={(val) => set(field.field_name, val)}
         />
       ))}
-      {/* === ISSUE #14 END === */}
 
       <ModalActions>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -189,5 +120,3 @@ function DynamicField({ field, value, error, onChange }) {
     </div>
   );
 }
-
-// === ISSUE #14 END: Card Definition Form ===

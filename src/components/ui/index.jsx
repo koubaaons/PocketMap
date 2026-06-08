@@ -4,7 +4,13 @@
  * These are the atomic building blocks of the app.
  * They have NO knowledge of app state — they receive everything via props.
  * This makes them fully reusable and independently testable.
+ *
+ * === REFACTOR4c START: Export PlaceholderTab ===
+ * PlaceholderTab is in its own file but re-exported from here
+ * so imports stay consistent: import { PlaceholderTab } from '../ui/index.jsx'
  */
+export { PlaceholderTab } from './PlaceholderTab.jsx';
+// === REFACTOR4c END ===
 
 import { useState, useEffect, useRef } from 'react';
 

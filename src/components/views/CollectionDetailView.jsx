@@ -14,40 +14,47 @@
 // === ISSUE #13 START: Card Definition Management — CollectionDetailView shell ===
 
 import { useState, useMemo } from 'react';
-import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
+import { Button, ConfirmModal, PlaceholderTab } from '../ui/index.jsx';
 import { CardDefinitionList } from '../collections/CardDefinitionList.jsx';
 import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
 import { applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 
+// === REFACTOR4a START: use useCardEditor hook ===
+import { useCardEditor } from '../../hooks/useCardEditor.js';
+// === REFACTOR4a END ===
+
 const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Settings'];
 
 const SORT_OPTIONS = [
-  { value: 'newest',    label: 'Newest first'  },
-  { value: 'oldest',    label: 'Oldest first'  },
-  { value: 'name_asc',  label: 'Name A → Z'    },
-  { value: 'name_desc', label: 'Name Z → A'    },
+  { value: 'newest',    label: 'Newest first' },
+  { value: 'oldest',    label: 'Oldest first' },
+  { value: 'name_asc',  label: 'Name A → Z'   },
+  { value: 'name_desc', label: 'Name Z → A'   },
 ];
 
 export function CollectionDetailView({ collection, cardDefinitions, templateFields, toast, onBack }) {
   const [activeTab, setActiveTab] = useState('Cards');
-  const [query, setQuery] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
-  const [showCreate, setShowCreate] = useState(false);
-  const [editingCard, setEditingCard] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
 
-  // Cards belonging to this collection
+  // === REFACTOR4a START: card editor state from hook ===
+  const editor = useCardEditor();
+  // === REFACTOR4a END ===
+
   const collectionCards = useMemo(
     () => cardDefinitions.filter(cd => cd.collectionId === collection.id),
     [cardDefinitions, collection.id]
   );
 
+  // === ISSUE #15: apply filter and sort ===
+  const filteredCards = useMemo(
+    () => applyCardDefinitionFilters(collectionCards, editor.query, editor.sortBy),
+    [collectionCards, editor.query, editor.sortBy]
+  );
 
   const { handleCreate, handleUpdate, handleDelete } = useCardDefinitionActions(toast, {
-    onCreateSuccess: () => setShowCreate(false),
-    onUpdateSuccess: () => setEditingCard(null),
-    onDeleteSuccess: () => setConfirmDelete(null),
+    onCreateSuccess: editor.closeCreate,
+    onUpdateSuccess: editor.closeEdit,
+    onDeleteSuccess: editor.closeDelete,
   });
 
   const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection.id);
@@ -82,103 +89,92 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
         ))}
       </div>
 
-      {/* === ISSUE #13: Cards tab — the only working tab in Milestone 4 === */}
+      {/* === ISSUE #13: Cards tab === */}
       {activeTab === 'Cards' && (
         <div className="tab-content">
-
-          {/* Toolbar */}
           <div className="card-list-toolbar">
             <div className="search-bar-wrapper" style={{ flex: 1 }}>
               <span className="search-icon">◎</span>
               <input
                 className="search-input"
                 placeholder="Search cards…"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
+                value={editor.query}
+                onChange={e => editor.setQuery(e.target.value)}
                 aria-label="Search cards"
               />
-              {query && (
-                <button className="search-clear" onClick={() => setQuery('')}>✕</button>
+              {editor.query && (
+                <button className="search-clear" onClick={editor.clearQuery}>✕</button>
               )}
             </div>
-
-            <select
-              className="sort-select"
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value)}
-              aria-label="Sort cards"
-            >
+            <select className="sort-select" value={editor.sortBy}
+              onChange={e => editor.setSortBy(e.target.value)} aria-label="Sort cards">
               {SORT_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-
-            <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-              + Add Card
-            </Button>
+            <Button variant="primary" size="sm" onClick={editor.openCreate}>+ Add Card</Button>
           </div>
 
-          {/* Card list — collection-agnostic, receives slice */}
           <CardDefinitionList
             cards={filteredCards}
             templateFields={collectionTemplateFields}
             totalCount={collectionCards.length}
-            onEdit={(card) => setEditingCard(card)}
-            onDelete={(card) => setConfirmDelete(card)}
-            emptyTitle={query ? `No results for "${query}"` : 'No cards yet'}
-            emptySubtitle={query ? 'Try a different search' : 'Add your first card to start building this collection'}
+            onEdit={editor.openEdit}
+            onDelete={editor.openDelete}
+            emptyTitle={editor.query ? `No results for "${editor.query}"` : 'No cards yet'}
+            emptySubtitle={editor.query ? 'Try a different search' : 'Add your first card to start building this collection'}
           />
         </div>
       )}
 
-      {/* Placeholder tabs — implemented in Milestone 6 */}
+      {/* === REFACTOR4c START: PlaceholderTab for unimplemented tabs === */}
       {activeTab === 'Owned' && (
-        <div className="tab-content tab-placeholder">
-          <EmptyState icon="✓" title="Owned Cards" subtitle="Coming in Milestone 6 — Ownership Tracking" />
-        </div>
+        <PlaceholderTab icon="✓" title="Owned Cards" milestone="Milestone 6 — Ownership Tracking" />
       )}
       {activeTab === 'Missing' && (
-        <div className="tab-content tab-placeholder">
-          <EmptyState icon="?" title="Missing Cards" subtitle="Coming in Milestone 6 — Ownership Tracking" />
-        </div>
+        <PlaceholderTab icon="?" title="Missing Cards" milestone="Milestone 6 — Ownership Tracking" />
       )}
       {activeTab === 'Unorganised' && (
-        <div className="tab-content tab-placeholder">
-          <EmptyState icon="◫" title="Unorganised Cards" subtitle="Coming in Milestone 6 — Binder Integration" />
-        </div>
+        <PlaceholderTab icon="◫" title="Unorganised Cards" milestone="Milestone 6 — Binder Integration" />
       )}
       {activeTab === 'Settings' && (
-        <div className="tab-content tab-placeholder">
-          <EmptyState icon="⚙" title="Collection Settings" subtitle="Coming in Milestone 6 — includes field management" />
-        </div>
+        <PlaceholderTab icon="⚙" title="Collection Settings" milestone="Milestone 6 — includes field management" />
       )}
+      {/* === REFACTOR4c END === */}
 
-      {/* === ISSUE #14: Create card form === */}
-      {showCreate && (
+      {editor.showCreate && (
         <CardDefinitionForm
           collection={collection}
           templateFields={collectionTemplateFields}
           mode="create"
           onSubmit={handleCreate}
-          onClose={() => setShowCreate(false)}
+          onClose={editor.closeCreate}
         />
       )}
 
-
+      {/* === ISSUE #16: Edit card form === */}
+      {editor.editingCard && (
+        <CardDefinitionForm
+          collection={collection}
+          templateFields={collectionTemplateFields}
+          initialCard={editor.editingCard}
+          mode="edit"
+          onSubmit={handleUpdate}
+          onClose={editor.closeEdit}
+        />
+      )}
 
       {/* Delete confirm */}
-      {confirmDelete && (
+      {editor.confirmDelete && (
         <ConfirmModal
-          title={`Delete "${confirmDelete.name}"?`}
+          title={`Delete "${editor.confirmDelete.name}"?`}
           message="This will permanently delete this card and remove it from any binder slots or inventory. This cannot be undone."
           confirmLabel="Delete Card"
-          onConfirm={() => handleDelete(confirmDelete.id, confirmDelete.name)}
-          onClose={() => setConfirmDelete(null)}
+          onConfirm={() => handleDelete(editor.confirmDelete.id, editor.confirmDelete.name)}
+          onClose={editor.closeDelete}
         />
       )}
 
     </div>
   );
 }
-
-// === ISSUE #13 END: Card Definition Management — CollectionDetailView shell ===
