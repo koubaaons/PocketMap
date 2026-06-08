@@ -1,10 +1,5 @@
 /**
  * @fileoverview Types barrel — re-exports all validators, factories, and utilities.
- *
- * To add a new entity type:
- *   1. Create its file e.g. inventory.types.js
- *   2. Add export lines here
- *   Done.
  */
 
 export { validateBinder, createBinder } from './binder.types.js';
