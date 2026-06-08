@@ -42,9 +42,8 @@ export function createCollection({ name, is_custom, import_source = null, cover_
 // === END: userId added to factory ===
 
 // ─── TemplateField ────────────────────────────────────────────────────────────
-// TemplateField belongs to a collection, not directly to a user.
-// No userId needed here — cascade delete via collection handles cleanup.
 
+// === ISSUE #13 START: Card Definition Management — add options to TemplateField ===
 export function validateTemplateField(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
@@ -53,13 +52,29 @@ export function validateTemplateField(data) {
   if (!data.field_name || typeof data.field_name !== 'string' || !data.field_name.trim()) errors.push('field_name must be a non-empty string');
   if (!['text', 'number', 'boolean', 'select'].includes(data.field_type)) errors.push('field_type must be text | number | boolean | select');
   if (typeof data.is_required !== 'boolean') errors.push('is_required must be a boolean');
-  // order determines display position — required, must be a non-negative integer
   if (!Number.isInteger(data.order) || data.order < 0) errors.push('order must be a non-negative integer');
+  // options is required for select fields — must be a non-empty array of strings
+  if (data.field_type === 'select') {
+    if (!Array.isArray(data.options) || data.options.length === 0) {
+      errors.push('options must be a non-empty array for select fields');
+    }
+  } else {
+    // non-select fields can have options as empty array or undefined
+    if (data.options !== undefined && !Array.isArray(data.options)) {
+      errors.push('options must be an array');
+    }
+  }
   return { valid: errors.length === 0, errors };
 }
 
-// order is now required — assigned at creation time based on existing field count
-export function createTemplateField({ collectionId, field_name, field_type = 'text', is_required = false, order = 0 }) {
+export function createTemplateField({
+  collectionId,
+  field_name,
+  field_type = 'text',
+  is_required = false,
+  order = 0,
+  options = [],
+}) {
   const field = {
     id: generateId(),
     collectionId,
@@ -67,21 +82,13 @@ export function createTemplateField({ collectionId, field_name, field_type = 'te
     field_type,
     is_required: Boolean(is_required),
     order: Number(order),
+    // options: array of strings for select fields, empty array for all others
+    options: Array.isArray(options) ? options.map(o => String(o).trim()).filter(Boolean) : [],
   };
   const { valid, errors } = validateTemplateField(field);
   return valid ? { field, errors: [] } : { field: null, errors };
 }
-
-// === ISSUE #11 START: Restrict To One Template Per Collection — collection-level validation ===
-/**
- * Validates that a collection does not already have template fields.
- * Used in the reducer before TEMPLATE_FIELD_BULK_ADD to enforce
- * the one-template-per-collection rule at the data layer.
- *
- * @param {string} collectionId
- * @param {object[]} existingFields - current templateFields from state
- * @returns {{ valid: boolean, error?: string }}
- */
+// === ISSUE #13 END: Card Definition Management — add options to TemplateField ===
 export function validateOneTemplatePerCollection(collectionId, existingFields) {
   const alreadyHasFields = existingFields.some(f => f.collectionId === collectionId);
   if (alreadyHasFields) {
@@ -92,7 +99,6 @@ export function validateOneTemplatePerCollection(collectionId, existingFields) {
   }
   return { valid: true };
 }
-// === ISSUE #11 END: Restrict To One Template Per Collection ===
 
 // ─── CardDefinition ───────────────────────────────────────────────────────────
 // CardDefinition belongs to a collection, not directly to a user.
