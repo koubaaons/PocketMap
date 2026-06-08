@@ -43,7 +43,7 @@ export function createCollection({ name, is_custom, import_source = null, cover_
 
 // ─── TemplateField ────────────────────────────────────────────────────────────
 
-// === ISSUE #13 START: Card Definition Management — add options to TemplateField ===
+
 export function validateTemplateField(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
@@ -88,7 +88,6 @@ export function createTemplateField({
   const { valid, errors } = validateTemplateField(field);
   return valid ? { field, errors: [] } : { field: null, errors };
 }
-// === ISSUE #13 END: Card Definition Management — add options to TemplateField ===
 export function validateOneTemplatePerCollection(collectionId, existingFields) {
   const alreadyHasFields = existingFields.some(f => f.collectionId === collectionId);
   if (alreadyHasFields) {
