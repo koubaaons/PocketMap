@@ -45,3 +45,40 @@ export function buildOwnershipMap(inventory) {
 }
 
 // === ISSUE #36 END: Mark Card As Owned ===
+
+
+// === ISSUE #38 START: Favorite Cards — favorite selectors ===
+
+/**
+ * Returns all inventory items marked as favorite,
+ * with their full card definition attached.
+ *
+ * @param {object[]} inventory
+ * @param {object[]} cardDefinitions
+ * @returns {Array<{ inventoryItem: object, cardDef: object }>}
+ */
+export function getFavoriteCards(inventory, cardDefinitions) {
+  const cardDefMap = {};
+  cardDefinitions.forEach(cd => { cardDefMap[cd.id] = cd; });
+
+  return inventory
+    .filter(inv => inv.is_favorite)
+    .map(inv => ({
+      inventoryItem: inv,
+      cardDef: cardDefMap[inv.cardDefId] ?? null,
+    }))
+    .filter(({ cardDef }) => cardDef !== null); // drop orphans
+}
+
+/**
+ * Returns true if the user has favorited this card.
+ * @param {object[]} inventory
+ * @param {string} cardDefId
+ * @returns {boolean}
+ */
+export function isFavorite(inventory, cardDefId) {
+  const item = getInventoryItem(inventory, cardDefId);
+  return item?.is_favorite ?? false;
+}
+
+// === ISSUE #38 END: Favorite Cards ===

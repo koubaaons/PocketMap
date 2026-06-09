@@ -10,16 +10,15 @@ export function CardDefinitionRow({ card, templateFields, isOwned, isFavorite, o
 
   return (
     <div className={`card-def-row ${isOwned ? 'card-owned' : 'card-not-owned'}`}>
-
-      {/* === ISSUE #36 START: Mark Card As Owned — owned indicator === */}
       <div className="card-def-ownership">
         {isOwned
           ? <span className="ownership-dot ownership-owned" title="Owned">✓</span>
           : <span className="ownership-dot ownership-missing" title="Not owned">○</span>
         }
+        {/* === ISSUE #38 START: Favorite indicator === */}
+        {isFavorite && <span className="ownership-fav" title="Favorite">★</span>}
+        {/* === ISSUE #38 END === */}
       </div>
-      {/* === ISSUE #36 END === */}
-
       <div className="card-def-info" onClick={onView} style={{ cursor: 'pointer', flex: 1 }}>
         <span className="card-def-name">{card.name}</span>
         {previewFields.length > 0 && (
