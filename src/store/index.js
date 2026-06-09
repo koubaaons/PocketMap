@@ -27,10 +27,15 @@ function createStore(reducerFn, initialState) {
     ACTIONS.CARD_ADD, ACTIONS.CARD_UPDATE, ACTIONS.CARD_DELETE,
     ACTIONS.BIN_RESTORE, ACTIONS.BIN_DELETE, ACTIONS.BIN_EMPTY,
     ACTIONS.COLLECTION_ADD, ACTIONS.COLLECTION_UPDATE, ACTIONS.COLLECTION_DELETE,
-    ACTIONS.TEMPLATE_FIELD_ADD, ACTIONS.TEMPLATE_FIELD_BULK_ADD, ACTIONS.TEMPLATE_FIELD_UPDATE,
+    ACTIONS.TEMPLATE_FIELD_ADD, ACTIONS.TEMPLATE_FIELD_BULK_ADD,
+    ACTIONS.TEMPLATE_FIELD_UPDATE, ACTIONS.TEMPLATE_FIELD_REORDER,
     ACTIONS.CARD_DEFINITION_ADD, ACTIONS.CARD_DEFINITION_BULK_ADD,
     ACTIONS.CARD_DEFINITION_UPDATE, ACTIONS.CARD_DEFINITION_DELETE,
-    ACTIONS.TEMPLATE_FIELD_REORDER,
+    // === ISSUE #35 START: Create Inventory Entity — persist inventory actions ===
+    ACTIONS.INVENTORY_ADD,
+    ACTIONS.INVENTORY_UPDATE,
+    ACTIONS.INVENTORY_DELETE,
+    // === ISSUE #35 END ===
   ]);
 
   return {
@@ -47,9 +52,7 @@ function createStore(reducerFn, initialState) {
       if (PERSISTED_ACTIONS.has(action.type)) {
         const { success } = saveState({
           version: state.version,
-          // === MILESTONE 2: persist local user ===
           user: state.user,
-          // === END: persist local user ===
           binders: state.binders,
           cards: state.cards,
           bin: state.bin,

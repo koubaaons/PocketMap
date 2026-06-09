@@ -11,7 +11,7 @@ export const ACTIONS = Object.freeze({
   BINDER_UPDATE: 'BINDER_UPDATE',
   BINDER_DELETE: 'BINDER_DELETE',
 
-  // Cards
+  // Cards (legacy binder cards — replaced in Milestone 7)
   CARD_ADD:      'CARD_ADD',
   CARD_UPDATE:   'CARD_UPDATE',
   CARD_DELETE:   'CARD_DELETE',
@@ -34,20 +34,27 @@ export const ACTIONS = Object.freeze({
   TEMPLATE_FIELD_BULK_ADD:  'TEMPLATE_FIELD_BULK_ADD',
   TEMPLATE_FIELD_UPDATE:    'TEMPLATE_FIELD_UPDATE',
 
+  // === ISSUE #10 START: Template Builder UI — reorder action ===
   TEMPLATE_FIELD_REORDER:   'TEMPLATE_FIELD_REORDER',
-
+  // === ISSUE #10 END ===
 
   // Card Definitions
   CARD_DEFINITION_ADD:      'CARD_DEFINITION_ADD',
   CARD_DEFINITION_BULK_ADD: 'CARD_DEFINITION_BULK_ADD',
   CARD_DEFINITION_UPDATE:   'CARD_DEFINITION_UPDATE',
   CARD_DEFINITION_DELETE:   'CARD_DEFINITION_DELETE',
+
+  // === ISSUE #35 START: Create Inventory Entity — action types ===
+  INVENTORY_ADD:    'INVENTORY_ADD',
+  INVENTORY_UPDATE: 'INVENTORY_UPDATE',
+  INVENTORY_DELETE: 'INVENTORY_DELETE',
+  // === ISSUE #35 END ===
 });
 
 export function reducer(state, action) {
   switch (action.type) {
 
-    // ── Binders ──────────────────────────────────────────────────────────────
+    // ── Binders ───────────────────────────────────────────────────────────────
 
     case ACTIONS.BINDER_ADD:
       return { ...state, binders: [...state.binders, action.payload] };
@@ -75,7 +82,7 @@ export function reducer(state, action) {
       };
     }
 
-    // ── Cards ─────────────────────────────────────────────────────────────────
+    // ── Cards (legacy) ────────────────────────────────────────────────────────
 
     case ACTIONS.CARD_ADD:
       return { ...state, cards: [...state.cards, action.payload] };
@@ -166,31 +173,21 @@ export function reducer(state, action) {
     // ── Template Fields ───────────────────────────────────────────────────────
 
     case ACTIONS.TEMPLATE_FIELD_ADD:
-      return {
-        ...state,
-        templateFields: [...state.templateFields, action.payload],
-      };
+      return { ...state, templateFields: [...state.templateFields, action.payload] };
 
-    // === ISSUE #11 START: Restrict To One Template Per Collection — enforce in reducer ===
     case ACTIONS.TEMPLATE_FIELD_BULK_ADD: {
-      // payload is an array of template fields, all sharing the same collectionId
       const collectionId = action.payload[0]?.collectionId;
       if (!collectionId) {
-        console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD: missing collectionId in payload');
+        console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD: missing collectionId');
         return state;
       }
       const { valid, error } = validateOneTemplatePerCollection(collectionId, state.templateFields);
       if (!valid) {
-        // Reject silently — the UI should never allow this but we protect at the data layer
         console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD rejected:', error);
         return state;
       }
-      return {
-        ...state,
-        templateFields: [...state.templateFields, ...action.payload],
-      };
+      return { ...state, templateFields: [...state.templateFields, ...action.payload] };
     }
-    // === ISSUE #11 END: Restrict To One Template Per Collection ===
 
     case ACTIONS.TEMPLATE_FIELD_UPDATE:
       return {
@@ -201,24 +198,16 @@ export function reducer(state, action) {
       };
 
     case ACTIONS.TEMPLATE_FIELD_REORDER: {
-      // payload: { collectionId, fieldId, direction: 'up' | 'down' }
       const { collectionId, fieldId, direction } = action.payload;
-
-      // Get only this collection's fields sorted by order
       const collectionFields = state.templateFields
         .filter(f => f.collectionId === collectionId)
         .sort((a, b) => a.order - b.order);
-
       const idx = collectionFields.findIndex(f => f.id === fieldId);
       if (idx === -1) return state;
-
       const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
       if (swapIdx < 0 || swapIdx >= collectionFields.length) return state;
-
-      // Swap order values between the two fields
       const fieldA = collectionFields[idx];
       const fieldB = collectionFields[swapIdx];
-
       return {
         ...state,
         templateFields: state.templateFields.map(f => {
@@ -228,7 +217,6 @@ export function reducer(state, action) {
         }),
       };
     }
-
 
     // ── Card Definitions ──────────────────────────────────────────────────────
 
@@ -252,10 +240,41 @@ export function reducer(state, action) {
       const { cardDefId } = action.payload;
       return {
         ...state,
+        // === ISSUE #35 START: cascade delete inventory on card definition delete ===
         inventory: state.inventory.filter(inv => inv.cardDefId !== cardDefId),
+        // === ISSUE #35 END ===
         cardDefinitions: state.cardDefinitions.filter(cd => cd.id !== cardDefId),
       };
     }
+
+    // === ISSUE #35 START: Create Inventory Entity — reducer cases ===
+
+    case ACTIONS.INVENTORY_ADD:
+      // Guard: prevent duplicate inventory entries for the same card
+      if (state.inventory.some(inv => inv.cardDefId === action.payload.cardDefId)) {
+        console.warn('[BinderVault] INVENTORY_ADD: card already owned', action.payload.cardDefId);
+        return state;
+      }
+      return { ...state, inventory: [...state.inventory, action.payload] };
+
+    case ACTIONS.INVENTORY_UPDATE:
+      return {
+        ...state,
+        inventory: state.inventory.map(inv =>
+          inv.id === action.payload.id
+            ? { ...inv, ...action.payload, updatedAt: Date.now() }
+            : inv
+        ),
+      };
+
+    case ACTIONS.INVENTORY_DELETE:
+      // Deleting inventory = removing ownership
+      return {
+        ...state,
+        inventory: state.inventory.filter(inv => inv.id !== action.payload.inventoryId),
+      };
+
+    // === ISSUE #35 END: Create Inventory Entity ===
 
     default:
       console.warn('[BinderVault] Unknown action type:', action.type);
