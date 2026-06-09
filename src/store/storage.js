@@ -6,24 +6,19 @@
 import {
   validateBinder, validateCard, validateBinItem,
   validateCollection, validateTemplateField, validateCardDefinition,
+  validateInventoryItem,
 } from '../types/index.js';
 
 const STORAGE_KEY = 'bindervault';
 const SCHEMA_VERSION = 1;
 
-// ─── Default state shape ──────────────────────────────────────────────────────
-
 const DEFAULT_STATE = {
   version: SCHEMA_VERSION,
-
-  // === MILESTONE 2: Local user — replaced with real auth in Milestone 9 ===
   user: {
     id: 'local-user-1',
     username: 'Collector',
     createdAt: Date.now(),
   },
-  // === END: Local user ===
-
   binders: [],
   cards: [],
   bin: [],
@@ -32,9 +27,6 @@ const DEFAULT_STATE = {
   cardDefinitions: [],
   inventory: [],
 };
-
-// ─── Migration registry ───────────────────────────────────────────────────────
-// Add a function here for each version bump.
 
 const MIGRATIONS = {
   // 2: (state) => ({ ...state, newField: defaultValue, version: 2 }),
@@ -51,14 +43,10 @@ function applyMigrations(state) {
   return current;
 }
 
-// ─── Sanitize loaded data ─────────────────────────────────────────────────────
-
 function sanitizeState(raw) {
-  // === MILESTONE 2: Restore user or fall back to default local user ===
   const user = (raw.user && raw.user.id && raw.user.username)
     ? raw.user
     : DEFAULT_STATE.user;
-  // === END: Restore user ===
 
   const binders = (raw.binders ?? []).filter(b => {
     const { valid, errors } = validateBinder(b);
@@ -105,11 +93,18 @@ function sanitizeState(raw) {
 
   const cardDefIds = new Set(cardDefinitions.map(cd => cd.id));
 
+  // === ISSUE #35 START: Create Inventory Entity — sanitize inventory on load ===
   const inventory = (raw.inventory ?? []).filter(inv => {
-    if (!inv.id || !inv.cardDefId) { console.warn('[BinderVault] Dropping corrupt inventory item:', inv); return false; }
-    if (!cardDefIds.has(inv.cardDefId)) { console.warn('[BinderVault] Dropping orphan inventory item:', inv.id); return false; }
+    const { valid, errors } = validateInventoryItem(inv);
+    if (!valid) { console.warn('[BinderVault] Dropping corrupt inventory item:', errors, inv); return false; }
+    // Drop orphans whose card definition no longer exists
+    if (!cardDefIds.has(inv.cardDefId)) {
+      console.warn('[BinderVault] Dropping orphan inventory item (no card def):', inv.id);
+      return false;
+    }
     return true;
   });
+  // === ISSUE #35 END ===
 
   return {
     ...raw,
@@ -123,8 +118,6 @@ function sanitizeState(raw) {
     inventory,
   };
 }
-
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 export function loadState() {
   try {
