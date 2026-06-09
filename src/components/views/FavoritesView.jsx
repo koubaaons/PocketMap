@@ -1,79 +1,64 @@
-import { useState, useMemo } from 'react';
+// === ISSUE #38 START: Favorite Cards — FavoritesView reads from inventory ===
+
+import { useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
-import { EditCardModal, CardDetailModal } from '../modals/index.js';
-import { ACTIONS } from '../../store/index.js';
-import { useDispatch } from '../../hooks/useStore.js';
+import { getFavoriteCards } from '../../selectors/inventorySelectors.js';
 
-export function FavoritesView({ cards, binders, toast }) {
-  const dispatch = useDispatch();
-  const [activeCard, setActiveCard] = useState(null);
-  const [editing, setEditing] = useState(false);
+/**
+ * FavoritesView now reads favorites from inventory (is_favorite flag)
+ * rather than from legacy binder cards.
+ *
+ * A card is a favorite when its USER_INVENTORY record has is_favorite = true.
+ */
+export function FavoritesView({ inventory, cardDefinitions, collections, toast }) {
+  const favorites = useMemo(
+    () => getFavoriteCards(inventory, cardDefinitions),
+    [inventory, cardDefinitions]
+  );
 
-  const binderMap = useMemo(() => {
+  const collectionMap = useMemo(() => {
     const map = {};
-    binders.forEach(b => map[b.id] = b);
+    collections.forEach(c => { map[c.id] = c; });
     return map;
-  }, [binders]);
-
-  const favorites = useMemo(() => cards.filter(c => c.favorite), [cards]);
-
-  const handleToggleFav = (card) => {
-    const updated = { ...card, favorite: false };
-    dispatch({ type: ACTIONS.CARD_UPDATE, payload: updated });
-    toast('Removed from favorites');
-    setActiveCard(null);
-  };
-
-  const handleDelete = (cardId) => {
-    dispatch({ type: ACTIONS.CARD_DELETE, payload: { cardId } });
-    toast('Card moved to trash');
-    setActiveCard(null);
-  };
-
-  const handleUpdate = (updated) => {
-    dispatch({ type: ACTIONS.CARD_UPDATE, payload: updated });
-    toast('Card updated');
-    setEditing(false);
-    setActiveCard(updated);
-  };
+  }, [collections]);
 
   if (favorites.length === 0) {
     return (
       <div className="view">
-        <EmptyState icon="★" title="No favorites yet" subtitle="Open any card and mark it as a favorite" />
+        <EmptyState
+          icon="★"
+          title="No favorites yet"
+          subtitle="Open any card you own and mark it as a favorite"
+        />
       </div>
     );
   }
 
   return (
     <div className="view">
-      <p className="search-count">{favorites.length} favorite{favorites.length !== 1 ? 's' : ''}</p>
+      <p className="search-count">
+        {favorites.length} favorite{favorites.length !== 1 ? 's' : ''}
+      </p>
       <div className="results-list">
-        {favorites.map(card => {
-          const b = binderMap[card.binderId];
+        {favorites.map(({ inventoryItem, cardDef }) => {
+          const collection = collectionMap[cardDef.collectionId];
           return (
-            <button key={card.id} className="result-row" onClick={() => setActiveCard(card)}>
+            <div key={inventoryItem.id} className="result-row">
               <div className="result-info">
-                <span className="result-name">★ {card.name}</span>
+                <span className="result-name">★ {cardDef.name}</span>
                 <span className="result-meta">
-                  {card.character && <><strong>{card.character}</strong> · </>}
-                  {card.series && <span className="result-series">{card.series} · </span>}
-                  {b?.name ?? '—'} · Page {card.page} · Slot {card.slot}
+                  {collection?.name ?? '—'}
+                  {inventoryItem.condition_rating && (
+                    <> · {inventoryItem.condition_rating.replace('_', ' ')}</>
+                  )}
                 </span>
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
-
-      {activeCard && !editing && (
-        <CardDetailModal card={activeCard} binderName={binderMap[activeCard.binderId]?.name ?? '—'}
-          onEdit={() => setEditing(true)} onDelete={() => handleDelete(activeCard.id)}
-          onToggleFavorite={() => handleToggleFav(activeCard)} onClose={() => setActiveCard(null)} />
-      )}
-      {activeCard && editing && (
-        <EditCardModal card={activeCard} onSubmit={handleUpdate} onClose={() => setEditing(false)} />
-      )}
     </div>
   );
 }
+
+// === ISSUE #38 END: Favorite Cards ===

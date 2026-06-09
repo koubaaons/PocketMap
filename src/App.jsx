@@ -87,6 +87,17 @@ export default function App() {
         return <SearchView cards={cards} binders={binders} toast={toast}
           onNavigateToBinder={(id) => navigate('binder', id)} />;
 
+      // === ISSUE #38 START: pass inventory and collections to FavoritesView ===
+      case 'favorites':
+        return (
+          <FavoritesView
+            inventory={inventory}
+            cardDefinitions={cardDefinitions}
+            collections={collections}
+            toast={toast}
+          />
+        );
+      // === ISSUE #38 END ===
 
       case 'bin':
         return <BinView bin={bin} binders={binders} toast={toast} />;

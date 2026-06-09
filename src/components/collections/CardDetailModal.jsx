@@ -47,8 +47,6 @@ export function CardDetailModal({
   const sortedFields = [...templateFields]
     .filter(f => f.collectionId === card.collectionId)
     .sort((a, b) => a.order - b.order);
-
-  // === ISSUE #37: Show AcquisitionForm ===
   if (showAcquisition && inventoryItem) {
     return (
       <AcquisitionForm
@@ -94,6 +92,7 @@ export function CardDetailModal({
         ) : (
           <span className="status-badge status-not-owned">Not owned</span>
         )}
+        {/* === ISSUE #38 START: Favorite indicator === */}
         {isOwned && (
           <button
             className={`fav-toggle ${inventoryItem.is_favorite ? 'fav-active' : ''}`}
@@ -103,6 +102,7 @@ export function CardDetailModal({
             {inventoryItem.is_favorite ? '★' : '☆'}
           </button>
         )}
+        {/* === ISSUE #38 END === */}
       </div>
 
       {/* Card attributes from template */}
@@ -122,8 +122,6 @@ export function CardDetailModal({
           }).filter(Boolean)}
         </div>
       )}
-
-      {/* === ISSUE #37: Acquisition details if owned === */}
       {isOwned && (
         <div className="acquisition-summary">
           {inventoryItem.condition_rating && (
@@ -193,4 +191,3 @@ export function CardDetailModal({
     </Modal>
   );
 }
-

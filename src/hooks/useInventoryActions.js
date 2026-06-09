@@ -44,8 +44,6 @@ export function useInventoryActions(toast, callbacks = {}) {
     toast('Ownership removed');
     callbacks.onUnownSuccess?.();
   }, [dispatch, toast, callbacks.onUnownSuccess]);
-
-  // === ISSUE #37 START: Acquisition Information — update handler ===
   /**
    * Updates acquisition information on an owned card.
    * @param {object} updatedItem - partial inventory item with id
@@ -54,7 +52,20 @@ export function useInventoryActions(toast, callbacks = {}) {
     dispatch({ type: ACTIONS.INVENTORY_UPDATE, payload: updatedItem });
     toast('Card details updated');
   }, [dispatch, toast]);
-  // === ISSUE #37 END ===
+
+  // === ISSUE #38 START: Favorite Cards — toggle favorite ===
+  /**
+   * Toggles the is_favorite flag on an inventory item.
+   * @param {object} inventoryItem
+   */
+  const handleToggleFavorite = useCallback((inventoryItem) => {
+    dispatch({
+      type: ACTIONS.INVENTORY_UPDATE,
+      payload: { ...inventoryItem, is_favorite: !inventoryItem.is_favorite },
+    });
+    toast(inventoryItem.is_favorite ? 'Removed from favorites' : 'Added to favorites');
+  }, [dispatch, toast]);
+  // === ISSUE #38 END ===
 
   return {
     handleOwn,
