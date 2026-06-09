@@ -7,9 +7,6 @@
  * - Update acquisition info (condition, notes, tradeable, sellable)
  * - Toggle favorite
  */
-
-// === ISSUE #36 START: Mark Card As Owned — useInventoryActions hook ===
-
 import { useCallback } from 'react';
 import { useDispatch } from './useStore.js';
 import { ACTIONS } from '../store/index.js';
@@ -48,6 +45,17 @@ export function useInventoryActions(toast, callbacks = {}) {
     callbacks.onUnownSuccess?.();
   }, [dispatch, toast, callbacks.onUnownSuccess]);
 
+  // === ISSUE #37 START: Acquisition Information — update handler ===
+  /**
+   * Updates acquisition information on an owned card.
+   * @param {object} updatedItem - partial inventory item with id
+   */
+  const handleUpdateAcquisition = useCallback((updatedItem) => {
+    dispatch({ type: ACTIONS.INVENTORY_UPDATE, payload: updatedItem });
+    toast('Card details updated');
+  }, [dispatch, toast]);
+  // === ISSUE #37 END ===
+
   return {
     handleOwn,
     handleUnown,
@@ -55,5 +63,3 @@ export function useInventoryActions(toast, callbacks = {}) {
     handleToggleFavorite,
   };
 }
-
-// === ISSUE #36 END: Mark Card As Owned ===
