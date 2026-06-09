@@ -39,6 +39,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     handleAdd: handleAddField,
     handleChange: handleChangeField,
     handleReorder: handleReorderField,
+    handleRemove,
     validate: validateFields,
     clearErrors,
   } = useTemplateEditor([
@@ -239,6 +240,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
           onChange={handleChangeField}
           onAdd={handleAddField}
           onReorder={handleReorderField}
+          onRemove={handleRemove}
         />
         <ModalActions>
           <Button variant="ghost" onClick={() => setStep('custom-name')}>← Back</Button>

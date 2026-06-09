@@ -2,6 +2,8 @@
  * @fileoverview TemplateBuilder — reusable field builder component.
  */
 
+// === ISSUE #10 START: Template Builder UI ===
+
 const FIELD_TYPES = [
   { value: 'text',    label: 'Text'     },
   { value: 'number',  label: 'Number'   },
@@ -42,9 +44,7 @@ export function TemplateBuilder({ fields, errors = {}, onChange, onAdd, onReorde
 }
 
 function TemplateBuilderRow({ field, error, isFirst, isLast, onChange, onReorder, onRemove, readOnly }) {
-  // === ISSUE #13 START: Card Definition Management — cancel button for new fields ===
   const isNew = field.id.startsWith('new-');
-  // === ISSUE #13 END ===
 
   return (
     <div className={`template-field-row ${error ? 'has-error' : ''}`}>
@@ -81,24 +81,27 @@ function TemplateBuilderRow({ field, error, isFirst, isLast, onChange, onReorder
         ))}
       </select>
 
-      {/* === ISSUE #13 START: Card Definition Management — options input for select fields === */}
+      {/* === ISSUE #13 START: options input for select fields ===
+          Uses defaultValue + onBlur so user can type commas freely.
+          Only parses into array when user clicks away. === */}
       {field.field_type === 'select' && !readOnly && (
         <input
           className="field-options-input"
           placeholder="Options: e.g. Common, Rare, Ultra Rare"
-          value={Array.isArray(field.options) ? field.options.join(', ') : ''}
-          onChange={e => {
-            const parsed = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-            onChange(field.id, 'options', parsed);
-          }}
+          defaultValue={Array.isArray(field.options) ? field.options.join(', ') : ''}
+          onBlur={e => onChange(
+            field.id,
+            'options',
+            e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+          )}
           aria-label="Dropdown options (comma-separated)"
-          title="Enter options separated by commas"
+          title="Enter options separated by commas. Click away to save."
         />
       )}
       {field.field_type === 'select' && readOnly && field.options?.length > 0 && (
         <span className="field-options-readonly">{field.options.join(', ')}</span>
       )}
-      {/* === ISSUE #13 END: Card Definition Management — options input === */}
+      {/* === ISSUE #13 END === */}
 
       <label className="field-required-label" title="Mark as required">
         <input type="checkbox" checked={field.is_required}
@@ -107,7 +110,7 @@ function TemplateBuilderRow({ field, error, isFirst, isLast, onChange, onReorder
         <span className="field-required-text">Required</span>
       </label>
 
-      {/* === ISSUE #13 START: Card Definition Management — remove button for new fields === */}
+      {/* === ISSUE #13 START: remove button for new unsaved fields === */}
       {!readOnly && isNew && onRemove && (
         <button
           className="field-remove-btn"
@@ -118,8 +121,10 @@ function TemplateBuilderRow({ field, error, isFirst, isLast, onChange, onReorder
           ✕
         </button>
       )}
-      {/* === ISSUE #13 END: Card Definition Management — remove button === */}
+      {/* === ISSUE #13 END === */}
 
     </div>
   );
 }
+
+// === ISSUE #10 END: Template Builder UI ===
