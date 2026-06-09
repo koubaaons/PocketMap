@@ -1,30 +1,26 @@
 /**
  * @fileoverview CardDefinitionRow — renders a single card definition in the list.
- *
- * Receives pre-computed data via props. No state, no dispatch.
- * Shows card name, key attributes, and an actions menu.
+ * Receives pre-computed ownership state via props. No dispatch.
  */
-
-// === ISSUE #15 START: Card Definitions List — CardDefinitionRow ===
-
-/**
- * @param {{
- *   card: object,
- *   templateFields: object[],
- *   onEdit: () => void,
- *   onDelete: () => void,
- * }} props
- */
-export function CardDefinitionRow({ card, templateFields, onEdit, onDelete }) {
-  // Show the first 3 attributes as preview values
+export function CardDefinitionRow({ card, templateFields, isOwned, isFavorite, onView, onEdit, onDelete }) {
   const previewFields = templateFields
     .filter(f => f.collectionId === card.collectionId)
     .sort((a, b) => a.order - b.order)
     .slice(0, 3);
 
   return (
-    <div className="card-def-row">
-      <div className="card-def-info">
+    <div className={`card-def-row ${isOwned ? 'card-owned' : 'card-not-owned'}`}>
+
+      {/* === ISSUE #36 START: Mark Card As Owned — owned indicator === */}
+      <div className="card-def-ownership">
+        {isOwned
+          ? <span className="ownership-dot ownership-owned" title="Owned">✓</span>
+          : <span className="ownership-dot ownership-missing" title="Not owned">○</span>
+        }
+      </div>
+      {/* === ISSUE #36 END === */}
+
+      <div className="card-def-info" onClick={onView} style={{ cursor: 'pointer', flex: 1 }}>
         <span className="card-def-name">{card.name}</span>
         {previewFields.length > 0 && (
           <span className="card-def-attrs">
@@ -41,16 +37,11 @@ export function CardDefinitionRow({ card, templateFields, onEdit, onDelete }) {
           </span>
         )}
       </div>
+
       <div className="card-def-actions">
-        <button className="card-action-btn" onClick={onEdit} aria-label={`Edit ${card.name}`}>
-          Edit
-        </button>
-        <button className="card-action-btn card-action-danger" onClick={onDelete} aria-label={`Delete ${card.name}`}>
-          Delete
-        </button>
+        <button className="card-action-btn" onClick={onEdit} aria-label={`Edit ${card.name}`}>Edit</button>
+        <button className="card-action-btn card-action-danger" onClick={onDelete} aria-label={`Delete ${card.name}`}>Delete</button>
       </div>
     </div>
   );
 }
-
-// === ISSUE #15 END: Card Definitions List — CardDefinitionRow ===

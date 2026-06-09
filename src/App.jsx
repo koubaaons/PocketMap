@@ -9,28 +9,28 @@ import { ACTIONS } from './store/index.js';
 import { Sidebar } from './components/Sidebar.jsx';
 import { ToastContainer, Button } from './components/ui/index.jsx';
 import { AddCardModal } from './components/modals/index.js';
+
 import { HomeView } from './components/views/HomeView.jsx';
 import { BinderView } from './components/views/BinderView.jsx';
 import { SearchView } from './components/views/SearchView.jsx';
-import { FavoritesView } from './components/views/FavoritesView.jsx';
 import { BinView } from './components/views/BinView.jsx';
 import { CollectionsView } from './components/views/CollectionsView.jsx';
 import { AccountView } from './components/views/AccountView.jsx';
-// === ISSUE #13 START: Card Definition Management — import CollectionDetailView ===
 import { CollectionDetailView } from './components/views/CollectionDetailView.jsx';
-// === ISSUE #13 END ===
 
+// === ISSUE #38 START: Favorite Cards — updated FavoritesView reads from inventory ===
+import { FavoritesView } from './components/views/FavoritesView.jsx';
+// === ISSUE #38 END ===
 
 const VIEW_TITLES = {
   home:        'Home',
   collections: 'Collections',
-  collection:  '', // title set by CollectionDetailView header
+  collection:  '',
   search:      'Search Cards',
   favorites:   'Favorites',
   bin:         'Trash Bin',
   account:     'Account',
 };
-
 
 export default function App() {
   const dispatch = useDispatch();
@@ -43,7 +43,9 @@ export default function App() {
   const collections     = useStore(s => s.collections);
   const cardDefinitions = useStore(s => s.cardDefinitions);
   const templateFields  = useStore(s => s.templateFields);
+  // === ISSUE #36 START: read inventory from store ===
   const inventory       = useStore(s => s.inventory);
+  // === ISSUE #36 END ===
 
   const navigate = useCallback((view, id = null) => {
     dispatch({
@@ -57,10 +59,8 @@ export default function App() {
     });
   }, [dispatch]);
 
-  const currentBinder    = binders.find(b => b.id === nav.currentBinderId) ?? null;
-  // === ISSUE #13 START: Card Definition Management — resolve current collection ===
+  const currentBinder     = binders.find(b => b.id === nav.currentBinderId) ?? null;
   const currentCollection = collections.find(c => c.id === nav.currentCollectionId) ?? null;
-  // === ISSUE #13 END ===
 
   const pageTitle = nav.currentView === 'binder'
     ? (currentBinder?.name ?? 'Binder')
@@ -84,26 +84,19 @@ export default function App() {
         );
 
       case 'search':
-        return <SearchView cards={cards} binders={binders} toast={toast} onNavigateToBinder={(id) => navigate('binder', id)} />;
+        return <SearchView cards={cards} binders={binders} toast={toast}
+          onNavigateToBinder={(id) => navigate('binder', id)} />;
 
-      case 'favorites':
-        return <FavoritesView cards={cards} binders={binders} toast={toast} />;
 
       case 'bin':
         return <BinView bin={bin} binders={binders} toast={toast} />;
 
       case 'collections':
         return (
-          <CollectionsView
-            collections={collections}
-            cardDefinitions={cardDefinitions}
-            inventory={inventory}
-            toast={toast}
-            onNavigate={navigate}
-          />
+          <CollectionsView collections={collections} cardDefinitions={cardDefinitions}
+            inventory={inventory} toast={toast} onNavigate={navigate} />
         );
 
-      // === ISSUE #13 START: Card Definition Management — collection detail route ===
       case 'collection':
         if (!currentCollection) { navigate('collections'); return null; }
         return (
@@ -111,11 +104,13 @@ export default function App() {
             collection={currentCollection}
             cardDefinitions={cardDefinitions}
             templateFields={templateFields}
+            // === ISSUE #36 START: pass inventory to CollectionDetailView ===
+            inventory={inventory}
+            // === ISSUE #36 END ===
             toast={toast}
             onBack={() => navigate('collections')}
           />
         );
-      // === ISSUE #13 END ===
 
       case 'account':
         return <AccountView toast={toast} />;
