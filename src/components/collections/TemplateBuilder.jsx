@@ -4,6 +4,8 @@
 
 // === ISSUE #10 START: Template Builder UI ===
 
+import { useState } from 'react';
+
 const FIELD_TYPES = [
   { value: 'text',    label: 'Text'     },
   { value: 'number',  label: 'Number'   },
@@ -81,21 +83,11 @@ function TemplateBuilderRow({ field, error, isFirst, isLast, onChange, onReorder
         ))}
       </select>
 
-      {/* === ISSUE #13 START: options input for select fields ===
-          Uses defaultValue + onBlur so user can type commas freely.
-          Only parses into array when user clicks away. === */}
+      {/* === ISSUE #13 START: options input for select fields === */}
       {field.field_type === 'select' && !readOnly && (
-        <input
-          className="field-options-input"
-          placeholder="Options: e.g. Common, Rare, Ultra Rare"
-          defaultValue={Array.isArray(field.options) ? field.options.join(', ') : ''}
-          onBlur={e => onChange(
-            field.id,
-            'options',
-            e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-          )}
-          aria-label="Dropdown options (comma-separated)"
-          title="Enter options separated by commas. Click away to save."
+        <OptionsInput
+          options={field.options}
+          onChange={opts => onChange(field.id, 'options', opts)}
         />
       )}
       {field.field_type === 'select' && readOnly && field.options?.length > 0 && (
@@ -110,20 +102,41 @@ function TemplateBuilderRow({ field, error, isFirst, isLast, onChange, onReorder
         <span className="field-required-text">Required</span>
       </label>
 
-      {/* === ISSUE #13 START: remove button for new unsaved fields === */}
       {!readOnly && isNew && onRemove && (
-        <button
-          className="field-remove-btn"
-          onClick={() => onRemove(field.id)}
-          title="Remove field"
-          aria-label="Remove field"
-        >
-          ✕
-        </button>
+        <button className="field-remove-btn" onClick={() => onRemove(field.id)}
+          title="Remove field" aria-label="Remove field">✕</button>
       )}
-      {/* === ISSUE #13 END === */}
 
     </div>
+  );
+}
+
+/**
+ * OptionsInput — local string state so commas can be typed freely.
+ * Saves on every keystroke so clicking Next never loses data.
+ * Initialises from existing options prop for edit mode.
+ */
+function OptionsInput({ options, onChange }) {
+  const [raw, setRaw] = useState(
+    Array.isArray(options) && options.length > 0 ? options.join(', ') : ''
+  );
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setRaw(val);
+    // Parse and save on every keystroke — clicking Next won't lose data
+    onChange(val.split(',').map(s => s.trim()).filter(Boolean));
+  };
+
+  return (
+    <input
+      className="field-options-input"
+      placeholder="Options: e.g. Common, Rare, Ultra Rare"
+      value={raw}
+      onChange={handleChange}
+      aria-label="Dropdown options (comma-separated)"
+      title="Enter options separated by commas."
+    />
   );
 }
 
