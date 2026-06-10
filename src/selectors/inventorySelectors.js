@@ -8,6 +8,9 @@
  *   Owned     = USER_INVENTORY record exists for this cardDefId
  *   Not owned = no record
  */
+
+// === ISSUE #36 START: Mark Card As Owned — ownership selectors ===
+
 export function isOwned(inventory, cardDefId) {
   return inventory.some(inv => inv.cardDefId === cardDefId);
 }
@@ -21,6 +24,11 @@ export function buildOwnershipMap(inventory) {
   inventory.forEach(inv => { map[inv.cardDefId] = inv; });
   return map;
 }
+
+// === ISSUE #36 END: Mark Card As Owned ===
+
+// === ISSUE #38 START: Favorite Cards — favorite selectors ===
+
 export function getFavoriteCards(inventory, cardDefinitions) {
   const cardDefMap = {};
   cardDefinitions.forEach(cd => { cardDefMap[cd.id] = cd; });
@@ -35,7 +43,7 @@ export function isFavorite(inventory, cardDefId) {
   return item?.is_favorite ?? false;
 }
 
-
+// === ISSUE #38 END: Favorite Cards ===
 
 // === ISSUE #45 START: Collection Tabs — Owned & Missing — tab selectors ===
 
@@ -60,3 +68,24 @@ export function getMissingCards(cards, ownershipMap) {
 }
 
 // === ISSUE #45 END: Collection Tabs — Owned & Missing ===
+
+// === ISSUE #46 START: Collection Tab — Unorganised ===
+
+/**
+ * Returns owned cards that are not yet placed in a binder slot.
+ * Until Milestone 7 (binder slots), all owned cards are considered unorganised.
+ * After Milestone 7, filter by: owned AND no BINDER_SLOT record.
+ *
+ * @param {object[]} cards
+ * @param {Record<string, object>} ownershipMap
+ * @param {string[]} organisedCardDefIds - card def IDs that have binder slots (empty until M7)
+ * @returns {object[]}
+ */
+export function getUnorganisedCards(cards, ownershipMap, organisedCardDefIds = []) {
+  const organisedSet = new Set(organisedCardDefIds);
+  return cards.filter(card =>
+    ownershipMap[card.id] !== undefined && !organisedSet.has(card.id)
+  );
+}
+
+// === ISSUE #46 END: Collection Tab — Unorganised ===

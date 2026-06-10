@@ -50,7 +50,6 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
     [inventory]
   );
 
- 
   // All Cards tab
   const filteredCards = useMemo(
     () => applyCardDefinitionFilters(collectionCards, editor.query, editor.sortBy),
@@ -69,6 +68,12 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
   );
   // === ISSUE #45 END ===
 
+  // === ISSUE #46 START: Unorganised filtered slice ===
+  const unorganisedCards = useMemo(
+    () => applyCardDefinitionFilters(getUnorganisedCards(collectionCards, ownershipMap), unorganisedQuery, unorganisedSort),
+    [collectionCards, ownershipMap, unorganisedQuery, unorganisedSort]
+  );
+  // === ISSUE #46 END ===
 
   const { handleCreate, handleUpdate, handleDelete } = useCardDefinitionActions(toast, {
     onCreateSuccess: editor.closeCreate,
@@ -118,6 +123,7 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
           </span>
         </div>
       </div>
+
 
       {/* Tab navigation with live counts */}
       <div className="collection-tabs">
@@ -195,6 +201,26 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
         </div>
       )}
       {/* === ISSUE #45 END: Missing tab === */}
+
+      {/* === ISSUE #46 START: Unorganised tab === */}
+      {activeTab === 'Unorganised' && (
+        <div className="tab-content">
+          {renderToolbar(unorganisedQuery, setUnorganisedQuery, unorganisedSort, setUnorganisedSort)}
+          <CardDefinitionList
+            cards={unorganisedCards}
+            templateFields={collectionTemplateFields}
+            ownershipMap={ownershipMap}
+            totalCount={summary.unorganised}
+            onView={ownership.openDetail}
+            onEdit={editor.openEdit}
+            onDelete={editor.openDelete}
+            emptyTitle={unorganisedQuery ? `No results for "${unorganisedQuery}"` : 'No unorganised cards'}
+            emptySubtitle={unorganisedQuery ? 'Try a different search' : 'All your owned cards are in a binder'}
+          />
+        </div>
+      )}
+      {/* === ISSUE #46 END: Unorganised tab === */}
+
 
       {/* Card detail modal */}
       {ownership.viewingCard && (
