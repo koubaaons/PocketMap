@@ -5,6 +5,9 @@
  * Milestone 5: Ownership wired — own/unown, favorites, acquisition info.
  * Milestone 6: All tabs wired — Owned, Missing, Unorganised, Settings, Summary.
  */
+
+// === ISSUE #13 START: Card Definition Management — CollectionDetailView shell ===
+
 import { useState, useMemo } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { CardDefinitionList } from '../collections/CardDefinitionList.jsx';
@@ -22,6 +25,11 @@ import { useCardEditor } from '../../hooks/useCardEditor.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 import { useOwnershipEditor } from '../../hooks/useOwnershipEditor.js';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
+
+// === ISSUE #47 START: Collection Summary ===
+import { CollectionSummary } from '../collections/CollectionSummary.jsx';
+// === ISSUE #47 END ===
+
 
 const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Settings'];
 
@@ -49,6 +57,13 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
     () => buildOwnershipMap(inventory),
     [inventory]
   );
+
+  // === ISSUE #47 START: collection summary stats ===
+  const summary = useMemo(
+    () => buildCollectionSummary(collectionCards, ownershipMap),
+    [collectionCards, ownershipMap]
+  );
+  // === ISSUE #47 END ===
 
   // All Cards tab
   const filteredCards = useMemo(
@@ -124,6 +139,9 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
         </div>
       </div>
 
+      {/* === ISSUE #47 START: Collection summary shown on all tabs === */}
+      <CollectionSummary stats={summary} />
+      {/* === ISSUE #47 END === */}
 
       {/* Tab navigation with live counts */}
       <div className="collection-tabs">
