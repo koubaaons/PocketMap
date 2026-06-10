@@ -30,6 +30,9 @@ import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { CollectionSummary } from '../collections/CollectionSummary.jsx';
 // === ISSUE #47 END ===
 
+// === ISSUE #48 START: Collection Settings Tab ===
+import { TemplateManagementView } from './TemplateManagementView.jsx';
+// === ISSUE #48 END ===
 
 const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Settings'];
 
@@ -239,6 +242,17 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
       )}
       {/* === ISSUE #46 END: Unorganised tab === */}
 
+      {/* === ISSUE #48 START: Settings tab — wire TemplateManagementView === */}
+      {activeTab === 'Settings' && (
+        <div className="tab-content">
+          <TemplateManagementView
+            collection={collection}
+            templateFields={templateFields}
+            toast={toast}
+          />
+        </div>
+      )}
+      {/* === ISSUE #48 END: Settings tab === */}
 
       {/* Card detail modal */}
       {ownership.viewingCard && (
