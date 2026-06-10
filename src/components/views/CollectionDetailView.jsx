@@ -17,7 +17,11 @@ import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useCardEditor } from '../../hooks/useCardEditor.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
+
+// === REFACTOR5a START: use useOwnershipEditor hook ===
 import { useOwnershipEditor } from '../../hooks/useOwnershipEditor.js';
+// === REFACTOR5a END ===
+
 // === REFACTOR5d START: import CardDetailModal from modals folder ===
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 // === REFACTOR5d END ===
@@ -26,9 +30,12 @@ const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Settings'];
 
 export function CollectionDetailView({ collection, cardDefinitions, templateFields, inventory, toast, onBack }) {
   const [activeTab, setActiveTab] = useState('Cards');
-  const editor    = useCardEditor();
-  const ownership = useOwnershipEditor();
 
+  const editor    = useCardEditor();
+
+  // === REFACTOR5a START: ownership view state from hook ===
+  const ownership = useOwnershipEditor();
+  // === REFACTOR5a END ===
 
   const collectionCards = useMemo(
     () => cardDefinitions.filter(cd => cd.collectionId === collection.id),
@@ -40,7 +47,6 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
     () => applyCardDefinitionFilters(collectionCards, editor.query, editor.sortBy),
     [collectionCards, editor.query, editor.sortBy]
   );
-
   const ownershipMap = useMemo(
     () => buildOwnershipMap(inventory),
     [inventory]
@@ -99,12 +105,16 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
                 <button className="search-clear" onClick={editor.clearQuery}>✕</button>
               )}
             </div>
+
+            {/* === REFACTOR5e START: CARD_SORT_OPTIONS from selector === */}
             <select className="sort-select" value={editor.sortBy}
               onChange={e => editor.setSortBy(e.target.value)}>
               {CARD_SORT_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
+            {/* === REFACTOR5e END === */}
+
             <Button variant="primary" size="sm" onClick={editor.openCreate}>+ Add Card</Button>
           </div>
 
@@ -176,4 +186,3 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
     </div>
   );
 }
-
