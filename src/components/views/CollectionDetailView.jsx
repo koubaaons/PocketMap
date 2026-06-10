@@ -3,28 +3,25 @@
  *
  * Milestone 4: Cards tab implemented.
  * Milestone 5: Ownership wired — own/unown, favorites, acquisition info.
- * Other tabs are placeholders — wired in Milestone 6.
- *
- * TODO: Render TemplateManagementView inside Settings tab (Milestone 6)
+ * Milestone 6: All tabs wired — Owned, Missing, Unorganised, Settings, Summary.
  */
-import { useMemo } from 'react';
-import { useState } from 'react';
-import { Button, ConfirmModal, PlaceholderTab } from '../ui/index.jsx';
+import { useState, useMemo } from 'react';
+import { Button, ConfirmModal } from '../ui/index.jsx';
 import { CardDefinitionList } from '../collections/CardDefinitionList.jsx';
 import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
 import { applyCardDefinitionFilters, CARD_SORT_OPTIONS } from '../../selectors/cardDefinitionSelectors.js';
-import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
+import {
+  buildOwnershipMap,
+  getOwnedCards,
+  getMissingCards,
+  getUnorganisedCards,
+  buildCollectionSummary,
+} from '../../selectors/inventorySelectors.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useCardEditor } from '../../hooks/useCardEditor.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
-
-// === REFACTOR5a START: use useOwnershipEditor hook ===
 import { useOwnershipEditor } from '../../hooks/useOwnershipEditor.js';
-// === REFACTOR5a END ===
-
-// === REFACTOR5d START: import CardDetailModal from modals folder ===
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
-// === REFACTOR5d END ===
 
 const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Settings'];
 
@@ -32,25 +29,46 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
   const [activeTab, setActiveTab] = useState('Cards');
 
   const editor    = useCardEditor();
-
-  // === REFACTOR5a START: ownership view state from hook ===
   const ownership = useOwnershipEditor();
-  // === REFACTOR5a END ===
+
+  // === ISSUE #45 START: per-tab search/sort state ===
+  const [ownedQuery,        setOwnedQuery]        = useState('');
+  const [ownedSort,         setOwnedSort]          = useState('newest');
+  const [missingQuery,      setMissingQuery]       = useState('');
+  const [missingSort,       setMissingSort]        = useState('newest');
+  const [unorganisedQuery,  setUnorganisedQuery]   = useState('');
+  const [unorganisedSort,   setUnorganisedSort]    = useState('newest');
+  // === ISSUE #45 END ===
 
   const collectionCards = useMemo(
     () => cardDefinitions.filter(cd => cd.collectionId === collection.id),
     [cardDefinitions, collection.id]
   );
 
-
-  const filteredCards = useMemo(
-    () => applyCardDefinitionFilters(collectionCards, editor.query, editor.sortBy),
-    [collectionCards, editor.query, editor.sortBy]
-  );
   const ownershipMap = useMemo(
     () => buildOwnershipMap(inventory),
     [inventory]
   );
+
+ 
+  // All Cards tab
+  const filteredCards = useMemo(
+    () => applyCardDefinitionFilters(collectionCards, editor.query, editor.sortBy),
+    [collectionCards, editor.query, editor.sortBy]
+  );
+
+  // === ISSUE #45 START: Owned & Missing filtered slices ===
+  const ownedCards = useMemo(
+    () => applyCardDefinitionFilters(getOwnedCards(collectionCards, ownershipMap), ownedQuery, ownedSort),
+    [collectionCards, ownershipMap, ownedQuery, ownedSort]
+  );
+
+  const missingCards = useMemo(
+    () => applyCardDefinitionFilters(getMissingCards(collectionCards, ownershipMap), missingQuery, missingSort),
+    [collectionCards, ownershipMap, missingQuery, missingSort]
+  );
+  // === ISSUE #45 END ===
+
 
   const { handleCreate, handleUpdate, handleDelete } = useCardDefinitionActions(toast, {
     onCreateSuccess: editor.closeCreate,
@@ -66,6 +84,27 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
 
   const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection.id);
 
+  // Helper — renders a toolbar with search + sort
+  const renderToolbar = (query, setQuery, sort, setSort, showAdd = false) => (
+    <div className="card-list-toolbar">
+      <div className="search-bar-wrapper" style={{ flex: 1 }}>
+        <span className="search-icon">◎</span>
+        <input className="search-input" placeholder="Search cards…"
+          value={query} onChange={e => setQuery(e.target.value)}
+          aria-label="Search cards" />
+        {query && <button className="search-clear" onClick={() => setQuery('')}>✕</button>}
+      </div>
+      <select className="sort-select" value={sort} onChange={e => setSort(e.target.value)}>
+        {CARD_SORT_OPTIONS.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      {showAdd && (
+        <Button variant="primary" size="sm" onClick={editor.openCreate}>+ Add Card</Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="collection-detail-view">
 
@@ -80,44 +119,31 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
         </div>
       </div>
 
-      {/* Tab navigation */}
+      {/* Tab navigation with live counts */}
       <div className="collection-tabs">
-        {TABS.map(tab => (
-          <button key={tab}
-            className={`collection-tab ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}>
-            {tab}
-            {tab === 'Cards' && <span className="tab-count">{collectionCards.length}</span>}
-          </button>
-        ))}
+        {TABS.map(tab => {
+          // === ISSUE #45 START: tab count badges ===
+          const count =
+            tab === 'Cards'       ? summary.total        :
+            tab === 'Owned'       ? summary.owned        :
+            tab === 'Missing'     ? summary.missing      :
+            tab === 'Unorganised' ? summary.unorganised  : null;
+          // === ISSUE #45 END ===
+          return (
+            <button key={tab}
+              className={`collection-tab ${activeTab === tab ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab)}>
+              {tab}
+              {count !== null && <span className="tab-count">{count}</span>}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Cards tab */}
+      {/* ── Cards tab ──────────────────────────────────────────────────────── */}
       {activeTab === 'Cards' && (
         <div className="tab-content">
-          <div className="card-list-toolbar">
-            <div className="search-bar-wrapper" style={{ flex: 1 }}>
-              <span className="search-icon">◎</span>
-              <input className="search-input" placeholder="Search cards…"
-                value={editor.query} onChange={e => editor.setQuery(e.target.value)}
-                aria-label="Search cards" />
-              {editor.query && (
-                <button className="search-clear" onClick={editor.clearQuery}>✕</button>
-              )}
-            </div>
-
-            {/* === REFACTOR5e START: CARD_SORT_OPTIONS from selector === */}
-            <select className="sort-select" value={editor.sortBy}
-              onChange={e => editor.setSortBy(e.target.value)}>
-              {CARD_SORT_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            {/* === REFACTOR5e END === */}
-
-            <Button variant="primary" size="sm" onClick={editor.openCreate}>+ Add Card</Button>
-          </div>
-
+          {renderToolbar(editor.query, editor.setQuery, editor.sortBy, editor.setSortBy, true)}
           <CardDefinitionList
             cards={filteredCards}
             templateFields={collectionTemplateFields}
@@ -132,21 +158,45 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
         </div>
       )}
 
-      {/* Placeholder tabs */}
+      {/* === ISSUE #45 START: Owned tab === */}
       {activeTab === 'Owned' && (
-        <PlaceholderTab icon="✓" title="Owned Cards" milestone="Milestone 6 — Ownership Tracking" />
+        <div className="tab-content">
+          {renderToolbar(ownedQuery, setOwnedQuery, ownedSort, setOwnedSort)}
+          <CardDefinitionList
+            cards={ownedCards}
+            templateFields={collectionTemplateFields}
+            ownershipMap={ownershipMap}
+            totalCount={summary.owned}
+            onView={ownership.openDetail}
+            onEdit={editor.openEdit}
+            onDelete={editor.openDelete}
+            emptyTitle={ownedQuery ? `No results for "${ownedQuery}"` : 'No owned cards yet'}
+            emptySubtitle={ownedQuery ? 'Try a different search' : 'Mark cards as owned to see them here'}
+          />
+        </div>
       )}
-      {activeTab === 'Missing' && (
-        <PlaceholderTab icon="?" title="Missing Cards" milestone="Milestone 6 — Ownership Tracking" />
-      )}
-      {activeTab === 'Unorganised' && (
-        <PlaceholderTab icon="◫" title="Unorganised Cards" milestone="Milestone 6 — Binder Integration" />
-      )}
-      {activeTab === 'Settings' && (
-        <PlaceholderTab icon="⚙" title="Collection Settings" milestone="Milestone 6 — includes field management" />
-      )}
+      {/* === ISSUE #45 END: Owned tab === */}
 
-      {/* === ISSUE #36: Card detail modal with ownership === */}
+      {/* === ISSUE #45 START: Missing tab === */}
+      {activeTab === 'Missing' && (
+        <div className="tab-content">
+          {renderToolbar(missingQuery, setMissingQuery, missingSort, setMissingSort)}
+          <CardDefinitionList
+            cards={missingCards}
+            templateFields={collectionTemplateFields}
+            ownershipMap={ownershipMap}
+            totalCount={summary.missing}
+            onView={ownership.openDetail}
+            onEdit={editor.openEdit}
+            onDelete={editor.openDelete}
+            emptyTitle={missingQuery ? `No results for "${missingQuery}"` : 'No missing cards'}
+            emptySubtitle={missingQuery ? 'Try a different search' : 'You own every card in this collection!'}
+          />
+        </div>
+      )}
+      {/* === ISSUE #45 END: Missing tab === */}
+
+      {/* Card detail modal */}
       {ownership.viewingCard && (
         <CardDetailModal
           card={ownership.viewingCard}
