@@ -89,3 +89,41 @@ export function getUnorganisedCards(cards, ownershipMap, organisedCardDefIds = [
 }
 
 // === ISSUE #46 END: Collection Tab — Unorganised ===
+
+// === ISSUE #47 START: Collection Summary — stats selector ===
+
+/**
+ * Builds a stats summary for a single collection.
+ * Single O(n) pass — call once per render, not per card.
+ *
+ * @param {object[]} cards - collection's card definitions
+ * @param {Record<string, object>} ownershipMap
+ * @param {string[]} organisedCardDefIds - empty until Milestone 7
+ * @returns {{
+ *   total: number,
+ *   owned: number,
+ *   missing: number,
+ *   unorganised: number,
+ *   pct: number,
+ * }}
+ */
+export function buildCollectionSummary(cards, ownershipMap, organisedCardDefIds = []) {
+  const organisedSet = new Set(organisedCardDefIds);
+  let owned = 0;
+  let unorganised = 0;
+
+  cards.forEach(card => {
+    if (ownershipMap[card.id]) {
+      owned++;
+      if (!organisedSet.has(card.id)) unorganised++;
+    }
+  });
+
+  const total   = cards.length;
+  const missing = total - owned;
+  const pct     = total > 0 ? Math.round((owned / total) * 100) : 0;
+
+  return { total, owned, missing, unorganised, pct };
+}
+
+// === ISSUE #47 END: Collection Summary ===
