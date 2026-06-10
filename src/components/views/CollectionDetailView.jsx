@@ -7,65 +7,62 @@
  *
  * TODO: Render TemplateManagementView inside Settings tab (Milestone 6)
  */
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useState } from 'react';
 import { Button, ConfirmModal, PlaceholderTab } from '../ui/index.jsx';
 import { CardDefinitionList } from '../collections/CardDefinitionList.jsx';
 import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
-import { CardDetailModal } from '../collections/CardDetailModal.jsx';
-import { applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
+import { applyCardDefinitionFilters, CARD_SORT_OPTIONS } from '../../selectors/cardDefinitionSelectors.js';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useCardEditor } from '../../hooks/useCardEditor.js';
-
-// === ISSUE #36 START: Mark Card As Owned — import inventory actions ===
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
-// === ISSUE #36 END ===
+
+// === REFACTOR5a START: use useOwnershipEditor hook ===
+import { useOwnershipEditor } from '../../hooks/useOwnershipEditor.js';
+// === REFACTOR5a END ===
+
+// === REFACTOR5d START: import CardDetailModal from modals folder ===
+import { CardDetailModal } from '../modals/CardDetailModal.jsx';
+// === REFACTOR5d END ===
 
 const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Settings'];
 
-const SORT_OPTIONS = [
-  { value: 'newest',    label: 'Newest first' },
-  { value: 'oldest',    label: 'Oldest first' },
-  { value: 'name_asc',  label: 'Name A → Z'   },
-  { value: 'name_desc', label: 'Name Z → A'   },
-];
-
 export function CollectionDetailView({ collection, cardDefinitions, templateFields, inventory, toast, onBack }) {
   const [activeTab, setActiveTab] = useState('Cards');
-  const [viewingCard, setViewingCard] = useState(null);
 
-  const editor = useCardEditor();
+  const editor    = useCardEditor();
+
+  // === REFACTOR5a START: ownership view state from hook ===
+  const ownership = useOwnershipEditor();
+  // === REFACTOR5a END ===
 
   const collectionCards = useMemo(
     () => cardDefinitions.filter(cd => cd.collectionId === collection.id),
     [cardDefinitions, collection.id]
   );
 
+
   const filteredCards = useMemo(
     () => applyCardDefinitionFilters(collectionCards, editor.query, editor.sortBy),
     [collectionCards, editor.query, editor.sortBy]
   );
-
-  // === ISSUE #36 START: build ownership map for O(1) lookups ===
   const ownershipMap = useMemo(
     () => buildOwnershipMap(inventory),
     [inventory]
   );
-  // === ISSUE #36 END ===
 
   const { handleCreate, handleUpdate, handleDelete } = useCardDefinitionActions(toast, {
     onCreateSuccess: editor.closeCreate,
-    onUpdateSuccess: () => { editor.closeEdit(); setViewingCard(null); },
-    onDeleteSuccess: () => { editor.closeDelete(); setViewingCard(null); },
+    onUpdateSuccess: () => { editor.closeEdit(); ownership.closeDetail(); },
+    onDeleteSuccess: () => { editor.closeDelete(); ownership.closeDetail(); },
   });
 
-  // === ISSUE #36 START: inventory actions ===
   const { handleOwn, handleUnown, handleUpdateAcquisition, handleToggleFavorite } =
     useInventoryActions(toast, {
-      onOwnSuccess: () => {},
-      onUnownSuccess: () => setViewingCard(null),
+      onOwnSuccess:   () => {},
+      onUnownSuccess: ownership.closeDetail,
     });
-  // === ISSUE #36 END ===
 
   const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection.id);
 
@@ -108,12 +105,16 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
                 <button className="search-clear" onClick={editor.clearQuery}>✕</button>
               )}
             </div>
+
+            {/* === REFACTOR5e START: CARD_SORT_OPTIONS from selector === */}
             <select className="sort-select" value={editor.sortBy}
               onChange={e => editor.setSortBy(e.target.value)}>
-              {SORT_OPTIONS.map(opt => (
+              {CARD_SORT_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
+            {/* === REFACTOR5e END === */}
+
             <Button variant="primary" size="sm" onClick={editor.openCreate}>+ Add Card</Button>
           </div>
 
@@ -122,7 +123,7 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
             templateFields={collectionTemplateFields}
             ownershipMap={ownershipMap}
             totalCount={collectionCards.length}
-            onView={setViewingCard}
+            onView={ownership.openDetail}
             onEdit={editor.openEdit}
             onDelete={editor.openDelete}
             emptyTitle={editor.query ? `No results for "${editor.query}"` : 'No cards yet'}
@@ -145,22 +146,21 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
         <PlaceholderTab icon="⚙" title="Collection Settings" milestone="Milestone 6 — includes field management" />
       )}
 
-      {/* === ISSUE #36 START: Card detail modal with ownership === */}
-      {viewingCard && (
+      {/* === ISSUE #36: Card detail modal with ownership === */}
+      {ownership.viewingCard && (
         <CardDetailModal
-          card={viewingCard}
-          inventoryItem={ownershipMap[viewingCard.id] ?? null}
+          card={ownership.viewingCard}
+          inventoryItem={ownershipMap[ownership.viewingCard.id] ?? null}
           templateFields={collectionTemplateFields}
-          onOwn={() => handleOwn({ cardDefId: viewingCard.id, collectionId: collection.id })}
-          onUnown={(inventoryId) => handleUnown(inventoryId)}
+          onOwn={() => handleOwn({ cardDefId: ownership.viewingCard.id, collectionId: collection.id })}
+          onUnown={handleUnown}
           onUpdateAcquisition={handleUpdateAcquisition}
           onToggleFavorite={handleToggleFavorite}
-          onEdit={() => { setViewingCard(null); editor.openEdit(viewingCard); }}
-          onDelete={() => handleDelete(viewingCard.id, viewingCard.name)}
-          onClose={() => setViewingCard(null)}
+          onEdit={() => { ownership.closeDetail(); editor.openEdit(ownership.viewingCard); }}
+          onDelete={() => handleDelete(ownership.viewingCard.id, ownership.viewingCard.name)}
+          onClose={ownership.closeDetail}
         />
       )}
-      {/* === ISSUE #36 END === */}
 
       {/* Create / Edit forms */}
       {editor.showCreate && (
@@ -186,4 +186,3 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
     </div>
   );
 }
-

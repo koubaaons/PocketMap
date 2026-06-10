@@ -43,7 +43,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     validate: validateFields,
     clearErrors,
   } = useTemplateEditor([
-    { id: `new-${Date.now()}`, field_name: '', field_type: 'text', is_required: false, order: 0, _isNew: true },
+    { id: `new-${Date.now()}`, field_name: '', field_type: 'text', is_required: false, order: 0, options: [], _isNew: true },
   ]);
   // === REFACTOR3a END ===
 
@@ -77,6 +77,8 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         field_type: f.field_type,
         is_required: f.is_required,
         order: idx,
+        // === FIX: pass options so select fields are not dropped by validator ===
+        options: f.options ?? [],
       }).field)
       .filter(Boolean);
 
@@ -102,6 +104,8 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         field_type: f.field_type,
         is_required: f.is_required,
         order: idx,
+        // === FIX: pass options for API select fields ===
+        options: f.options ?? [],
       }).field)
       .filter(Boolean);
 
@@ -148,9 +152,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   // ── Step: API select ────────────────────────────────────────────────────────
 
   if (step === 'api-select') {
-    // === REFACTOR3b START: use getApiSources() instead of MOCK_API_SOURCES ===
     const apiSources = getApiSources();
-    // === REFACTOR3b END ===
     return (
       <Modal title="Import Collection from API" onClose={onClose}>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
@@ -182,14 +184,12 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   // ── Step: API confirm ───────────────────────────────────────────────────────
 
   if (step === 'api-confirm') {
-    // === REFACTOR3d START: normalize preview field IDs to strings ===
     const previewFields = selectedSource.templateFields.map((f, idx) => ({
       id: String(idx),
       collectionId: '',
       ...f,
       order: idx,
     }));
-    // === REFACTOR3d END ===
     return (
       <Modal title={`Import "${selectedSource.name}"`} onClose={onClose}>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>

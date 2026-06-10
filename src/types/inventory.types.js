@@ -25,11 +25,32 @@ export const CONDITION_RATINGS = Object.freeze([
   'poor',
 ]);
 
+// === REFACTOR5c START: Move CONDITION_LABELS to inventory.types.js ===
 /**
- * Validates an inventory item.
- * @param {unknown} data
- * @returns {{ valid: boolean, errors: string[] }}
+ * Display labels for condition ratings.
+ * Single source of truth — import anywhere a condition needs displaying.
  */
+export const CONDITION_LABELS = Object.freeze({
+  mint:      'Mint',
+  near_mint: 'Near Mint',
+  excellent: 'Excellent',
+  good:      'Good',
+  played:    'Played',
+  poor:      'Poor',
+});
+
+/**
+ * Returns a human-readable label for a condition rating.
+ * Falls back to the raw value if not found.
+ * @param {string|null} rating
+ * @returns {string}
+ */
+export function formatConditionRating(rating) {
+  if (!rating) return 'Not graded';
+  return CONDITION_LABELS[rating] ?? rating.replace('_', ' ');
+}
+// === REFACTOR5c END ===
+
 export function validateInventoryItem(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
@@ -37,48 +58,23 @@ export function validateInventoryItem(data) {
   if (!data.userId || typeof data.userId !== 'string') errors.push('userId must be a non-empty string');
   if (!data.cardDefId || typeof data.cardDefId !== 'string') errors.push('cardDefId must be a non-empty string');
   if (!data.collectionId || typeof data.collectionId !== 'string') errors.push('collectionId must be a non-empty string');
-
-  // condition_rating is nullable
   if (data.condition_rating !== null && !CONDITION_RATINGS.includes(data.condition_rating)) {
     errors.push(`condition_rating must be one of: ${CONDITION_RATINGS.join(', ')} or null`);
   }
-
   if (typeof data.is_tradeable !== 'boolean') errors.push('is_tradeable must be a boolean');
   if (typeof data.is_sellable !== 'boolean') errors.push('is_sellable must be a boolean');
   if (typeof data.is_favorite !== 'boolean') errors.push('is_favorite must be a boolean');
-
-  // personal_notes is nullable string
   if (data.personal_notes !== null && typeof data.personal_notes !== 'string') {
     errors.push('personal_notes must be a string or null');
   }
-
-  // acquired_at is nullable timestamp
   if (data.acquired_at !== null && typeof data.acquired_at !== 'number') {
     errors.push('acquired_at must be a timestamp or null');
   }
-
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   if (typeof data.updatedAt !== 'number') errors.push('updatedAt must be a timestamp');
-
   return { valid: errors.length === 0, errors };
 }
 
-/**
- * Creates a validated inventory item.
- * Represents a user owning a copy of a card definition.
- *
- * @param {{
- *   cardDefId: string,
- *   collectionId: string,
- *   userId?: string,
- *   condition_rating?: string | null,
- *   is_tradeable?: boolean,
- *   is_sellable?: boolean,
- *   is_favorite?: boolean,
- *   personal_notes?: string | null,
- *   acquired_at?: number | null,
- * }} params
- */
 export function createInventoryItem({
   cardDefId,
   collectionId,
@@ -108,5 +104,3 @@ export function createInventoryItem({
   const { valid, errors } = validateInventoryItem(item);
   return valid ? { item, errors: [] } : { item: null, errors };
 }
-
-// === ISSUE #35 END: Create Inventory Entity — model ===
