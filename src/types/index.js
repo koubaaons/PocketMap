@@ -3,7 +3,6 @@
  */
 
 export { validateBinder, createBinder } from './binder.types.js';
-export { validateCard, validateBinItem, createCard } from './card.types.js';
 export {
   validateCollection,
   validateTemplateField,
@@ -18,10 +17,12 @@ export {
   validateInventoryItem,
   createInventoryItem,
   CONDITION_RATINGS,
-  // === REFACTOR5c START: export CONDITION_LABELS and formatter ===
   CONDITION_LABELS,
   formatConditionRating,
-  // === REFACTOR5c END ===
 } from './inventory.types.js';
+
+// === ISSUE #53 START: Binder Slot Entity ===
+export { validateBinderSlot, createBinderSlot } from './binderSlot.types.js';
+// === ISSUE #53 END ===
 
 export { generateId, sanitize } from './utils.js';
