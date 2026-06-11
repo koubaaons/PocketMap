@@ -2,28 +2,31 @@
  * @fileoverview App root — composes the full application.
  */
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useStore, useDispatch } from './hooks/useStore.js';
 import { useToast } from './hooks/useToast.js';
 import { ACTIONS } from './store/index.js';
 import { Sidebar } from './components/Sidebar.jsx';
-import { ToastContainer, Button } from './components/ui/index.jsx';
-import { AddCardModal } from './components/modals/index.js';
+import { ToastContainer } from './components/ui/index.jsx';
 
-import { HomeView } from './components/views/HomeView.jsx';
-import { BinderView } from './components/views/BinderView.jsx';
-import { SearchView } from './components/views/SearchView.jsx';
-import { BinView } from './components/views/BinView.jsx';
-import { CollectionsView } from './components/views/CollectionsView.jsx';
-import { AccountView } from './components/views/AccountView.jsx';
+import { HomeView }           from './components/views/HomeView.jsx';
+import { SearchView }         from './components/views/SearchView.jsx';
+import { CollectionsView }    from './components/views/CollectionsView.jsx';
 import { CollectionDetailView } from './components/views/CollectionDetailView.jsx';
+import { AccountView }        from './components/views/AccountView.jsx';
+import { FavoritesView }      from './components/views/FavoritesView.jsx';
 
-// === ISSUE #38 START: Favorite Cards — updated FavoritesView reads from inventory ===
-import { FavoritesView } from './components/views/FavoritesView.jsx';
-// === ISSUE #38 END ===
+// === ISSUE #57 START: Redesigned BinView ===
+import { BinView } from './components/views/BinView.jsx';
+// === ISSUE #57 END ===
+
+// === ISSUE #55 START: Binder Page View — updated BinderView ===
+import { BinderView } from './components/views/BinderView.jsx';
+// === ISSUE #55 END ===
 
 const VIEW_TITLES = {
   home:        'Home',
+  binder:      '',
   collections: 'Collections',
   collection:  '',
   search:      'Search Cards',
@@ -37,29 +40,29 @@ export default function App() {
   const { toasts, toast, dismiss } = useToast();
 
   const binders         = useStore(s => s.binders);
-  const cards           = useStore(s => s.cards);
   const bin             = useStore(s => s.bin);
   const nav             = useStore(s => s.nav);
   const collections     = useStore(s => s.collections);
   const cardDefinitions = useStore(s => s.cardDefinitions);
   const templateFields  = useStore(s => s.templateFields);
-  // === ISSUE #36 START: read inventory from store ===
   const inventory       = useStore(s => s.inventory);
-  // === ISSUE #36 END ===
+  // === ISSUE #53 START: read binder slots from store ===
+  const binderSlots     = useStore(s => s.binderSlots ?? []);
+  // === ISSUE #53 END ===
 
   const navigate = useCallback((view, id = null) => {
     dispatch({
       type: ACTIONS.NAV_SET,
       payload: {
         currentView: view,
-        currentBinderId: view === 'binder' ? id : null,
+        currentBinderId:     view === 'binder'     ? id : null,
         currentCollectionId: view === 'collection' ? id : null,
         currentPage: 1,
       },
     });
   }, [dispatch]);
 
-  const currentBinder     = binders.find(b => b.id === nav.currentBinderId) ?? null;
+  const currentBinder     = binders.find(b => b.id === nav.currentBinderId)     ?? null;
   const currentCollection = collections.find(c => c.id === nav.currentCollectionId) ?? null;
 
   const pageTitle = nav.currentView === 'binder'
@@ -70,24 +73,37 @@ export default function App() {
     switch (nav.currentView) {
 
       case 'home':
-        return <HomeView binders={binders} cards={cards} bin={bin} toast={toast} onNavigate={navigate} />;
+        return <HomeView binders={binders} bin={bin} toast={toast} onNavigate={navigate} />;
 
+      // === ISSUE #55 START: pass binderSlots and cardDefinitions to BinderView ===
       case 'binder':
         if (!currentBinder) { navigate('home'); return null; }
         return (
           <BinderView
             binder={currentBinder}
-            cards={cards.filter(c => c.binderId === currentBinder.id)}
-            allCards={cards}
+            binderSlots={binderSlots.filter(s => s.binderId === currentBinder.id)}
+            cardDefinitions={cardDefinitions}
+            collections={collections}
+            templateFields={templateFields}
+            inventory={inventory}
             toast={toast}
           />
         );
+      // === ISSUE #55 END ===
 
       case 'search':
-        return <SearchView cards={cards} binders={binders} toast={toast}
-          onNavigateToBinder={(id) => navigate('binder', id)} />;
+        return (
+          <SearchView
+            cardDefinitions={cardDefinitions}
+            collections={collections}
+            binderSlots={binderSlots}
+            binders={binders}
+            inventory={inventory}
+            toast={toast}
+            onNavigateToBinder={(id) => navigate('binder', id)}
+          />
+        );
 
-      // === ISSUE #38 START: pass inventory and collections to FavoritesView ===
       case 'favorites':
         return (
           <FavoritesView
@@ -97,15 +113,21 @@ export default function App() {
             toast={toast}
           />
         );
-      // === ISSUE #38 END ===
 
+      // === ISSUE #57 START: updated BinView — no binders prop needed ===
       case 'bin':
-        return <BinView bin={bin} binders={binders} toast={toast} />;
+        return <BinView bin={bin} toast={toast} />;
+      // === ISSUE #57 END ===
 
       case 'collections':
         return (
-          <CollectionsView collections={collections} cardDefinitions={cardDefinitions}
-            inventory={inventory} toast={toast} onNavigate={navigate} />
+          <CollectionsView
+            collections={collections}
+            cardDefinitions={cardDefinitions}
+            inventory={inventory}
+            toast={toast}
+            onNavigate={navigate}
+          />
         );
 
       case 'collection':
@@ -115,9 +137,8 @@ export default function App() {
             collection={currentCollection}
             cardDefinitions={cardDefinitions}
             templateFields={templateFields}
-            // === ISSUE #36 START: pass inventory to CollectionDetailView ===
             inventory={inventory}
-            // === ISSUE #36 END ===
+            binderSlots={binderSlots}
             toast={toast}
             onBack={() => navigate('collections')}
           />
@@ -127,7 +148,7 @@ export default function App() {
         return <AccountView toast={toast} />;
 
       default:
-        return <HomeView binders={binders} cards={cards} bin={bin} toast={toast} onNavigate={navigate} />;
+        return <HomeView binders={binders} bin={bin} toast={toast} onNavigate={navigate} />;
     }
   };
 
@@ -137,11 +158,6 @@ export default function App() {
       <div className="main-area">
         <header className="topbar">
           <h2 className="topbar-title">{pageTitle}</h2>
-          <div className="topbar-actions">
-            {nav.currentView === 'binder' && currentBinder && (
-              <AddCardButton binder={currentBinder} cards={cards} toast={toast} dispatch={dispatch} />
-            )}
-          </div>
         </header>
         <main className="main-content" id="main-content">
           {renderView()}
@@ -149,22 +165,5 @@ export default function App() {
       </div>
       <ToastContainer toasts={toasts} dismiss={dismiss} />
     </div>
-  );
-}
-
-function AddCardButton({ binder, cards, toast, dispatch }) {
-  const [open, setOpen] = useState(false);
-  const handleAdd = (card) => {
-    dispatch({ type: ACTIONS.CARD_ADD, payload: card });
-    toast(`"${card.name}" added`);
-    setOpen(false);
-  };
-  return (
-    <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>+ Add Card</Button>
-      {open && (
-        <AddCardModal binder={binder} cards={cards} onSubmit={handleAdd} onClose={() => setOpen(false)} />
-      )}
-    </>
   );
 }
