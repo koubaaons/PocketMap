@@ -1,120 +1,170 @@
-import { useState, useCallback, useMemo } from 'react';
-import { Button } from '../ui/index.jsx';
-import { AddCardModal, EditCardModal, CardDetailModal } from '../modals/index.js';
-import { ACTIONS } from '../../store/index.js';
-import { useDispatch } from '../../hooks/useStore.js';
-import { binderCapacity, cardsOnPage } from '../../utils/index.js';
+/**
+ * @fileoverview BinderView — slot-based binder view.
+ *
+ * Milestone 7: Replaced legacy card system with binder slots.
+ * Slots reference CARD_DEFINITIONS directly.
+ * Grey card logic: unowned = placeholder, owned = colored.
+ */
 
-export function BinderView({ binder, cards, allCards, toast }) {
-  const dispatch = useDispatch();
-  const [page, setPage] = useState(1);
-  const [addSlot, setAddSlot] = useState(null);
-  const [activeCard, setActiveCard] = useState(null);
-  const [editing, setEditing] = useState(false);
+// === ISSUE #55 START: Binder Page View ===
+// === ISSUE #56 START: Binder Slot Actions ===
+
+import { useState, useMemo } from 'react';
+import { Button } from '../ui/index.jsx';
+import { BinderPage } from '../collections/BinderPage.jsx';
+import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
+import { SlotActionModal } from '../modals/SlotActionModal.jsx';
+import { buildPageSlotMap, getFilledSlotCount } from '../../selectors/binderSelectors.js';
+import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
+import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
+import { useInventoryActions } from '../../hooks/useInventoryActions.js';
+import { useStore } from '../../hooks/useStore.js';
+
+export function BinderView({ binder, binderSlots, cardDefinitions, collections, templateFields, inventory, toast }) {
+  const [page, setPage]               = useState(1);
+  const [addingToSlot, setAddingToSlot] = useState(null); // { slotIndex }
+  const [activeSlot, setActiveSlot]   = useState(null);   // { slot, cardDef }
+  const [viewingCardDef, setViewingCardDef] = useState(null);
 
   const safePage = Math.min(page, binder.pages);
-  const pageCards = useMemo(() => cardsOnPage(cards, binder.id, safePage), [cards, binder.id, safePage]);
-  const totalSlots = binder.rows * binder.cols;
 
-  const handleAddCard = useCallback((card) => {
-    dispatch({ type: ACTIONS.CARD_ADD, payload: card });
-    toast(`"${card.name}" added`);
-    setAddSlot(null);
-    setPage(card.page);
-  }, [dispatch, toast]);
+  // Build lookup maps
+  const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
-  const handleUpdateCard = useCallback((updated) => {
-    dispatch({ type: ACTIONS.CARD_UPDATE, payload: updated });
-    toast('Card updated');
-    setEditing(false);
-    setActiveCard(updated);
-  }, [dispatch, toast]);
+  const cardDefMap = useMemo(() => {
+    const map = {};
+    cardDefinitions.forEach(cd => { map[cd.id] = cd; });
+    return map;
+  }, [cardDefinitions]);
 
-  const handleDeleteCard = useCallback((cardId) => {
-    dispatch({ type: ACTIONS.CARD_DELETE, payload: { cardId } });
-    toast('Card moved to trash');
-    setActiveCard(null);
-  }, [dispatch, toast]);
+  const pageSlotMap = useMemo(
+    () => buildPageSlotMap(binderSlots, binder.id, safePage),
+    [binderSlots, binder.id, safePage]
+  );
 
-  const handleToggleFav = useCallback((card) => {
-    const updated = { ...card, favorite: !card.favorite };
-    dispatch({ type: ACTIONS.CARD_UPDATE, payload: updated });
-    toast(updated.favorite ? 'Added to favorites' : 'Removed from favorites');
-    setActiveCard(updated);
-  }, [dispatch, toast]);
+  const filled   = getFilledSlotCount(binderSlots, binder.id);
+  const capacity = binder.rows * binder.cols * binder.pages;
 
-  const filled = cards.filter(c => c.binderId === binder.id).length;
-  const cap = binderCapacity(binder);
+  const { handleAddToSlot, handleRemoveFromSlot, handleAddPage } =
+    useBinderSlotActions(toast, {
+      onAddSuccess:    () => setAddingToSlot(null),
+      onRemoveSuccess: () => setActiveSlot(null),
+    });
+
+  const { handleOwn } = useInventoryActions(toast, {
+    onOwnSuccess: () => setActiveSlot(null),
+  });
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleSlotClick = (slot, cardDef) => {
+    setActiveSlot({ slot, cardDef });
+  };
+
+  const handleEmptySlotClick = (slotIndex) => {
+    setAddingToSlot({ slotIndex });
+  };
+
+  const handlePlaceCard = (cardDef, collectionId) => {
+    handleAddToSlot({
+      binderId: binder.id,
+      cardDefId: cardDef.id,
+      collectionId,
+      pageNumber: safePage,
+      slotIndex: addingToSlot.slotIndex,
+    });
+  };
+
+  const handleOwnFromSlot = () => {
+    if (!activeSlot) return;
+    handleOwn({
+      cardDefId: activeSlot.cardDef.id,
+      collectionId: activeSlot.slot.collectionId,
+    });
+  };
 
   return (
     <div className="view">
+
+      {/* Page navigation */}
       <div className="page-nav-bar">
         <div className="page-nav-controls">
-          <Button variant="icon" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage <= 1}>←</Button>
+          <Button variant="icon" size="sm"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={safePage <= 1}>←</Button>
           <span className="page-label">Page {safePage} of {binder.pages}</span>
-          <Button variant="icon" size="sm" onClick={() => setPage(p => Math.min(binder.pages, p + 1))} disabled={safePage >= binder.pages}>→</Button>
+          <Button variant="icon" size="sm"
+            onClick={() => setPage(p => Math.min(binder.pages, p + 1))}
+            disabled={safePage >= binder.pages}>→</Button>
         </div>
+
+        {/* Page thumbnails */}
         <div className="page-jumper">
           {Array.from({ length: Math.min(binder.pages, 30) }, (_, i) => (
-            <button key={i + 1} className={`page-pip ${safePage === i + 1 ? 'active' : ''}`} onClick={() => setPage(i + 1)}>
+            <button key={i + 1}
+              className={`page-pip ${safePage === i + 1 ? 'active' : ''}`}
+              onClick={() => setPage(i + 1)}>
               {i + 1}
             </button>
           ))}
           {binder.pages > 30 && <span className="page-more">+{binder.pages - 30} more</span>}
         </div>
-        <span className="page-fill-count">{filled}/{cap}</span>
-      </div>
 
-      <div className="binder-page-wrapper">
-        <div className="binder-page-label">Page {safePage}</div>
-        <div className="slots-grid" style={{ gridTemplateColumns: `repeat(${binder.cols}, 1fr)` }}>
-          {Array.from({ length: totalSlots }, (_, i) => {
-            const slotNum = i + 1;
-            const card = pageCards.find(c => c.slot === slotNum);
-            return (
-              <SlotCell
-                key={slotNum}
-                slotNum={slotNum}
-                card={card}
-                onClickCard={() => setActiveCard(card)}
-                onClickEmpty={() => setAddSlot({ page: safePage, slot: slotNum })}
-              />
-            );
-          })}
+        <div className="page-nav-right">
+          <span className="page-fill-count">{filled}/{capacity}</span>
+          {/* === ISSUE #53: Add page button === */}
+          <Button variant="ghost" size="sm" onClick={() => handleAddPage(binder.id)}>
+            + Add Page
+          </Button>
         </div>
       </div>
 
-      {addSlot && (
-        <AddCardModal binder={binder} cards={allCards} initialPage={addSlot.page} initialSlot={addSlot.slot}
-          onSubmit={handleAddCard} onClose={() => setAddSlot(null)} />
+      {/* Binder page grid */}
+      <BinderPage
+        binder={binder}
+        pageNumber={safePage}
+        pageSlotMap={pageSlotMap}
+        cardDefMap={cardDefMap}
+        ownershipMap={ownershipMap}
+        onClickEmpty={handleEmptySlotClick}
+        onClickSlot={handleSlotClick}
+      />
+
+      {/* Add card to slot modal */}
+      {addingToSlot && (
+        <AddCardToBinderModal
+          binder={binder}
+          pageNumber={safePage}
+          slotIndex={addingToSlot.slotIndex}
+          cardDefinitions={cardDefinitions}
+          collections={collections}
+          templateFields={templateFields}
+          inventory={inventory}
+          binderSlots={binderSlots}
+          onSubmit={handlePlaceCard}
+          onClose={() => setAddingToSlot(null)}
+        />
       )}
-      {activeCard && !editing && (
-        <CardDetailModal card={activeCard} binderName={binder.name}
-          onEdit={() => setEditing(true)} onDelete={() => handleDeleteCard(activeCard.id)}
-          onToggleFavorite={() => handleToggleFav(activeCard)} onClose={() => setActiveCard(null)} />
+
+      {/* Slot action modal */}
+      {activeSlot && (
+        <SlotActionModal
+          slot={activeSlot.slot}
+          cardDef={activeSlot.cardDef}
+          inventoryItem={ownershipMap[activeSlot.cardDef.id] ?? null}
+          onOwn={handleOwnFromSlot}
+          onRemove={() => handleRemoveFromSlot(activeSlot.slot.id)}
+          onViewDetail={() => {
+            setViewingCardDef(activeSlot.cardDef);
+            setActiveSlot(null);
+          }}
+          onClose={() => setActiveSlot(null)}
+        />
       )}
-      {activeCard && editing && (
-        <EditCardModal card={activeCard} onSubmit={handleUpdateCard} onClose={() => setEditing(false)} />
-      )}
+
     </div>
   );
 }
 
-function SlotCell({ slotNum, card, onClickCard, onClickEmpty }) {
-  if (card) {
-    return (
-      <button className="slot slot-filled" onClick={onClickCard}>
-        {card.favorite && <span className="slot-fav-star" aria-label="Favorite">★</span>}
-        <span className="slot-num">{slotNum}</span>
-        <span className="slot-card-name">{card.name}</span>
-        {card.character && <span className="slot-card-char">{card.character}</span>}
-      </button>
-    );
-  }
-  return (
-    <button className="slot slot-empty" onClick={onClickEmpty} aria-label={`Add card to slot ${slotNum}`}>
-      <span className="slot-num">{slotNum}</span>
-      <span className="slot-empty-text">+</span>
-    </button>
-  );
-}
+// === ISSUE #55 END: Binder Page View ===
+// === ISSUE #56 END: Binder Slot Actions ===
