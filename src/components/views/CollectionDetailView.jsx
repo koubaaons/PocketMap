@@ -32,11 +32,14 @@ import { CollectionSummary } from '../collections/CollectionSummary.jsx';
 
 // === ISSUE #48 START: Collection Settings Tab ===
 import { TemplateManagementView } from './TemplateManagementView.jsx';
+// === ISSUE #53 START: binderSlots for accurate unorganised tab ===
+import { getOrganisedCardDefIds } from '../../selectors/binderSelectors.js';
+// === ISSUE #53 END ===
 // === ISSUE #48 END ===
 
 const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Settings'];
 
-export function CollectionDetailView({ collection, cardDefinitions, templateFields, inventory, toast, onBack }) {
+export function CollectionDetailView({ collection, cardDefinitions, templateFields, inventory, binderSlots = [], toast, onBack }) {
   const [activeTab, setActiveTab] = useState('Cards');
 
   const editor    = useCardEditor();
@@ -63,7 +66,7 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
 
   // === ISSUE #47 START: collection summary stats ===
   const summary = useMemo(
-    () => buildCollectionSummary(collectionCards, ownershipMap),
+    () => buildCollectionSummary(collectionCards, ownershipMap, getOrganisedCardDefIds(binderSlots)),
     [collectionCards, ownershipMap]
   );
   // === ISSUE #47 END ===
@@ -88,7 +91,7 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
 
   // === ISSUE #46 START: Unorganised filtered slice ===
   const unorganisedCards = useMemo(
-    () => applyCardDefinitionFilters(getUnorganisedCards(collectionCards, ownershipMap), unorganisedQuery, unorganisedSort),
+    () => applyCardDefinitionFilters(getUnorganisedCards(collectionCards, ownershipMap, getOrganisedCardDefIds(binderSlots)), unorganisedQuery, unorganisedSort),
     [collectionCards, ownershipMap, unorganisedQuery, unorganisedSort]
   );
   // === ISSUE #46 END ===
@@ -294,3 +297,4 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
     </div>
   );
 }
+
