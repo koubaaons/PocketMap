@@ -83,3 +83,35 @@ export function getFilledSlotCount(binderSlots, binderId) {
 }
 
 // === ISSUE #54 END: Add Card to Binder ===
+
+// === REFACTOR7b START: Move card filter logic to binderSelectors ===
+
+/**
+ * Filters card definitions for the AddCardToBinderModal.
+ * Excludes cards already placed in the binder.
+ * Applies search query across name, collection name, and attributes.
+ *
+ * @param {object[]} cardDefinitions
+ * @param {Set<string>} placedCardIds
+ * @param {string} query
+ * @param {Record<string, object>} collectionMap
+ * @param {number} limit
+ * @returns {object[]}
+ */
+export function filterCardsForBinder(cardDefinitions, placedCardIds, query, collectionMap, limit = 50) {
+  const q = query.trim().toLowerCase();
+  return cardDefinitions
+    .filter(cd => !placedCardIds.has(cd.id))
+    .filter(cd => {
+      if (!q) return true;
+      if (cd.name.toLowerCase().includes(q)) return true;
+      const col = collectionMap[cd.collectionId];
+      if (col?.name.toLowerCase().includes(q)) return true;
+      return Object.values(cd.attributes ?? {}).some(
+        v => typeof v === 'string' && v.toLowerCase().includes(q)
+      );
+    })
+    .slice(0, limit);
+}
+
+// === REFACTOR7b END ===

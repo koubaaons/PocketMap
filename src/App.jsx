@@ -73,7 +73,7 @@ export default function App() {
     switch (nav.currentView) {
 
       case 'home':
-        return <HomeView binders={binders} bin={bin} toast={toast} onNavigate={navigate} />;
+        return <HomeView binders={binders} binderSlots={binderSlots} inventory={inventory} cardDefinitions={cardDefinitions} bin={bin} toast={toast} onNavigate={navigate} />;
 
       // === ISSUE #55 START: pass binderSlots and cardDefinitions to BinderView ===
       case 'binder':
@@ -148,7 +148,7 @@ export default function App() {
         return <AccountView toast={toast} />;
 
       default:
-        return <HomeView binders={binders} bin={bin} toast={toast} onNavigate={navigate} />;
+        return <HomeView binders={binders} binderSlots={binderSlots} inventory={inventory} cardDefinitions={cardDefinitions} bin={bin} toast={toast} onNavigate={navigate} />;
     }
   };
 

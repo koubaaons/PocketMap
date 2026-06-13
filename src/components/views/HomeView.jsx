@@ -1,11 +1,15 @@
-import { useState, useCallback } from 'react';
+// === ISSUE #1 START: Split Views — HomeView ===
+// === ISSUE #58 START: Remove Legacy Card System — use binderSlots instead of cards ===
+
+import { useState, useCallback, useMemo } from 'react';
 import { Button, EmptyState, StatCard } from '../ui/index.jsx';
 import { CreateBinderModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
-import { binderCapacity, binderCardCount } from '../../utils/index.js';
+import { binderCapacity } from '../../utils/index.js';
+import { getFilledSlotCount } from '../../selectors/binderSelectors.js';
 
-export function HomeView({ binders, cards, bin, toast, onNavigate }) {
+export function HomeView({ binders, binderSlots = [], inventory = [], cardDefinitions = [], bin, toast, onNavigate }) {
   const dispatch = useDispatch();
   const [showCreate, setShowCreate] = useState(false);
 
@@ -15,14 +19,19 @@ export function HomeView({ binders, cards, bin, toast, onNavigate }) {
     setShowCreate(false);
   }, [dispatch, toast]);
 
+  // Stats derived from new system
+  const totalCards    = cardDefinitions.length;
+  const totalOwned    = inventory.length;
+  const totalFavorites = inventory.filter(inv => inv.is_favorite).length;
+
   return (
     <div className="view">
       <div className="view-header">
         <div className="stat-row">
-          <StatCard value={binders.length} label="binders" />
-          <StatCard value={cards.length} label="cards" />
-          <StatCard value={cards.filter(c => c.favorite).length} label="favorites" />
-          <StatCard value={bin.length} label="in trash" />
+          <StatCard value={binders.length}   label="binders"   />
+          <StatCard value={totalCards}        label="cards"     />
+          <StatCard value={totalFavorites}    label="favorites" />
+          <StatCard value={bin.length}        label="in trash"  />
         </div>
       </div>
 
@@ -44,7 +53,7 @@ export function HomeView({ binders, cards, bin, toast, onNavigate }) {
               <BinderCard
                 key={b.id}
                 binder={b}
-                cardCount={binderCardCount(cards, b.id)}
+                cardCount={getFilledSlotCount(binderSlots, b.id)}
                 capacity={binderCapacity(b)}
                 onClick={() => onNavigate('binder', b.id)}
               />
@@ -78,3 +87,6 @@ function BinderCard({ binder, cardCount, capacity, onClick }) {
     </button>
   );
 }
+
+// === ISSUE #58 END: Remove Legacy Card System ===
+// === ISSUE #1 END: Split Views — HomeView ===

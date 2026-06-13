@@ -9,7 +9,7 @@
 // === ISSUE #55 START: Binder Page View ===
 // === ISSUE #56 START: Binder Slot Actions ===
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Button } from '../ui/index.jsx';
 import { BinderPage } from '../collections/BinderPage.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
@@ -18,17 +18,18 @@ import { buildPageSlotMap, getFilledSlotCount } from '../../selectors/binderSele
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
-import { useStore } from '../../hooks/useStore.js';
+
+// === REFACTOR7a START: use useBinderView hook ===
+import { useBinderView } from '../../hooks/useBinderView.js';
+// === REFACTOR7a END ===
+// Refactor7c: removed unused useStore import
 
 export function BinderView({ binder, binderSlots, cardDefinitions, collections, templateFields, inventory, toast }) {
-  const [page, setPage]               = useState(1);
-  const [addingToSlot, setAddingToSlot] = useState(null); // { slotIndex }
-  const [activeSlot, setActiveSlot]   = useState(null);   // { slot, cardDef }
-  const [viewingCardDef, setViewingCardDef] = useState(null);
 
-  const safePage = Math.min(page, binder.pages);
+  // === REFACTOR7a START: state from hook ===
+  const view = useBinderView(binder);
+  // === REFACTOR7a END ===
 
-  // Build lookup maps
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
   const cardDefMap = useMemo(() => {
@@ -38,8 +39,8 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   }, [cardDefinitions]);
 
   const pageSlotMap = useMemo(
-    () => buildPageSlotMap(binderSlots, binder.id, safePage),
-    [binderSlots, binder.id, safePage]
+    () => buildPageSlotMap(binderSlots, binder.id, view.page),
+    [binderSlots, binder.id, view.page]
   );
 
   const filled   = getFilledSlotCount(binderSlots, binder.id);
@@ -47,39 +48,29 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
 
   const { handleAddToSlot, handleRemoveFromSlot, handleAddPage } =
     useBinderSlotActions(toast, {
-      onAddSuccess:    () => setAddingToSlot(null),
-      onRemoveSuccess: () => setActiveSlot(null),
+      onAddSuccess:    view.closeAddToSlot,
+      onRemoveSuccess: view.closeSlotAction,
     });
 
   const { handleOwn } = useInventoryActions(toast, {
-    onOwnSuccess: () => setActiveSlot(null),
+    onOwnSuccess: view.closeSlotAction,
   });
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
-
-  const handleSlotClick = (slot, cardDef) => {
-    setActiveSlot({ slot, cardDef });
-  };
-
-  const handleEmptySlotClick = (slotIndex) => {
-    setAddingToSlot({ slotIndex });
-  };
 
   const handlePlaceCard = (cardDef, collectionId) => {
     handleAddToSlot({
       binderId: binder.id,
       cardDefId: cardDef.id,
       collectionId,
-      pageNumber: safePage,
-      slotIndex: addingToSlot.slotIndex,
+      pageNumber: view.page,
+      slotIndex: view.addingToSlot.slotIndex,
     });
   };
 
   const handleOwnFromSlot = () => {
-    if (!activeSlot) return;
+    if (!view.activeSlot) return;
     handleOwn({
-      cardDefId: activeSlot.cardDef.id,
-      collectionId: activeSlot.slot.collectionId,
+      cardDefId: view.activeSlot.cardDef.id,
+      collectionId: view.activeSlot.slot.collectionId,
     });
   };
 
@@ -90,20 +81,17 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
       <div className="page-nav-bar">
         <div className="page-nav-controls">
           <Button variant="icon" size="sm"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={safePage <= 1}>←</Button>
-          <span className="page-label">Page {safePage} of {binder.pages}</span>
+            onClick={view.goToPrevPage} disabled={view.page <= 1}>←</Button>
+          <span className="page-label">Page {view.page} of {binder.pages}</span>
           <Button variant="icon" size="sm"
-            onClick={() => setPage(p => Math.min(binder.pages, p + 1))}
-            disabled={safePage >= binder.pages}>→</Button>
+            onClick={view.goToNextPage} disabled={view.page >= binder.pages}>→</Button>
         </div>
 
-        {/* Page thumbnails */}
         <div className="page-jumper">
           {Array.from({ length: Math.min(binder.pages, 30) }, (_, i) => (
             <button key={i + 1}
-              className={`page-pip ${safePage === i + 1 ? 'active' : ''}`}
-              onClick={() => setPage(i + 1)}>
+              className={`page-pip ${view.page === i + 1 ? 'active' : ''}`}
+              onClick={() => view.goToPage(i + 1)}>
               {i + 1}
             </button>
           ))}
@@ -112,7 +100,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
 
         <div className="page-nav-right">
           <span className="page-fill-count">{filled}/{capacity}</span>
-          {/* === ISSUE #53: Add page button === */}
           <Button variant="ghost" size="sm" onClick={() => handleAddPage(binder.id)}>
             + Add Page
           </Button>
@@ -122,43 +109,40 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
       {/* Binder page grid */}
       <BinderPage
         binder={binder}
-        pageNumber={safePage}
+        pageNumber={view.page}
         pageSlotMap={pageSlotMap}
         cardDefMap={cardDefMap}
         ownershipMap={ownershipMap}
-        onClickEmpty={handleEmptySlotClick}
-        onClickSlot={handleSlotClick}
+        onClickEmpty={view.openAddToSlot}
+        onClickSlot={view.openSlotAction}
       />
 
       {/* Add card to slot modal */}
-      {addingToSlot && (
+      {view.addingToSlot && (
         <AddCardToBinderModal
           binder={binder}
-          pageNumber={safePage}
-          slotIndex={addingToSlot.slotIndex}
+          pageNumber={view.page}
+          slotIndex={view.addingToSlot.slotIndex}
           cardDefinitions={cardDefinitions}
           collections={collections}
           templateFields={templateFields}
           inventory={inventory}
           binderSlots={binderSlots}
           onSubmit={handlePlaceCard}
-          onClose={() => setAddingToSlot(null)}
+          onClose={view.closeAddToSlot}
         />
       )}
 
       {/* Slot action modal */}
-      {activeSlot && (
+      {view.activeSlot && (
         <SlotActionModal
-          slot={activeSlot.slot}
-          cardDef={activeSlot.cardDef}
-          inventoryItem={ownershipMap[activeSlot.cardDef.id] ?? null}
+          slot={view.activeSlot.slot}
+          cardDef={view.activeSlot.cardDef}
+          inventoryItem={ownershipMap[view.activeSlot.cardDef.id] ?? null}
           onOwn={handleOwnFromSlot}
-          onRemove={() => handleRemoveFromSlot(activeSlot.slot.id)}
-          onViewDetail={() => {
-            setViewingCardDef(activeSlot.cardDef);
-            setActiveSlot(null);
-          }}
-          onClose={() => setActiveSlot(null)}
+          onRemove={() => handleRemoveFromSlot(view.activeSlot.slot.id)}
+          onViewDetail={() => view.openCardDetail(view.activeSlot.cardDef)}
+          onClose={view.closeSlotAction}
         />
       )}
 
