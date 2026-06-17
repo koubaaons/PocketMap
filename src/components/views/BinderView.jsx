@@ -2,9 +2,6 @@
  * @fileoverview BinderView — slot-based binder view.
  */
 
-// === ISSUE #55 START: Binder Page View ===
-// === ISSUE #56 START: Binder Slot Actions ===
-
 import { useMemo, useState } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { BinderPage } from '../collections/BinderPage.jsx';
@@ -19,11 +16,9 @@ import { useBinderView } from '../../hooks/useBinderView.js';
 import { useDispatch } from '../../hooks/useStore.js';
 import { ACTIONS } from '../../store/index.js';
 
-export function BinderView({ binder, binderSlots, cardDefinitions, collections, templateFields, inventory, toast }) {
+export function BinderView({ binder, binderSlots, cardDefinitions, collections, templateFields, inventory, toast, onNavigate }) {
   const dispatch = useDispatch();
   const view = useBinderView(binder);
-
-  // === FIX2: delete binder confirm state ===
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
@@ -72,14 +67,21 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     });
   };
 
-  // === FIX2: delete binder handler ===
   const handleDeleteBinder = () => {
     dispatch({ type: ACTIONS.BINDER_DELETE, payload: { binderId: binder.id } });
     toast(`"${binder.name}" moved to trash`);
     setConfirmDelete(false);
   };
 
-  // Template fields for the card detail modal
+  // === FIX: Edit Card navigates to the card's collection ===
+  const handleEditCardFromBinder = (cardDef) => {
+    view.closeCardDetail();
+    if (onNavigate && cardDef?.collectionId) {
+      onNavigate('collection', cardDef.collectionId);
+      toast(`Navigated to ${cardDef.name}'s collection to edit`);
+    }
+  };
+
   const cardTemplateFields = view.viewingCardDef
     ? templateFields.filter(f => f.collectionId === view.viewingCardDef.collectionId)
     : [];
@@ -87,7 +89,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   return (
     <div className="view">
 
-      {/* Page navigation */}
       <div className="page-nav-bar">
         <div className="page-nav-controls">
           <Button variant="icon" size="sm"
@@ -113,14 +114,12 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           <Button variant="ghost" size="sm" onClick={() => handleAddPage(binder.id)}>
             + Add Page
           </Button>
-          {/* === FIX2: delete binder button === */}
           <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
             Delete Binder
           </Button>
         </div>
       </div>
 
-      {/* Binder page grid */}
       <BinderPage
         binder={binder}
         pageNumber={view.page}
@@ -131,7 +130,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         onClickSlot={view.openSlotAction}
       />
 
-      {/* Add card to slot modal */}
       {view.addingToSlot && (
         <AddCardToBinderModal
           binder={binder}
@@ -147,7 +145,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         />
       )}
 
-      {/* Slot action modal */}
       {view.activeSlot && (
         <SlotActionModal
           slot={view.activeSlot.slot}
@@ -160,7 +157,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         />
       )}
 
-      {/* === FIX1: CardDetailModal wired to viewingCardDef === */}
       {view.viewingCardDef && (
         <CardDetailModal
           card={view.viewingCardDef}
@@ -173,13 +169,12 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           onUnown={(inventoryId) => handleUnown(inventoryId)}
           onUpdateAcquisition={handleUpdateAcquisition}
           onToggleFavorite={handleToggleFavorite}
-          onEdit={() => view.closeCardDetail()}
+          onEdit={() => handleEditCardFromBinder(view.viewingCardDef)}
           onDelete={() => view.closeCardDetail()}
           onClose={view.closeCardDetail}
         />
       )}
 
-      {/* === FIX2: delete binder confirm === */}
       {confirmDelete && (
         <ConfirmModal
           title={`Delete "${binder.name}"?`}
@@ -193,6 +188,3 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     </div>
   );
 }
-
-// === ISSUE #55 END: Binder Page View ===
-// === ISSUE #56 END: Binder Slot Actions ===
