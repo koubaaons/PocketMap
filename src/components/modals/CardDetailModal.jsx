@@ -135,7 +135,6 @@ export function CardDetailModal({
           )}
         </div>
         <div className="card-detail-actions-right">
-          <Button variant="ghost" size="sm" onClick={onEdit}>Edit Card</Button>
           {isOwned && (
             <Button variant="ghost" size="sm" onClick={() => setConfirmUnown(true)}>
               Remove Ownership

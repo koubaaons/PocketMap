@@ -6,65 +6,40 @@
 import { validateOneTemplatePerCollection } from '../types/index.js';
 
 export const ACTIONS = Object.freeze({
-  // Binders
   BINDER_ADD:      'BINDER_ADD',
   BINDER_UPDATE:   'BINDER_UPDATE',
   BINDER_DELETE:   'BINDER_DELETE',
-  // === ISSUE #53 START: Binder Slot Entity ===
   BINDER_ADD_PAGE: 'BINDER_ADD_PAGE',
-  // === ISSUE #53 END ===
-
-  // === ISSUE #58 START: Legacy card actions kept for migration ===
   CARD_ADD:    'CARD_ADD',
   CARD_UPDATE: 'CARD_UPDATE',
   CARD_DELETE: 'CARD_DELETE',
-  // === ISSUE #58 END ===
-
-  // Bin — three sections
-  // === ISSUE #57 START: Redesigned Trash Bin ===
   BIN_RESTORE_BINDER:     'BIN_RESTORE_BINDER',
   BIN_RESTORE_COLLECTION: 'BIN_RESTORE_COLLECTION',
   BIN_RESTORE_CARD:       'BIN_RESTORE_CARD',
   BIN_DELETE_ITEM:        'BIN_DELETE_ITEM',
   BIN_EMPTY:              'BIN_EMPTY',
-  // === ISSUE #57 END ===
-
-  // Navigation
   NAV_SET: 'NAV_SET',
-
-  // Collections
   COLLECTION_ADD:    'COLLECTION_ADD',
   COLLECTION_UPDATE: 'COLLECTION_UPDATE',
   COLLECTION_DELETE: 'COLLECTION_DELETE',
-
-  // Template Fields
   TEMPLATE_FIELD_ADD:      'TEMPLATE_FIELD_ADD',
   TEMPLATE_FIELD_BULK_ADD: 'TEMPLATE_FIELD_BULK_ADD',
   TEMPLATE_FIELD_UPDATE:   'TEMPLATE_FIELD_UPDATE',
   TEMPLATE_FIELD_REORDER:  'TEMPLATE_FIELD_REORDER',
-
-  // Card Definitions
   CARD_DEFINITION_ADD:      'CARD_DEFINITION_ADD',
   CARD_DEFINITION_BULK_ADD: 'CARD_DEFINITION_BULK_ADD',
   CARD_DEFINITION_UPDATE:   'CARD_DEFINITION_UPDATE',
   CARD_DEFINITION_DELETE:   'CARD_DEFINITION_DELETE',
-
-  // Inventory
   INVENTORY_ADD:    'INVENTORY_ADD',
   INVENTORY_UPDATE: 'INVENTORY_UPDATE',
   INVENTORY_DELETE: 'INVENTORY_DELETE',
-
-  // === ISSUE #53 START: Binder Slot Entity — slot actions ===
   BINDER_SLOT_ADD:    'BINDER_SLOT_ADD',
   BINDER_SLOT_REMOVE: 'BINDER_SLOT_REMOVE',
   BINDER_SLOT_MOVE:   'BINDER_SLOT_MOVE',
-  // === ISSUE #53 END ===
 });
 
 export function reducer(state, action) {
   switch (action.type) {
-
-    // ── Binders ───────────────────────────────────────────────────────────────
 
     case ACTIONS.BINDER_ADD:
       return { ...state, binders: [...state.binders, action.payload] };
@@ -77,7 +52,6 @@ export function reducer(state, action) {
         ),
       };
 
-    // === ISSUE #57 START: BINDER_DELETE — send to bin ===
     case ACTIONS.BINDER_DELETE: {
       const { binderId } = action.payload;
       const binder = state.binders.find(b => b.id === binderId);
@@ -85,30 +59,21 @@ export function reducer(state, action) {
       return {
         ...state,
         binders: state.binders.filter(b => b.id !== binderId),
-        // Remove all slots for this binder
         binderSlots: state.binderSlots.filter(s => s.binderId !== binderId),
-        // Send binder to bin
         bin: [...state.bin, { ...binder, _type: 'binder', deletedAt: Date.now() }],
         nav: state.nav.currentView === 'binder' && state.nav.currentBinderId === binderId
           ? { ...state.nav, currentView: 'home', currentBinderId: null, currentPage: 1 }
           : state.nav,
       };
     }
-    // === ISSUE #57 END ===
 
-    // === ISSUE #53 START: BINDER_ADD_PAGE ===
     case ACTIONS.BINDER_ADD_PAGE:
       return {
         ...state,
         binders: state.binders.map(b =>
-          b.id === action.payload.binderId
-            ? { ...b, pages: b.pages + 1 }
-            : b
+          b.id === action.payload.binderId ? { ...b, pages: b.pages + 1 } : b
         ),
       };
-    // === ISSUE #53 END ===
-
-    // ── Cards (legacy — kept for migration) ───────────────────────────────────
 
     case ACTIONS.CARD_ADD:
       return { ...state, cards: [...(state.cards ?? []), action.payload] };
@@ -133,7 +98,6 @@ export function reducer(state, action) {
 
     // ── Bin ───────────────────────────────────────────────────────────────────
 
-    // === ISSUE #57 START: Redesigned Trash Bin — three section restore/delete ===
     case ACTIONS.BIN_RESTORE_BINDER: {
       const { itemId } = action.payload;
       const item = state.bin.find(b => b.id === itemId && b._type === 'binder');
@@ -146,26 +110,34 @@ export function reducer(state, action) {
       };
     }
 
+    // === FIX4: restore collection with all cards, fields, and inventory ===
     case ACTIONS.BIN_RESTORE_COLLECTION: {
       const { itemId } = action.payload;
       const item = state.bin.find(c => c.id === itemId && c._type === 'collection');
       if (!item) return state;
-      const { _type, deletedAt, ...collection } = item;
+      const { _type, deletedAt, _cardDefs, _templateFields, _inventoryItems, ...collection } = item;
       return {
         ...state,
-        collections: [...state.collections, collection],
+        collections:     [...state.collections, collection],
+        cardDefinitions: _cardDefs       ? [...state.cardDefinitions, ..._cardDefs]      : state.cardDefinitions,
+        templateFields:  _templateFields ? [...state.templateFields,  ..._templateFields] : state.templateFields,
+        inventory:       _inventoryItems ? [...state.inventory,        ..._inventoryItems] : state.inventory,
         bin: state.bin.filter(c => c.id !== itemId),
       };
     }
 
+    // === FIX3: restore card with owned and favorite state ===
     case ACTIONS.BIN_RESTORE_CARD: {
       const { itemId } = action.payload;
       const item = state.bin.find(c => c.id === itemId && c._type === 'cardDef');
       if (!item) return state;
-      const { _type, deletedAt, ...cardDef } = item;
+      const { _type, deletedAt, _inventoryItem, ...cardDef } = item;
       return {
         ...state,
         cardDefinitions: [...state.cardDefinitions, cardDef],
+        inventory: _inventoryItem
+          ? [...state.inventory, _inventoryItem]
+          : state.inventory,
         bin: state.bin.filter(c => c.id !== itemId),
       };
     }
@@ -175,14 +147,9 @@ export function reducer(state, action) {
 
     case ACTIONS.BIN_EMPTY:
       return { ...state, bin: [] };
-    // === ISSUE #57 END ===
-
-    // ── Navigation ────────────────────────────────────────────────────────────
 
     case ACTIONS.NAV_SET:
       return { ...state, nav: { ...state.nav, ...action.payload } };
-
-    // ── Collections ───────────────────────────────────────────────────────────
 
     case ACTIONS.COLLECTION_ADD:
       return { ...state, collections: [...state.collections, action.payload] };
@@ -197,47 +164,44 @@ export function reducer(state, action) {
         ),
       };
 
-    // === ISSUE #57 START: COLLECTION_DELETE — send to bin ===
+    // === FIX4: save cards, fields, inventory to bin on collection delete ===
     case ACTIONS.COLLECTION_DELETE: {
       const { collectionId } = action.payload;
       const collection = state.collections.find(c => c.id === collectionId);
       if (!collection) return state;
-      const affectedCardDefIds = new Set(
-        state.cardDefinitions
-          .filter(cd => cd.collectionId === collectionId)
-          .map(cd => cd.id)
-      );
+      const affectedCardDefs      = state.cardDefinitions.filter(cd => cd.collectionId === collectionId);
+      const affectedCardDefIds    = new Set(affectedCardDefs.map(cd => cd.id));
+      const affectedTemplateFields = state.templateFields.filter(f => f.collectionId === collectionId);
+      const affectedInventoryItems = state.inventory.filter(inv => affectedCardDefIds.has(inv.cardDefId));
       return {
         ...state,
-        collections: state.collections.filter(c => c.id !== collectionId),
-        templateFields: state.templateFields.filter(f => f.collectionId !== collectionId),
+        collections:     state.collections.filter(c => c.id !== collectionId),
+        templateFields:  state.templateFields.filter(f => f.collectionId !== collectionId),
         cardDefinitions: state.cardDefinitions.filter(cd => cd.collectionId !== collectionId),
-        inventory: state.inventory.filter(inv => !affectedCardDefIds.has(inv.cardDefId)),
-        binderSlots: state.binderSlots.filter(s => s.collectionId !== collectionId),
-        bin: [...state.bin, { ...collection, _type: 'collection', deletedAt: Date.now() }],
+        inventory:       state.inventory.filter(inv => !affectedCardDefIds.has(inv.cardDefId)),
+        binderSlots:     state.binderSlots.filter(s => s.collectionId !== collectionId),
+        bin: [...state.bin, {
+          ...collection,
+          _type:           'collection',
+          deletedAt:       Date.now(),
+          _cardDefs:        affectedCardDefs,
+          _templateFields:  affectedTemplateFields,
+          _inventoryItems:  affectedInventoryItems,
+        }],
         nav: state.nav.currentView === 'collection' && state.nav.currentCollectionId === collectionId
           ? { ...state.nav, currentView: 'collections', currentCollectionId: null }
           : state.nav,
       };
     }
-    // === ISSUE #57 END ===
-
-    // ── Template Fields ───────────────────────────────────────────────────────
 
     case ACTIONS.TEMPLATE_FIELD_ADD:
       return { ...state, templateFields: [...state.templateFields, action.payload] };
 
     case ACTIONS.TEMPLATE_FIELD_BULK_ADD: {
       const collectionId = action.payload[0]?.collectionId;
-      if (!collectionId) {
-        console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD: missing collectionId');
-        return state;
-      }
+      if (!collectionId) { console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD: missing collectionId'); return state; }
       const { valid, error } = validateOneTemplatePerCollection(collectionId, state.templateFields);
-      if (!valid) {
-        console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD rejected:', error);
-        return state;
-      }
+      if (!valid) { console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD rejected:', error); return state; }
       return { ...state, templateFields: [...state.templateFields, ...action.payload] };
     }
 
@@ -270,8 +234,6 @@ export function reducer(state, action) {
       };
     }
 
-    // ── Card Definitions ──────────────────────────────────────────────────────
-
     case ACTIONS.CARD_DEFINITION_ADD:
       return { ...state, cardDefinitions: [...state.cardDefinitions, action.payload] };
 
@@ -288,22 +250,25 @@ export function reducer(state, action) {
         ),
       };
 
-    // === ISSUE #57 START: CARD_DEFINITION_DELETE — send to bin ===
+    // === FIX3: save inventory item to bin alongside card def ===
     case ACTIONS.CARD_DEFINITION_DELETE: {
       const { cardDefId } = action.payload;
       const cardDef = state.cardDefinitions.find(cd => cd.id === cardDefId);
       if (!cardDef) return state;
+      const inventoryItem = state.inventory.find(inv => inv.cardDefId === cardDefId) ?? null;
       return {
         ...state,
-        inventory: state.inventory.filter(inv => inv.cardDefId !== cardDefId),
-        binderSlots: state.binderSlots.filter(s => s.cardDefId !== cardDefId),
+        inventory:       state.inventory.filter(inv => inv.cardDefId !== cardDefId),
+        binderSlots:     state.binderSlots.filter(s => s.cardDefId !== cardDefId),
         cardDefinitions: state.cardDefinitions.filter(cd => cd.id !== cardDefId),
-        bin: [...state.bin, { ...cardDef, _type: 'cardDef', deletedAt: Date.now() }],
+        bin: [...state.bin, {
+          ...cardDef,
+          _type:          'cardDef',
+          deletedAt:      Date.now(),
+          _inventoryItem: inventoryItem,
+        }],
       };
     }
-    // === ISSUE #57 END ===
-
-    // ── Inventory ─────────────────────────────────────────────────────────────
 
     case ACTIONS.INVENTORY_ADD:
       if (state.inventory.some(inv => inv.cardDefId === action.payload.cardDefId)) {
@@ -328,50 +293,29 @@ export function reducer(state, action) {
         inventory: state.inventory.filter(inv => inv.id !== action.payload.inventoryId),
       };
 
-    // === ISSUE #53 START: Binder Slot Entity — reducer cases ===
-
     case ACTIONS.BINDER_SLOT_ADD: {
       const { slot } = action.payload;
-      // Guard: prevent duplicate slots on same page/position
       const duplicate = state.binderSlots.some(
-        s => s.binderId === slot.binderId &&
-             s.pageNumber === slot.pageNumber &&
-             s.slotIndex === slot.slotIndex
+        s => s.binderId === slot.binderId && s.pageNumber === slot.pageNumber && s.slotIndex === slot.slotIndex
       );
-      if (duplicate) {
-        console.warn('[BinderVault] BINDER_SLOT_ADD: slot already occupied', slot);
-        return state;
-      }
-      // Guard: prevent same card in two slots in same binder
+      if (duplicate) { console.warn('[BinderVault] BINDER_SLOT_ADD: slot already occupied', slot); return state; }
       const alreadyPlaced = state.binderSlots.some(
         s => s.binderId === slot.binderId && s.cardDefId === slot.cardDefId
       );
-      if (alreadyPlaced) {
-        console.warn('[BinderVault] BINDER_SLOT_ADD: card already in binder', slot.cardDefId);
-        return state;
-      }
+      if (alreadyPlaced) { console.warn('[BinderVault] BINDER_SLOT_ADD: card already in binder', slot.cardDefId); return state; }
       return { ...state, binderSlots: [...state.binderSlots, slot] };
     }
 
     case ACTIONS.BINDER_SLOT_REMOVE:
-      return {
-        ...state,
-        binderSlots: state.binderSlots.filter(s => s.id !== action.payload.slotId),
-      };
+      return { ...state, binderSlots: state.binderSlots.filter(s => s.id !== action.payload.slotId) };
 
     case ACTIONS.BINDER_SLOT_MOVE: {
-      // Move a card to a different page/slot within the same binder
       const { slotId, pageNumber, slotIndex } = action.payload;
-      // Check target is not already occupied
       const targetSlot = state.binderSlots.find(
         s => s.binderId === state.binderSlots.find(x => x.id === slotId)?.binderId &&
-             s.pageNumber === pageNumber &&
-             s.slotIndex === slotIndex
+             s.pageNumber === pageNumber && s.slotIndex === slotIndex
       );
-      if (targetSlot) {
-        console.warn('[BinderVault] BINDER_SLOT_MOVE: target slot occupied');
-        return state;
-      }
+      if (targetSlot) { console.warn('[BinderVault] BINDER_SLOT_MOVE: target slot occupied'); return state; }
       return {
         ...state,
         binderSlots: state.binderSlots.map(s =>
@@ -379,8 +323,6 @@ export function reducer(state, action) {
         ),
       };
     }
-
-    // === ISSUE #53 END: Binder Slot Entity ===
 
     default:
       console.warn('[BinderVault] Unknown action type:', action.type);

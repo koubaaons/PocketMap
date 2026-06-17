@@ -1,34 +1,25 @@
 /**
  * @fileoverview BinderView — slot-based binder view.
- *
- * Milestone 7: Replaced legacy card system with binder slots.
- * Slots reference CARD_DEFINITIONS directly.
- * Grey card logic: unowned = placeholder, owned = colored.
  */
 
-// === ISSUE #55 START: Binder Page View ===
-// === ISSUE #56 START: Binder Slot Actions ===
-
-import { useMemo } from 'react';
-import { Button } from '../ui/index.jsx';
+import { useMemo, useState } from 'react';
+import { Button, ConfirmModal } from '../ui/index.jsx';
 import { BinderPage } from '../collections/BinderPage.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { SlotActionModal } from '../modals/SlotActionModal.jsx';
+import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { buildPageSlotMap, getFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
-
-// === REFACTOR7a START: use useBinderView hook ===
 import { useBinderView } from '../../hooks/useBinderView.js';
-// === REFACTOR7a END ===
-// Refactor7c: removed unused useStore import
+import { useDispatch } from '../../hooks/useStore.js';
+import { ACTIONS } from '../../store/index.js';
 
-export function BinderView({ binder, binderSlots, cardDefinitions, collections, templateFields, inventory, toast }) {
-
-  // === REFACTOR7a START: state from hook ===
+export function BinderView({ binder, binderSlots, cardDefinitions, collections, templateFields, inventory, toast, onNavigate }) {
+  const dispatch = useDispatch();
   const view = useBinderView(binder);
-  // === REFACTOR7a END ===
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
@@ -52,9 +43,11 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
       onRemoveSuccess: view.closeSlotAction,
     });
 
-  const { handleOwn } = useInventoryActions(toast, {
-    onOwnSuccess: view.closeSlotAction,
-  });
+  const { handleOwn, handleUnown, handleUpdateAcquisition, handleToggleFavorite } =
+    useInventoryActions(toast, {
+      onOwnSuccess:   view.closeSlotAction,
+      onUnownSuccess: view.closeCardDetail,
+    });
 
   const handlePlaceCard = (cardDef, collectionId) => {
     handleAddToSlot({
@@ -74,10 +67,28 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     });
   };
 
+  const handleDeleteBinder = () => {
+    dispatch({ type: ACTIONS.BINDER_DELETE, payload: { binderId: binder.id } });
+    toast(`"${binder.name}" moved to trash`);
+    setConfirmDelete(false);
+  };
+
+  // === FIX: Edit Card navigates to the card's collection ===
+  const handleEditCardFromBinder = (cardDef) => {
+    view.closeCardDetail();
+    if (onNavigate && cardDef?.collectionId) {
+      onNavigate('collection', cardDef.collectionId);
+      toast(`Navigated to ${cardDef.name}'s collection to edit`);
+    }
+  };
+
+  const cardTemplateFields = view.viewingCardDef
+    ? templateFields.filter(f => f.collectionId === view.viewingCardDef.collectionId)
+    : [];
+
   return (
     <div className="view">
 
-      {/* Page navigation */}
       <div className="page-nav-bar">
         <div className="page-nav-controls">
           <Button variant="icon" size="sm"
@@ -103,10 +114,12 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           <Button variant="ghost" size="sm" onClick={() => handleAddPage(binder.id)}>
             + Add Page
           </Button>
+          <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
+            Delete Binder
+          </Button>
         </div>
       </div>
 
-      {/* Binder page grid */}
       <BinderPage
         binder={binder}
         pageNumber={view.page}
@@ -117,7 +130,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         onClickSlot={view.openSlotAction}
       />
 
-      {/* Add card to slot modal */}
       {view.addingToSlot && (
         <AddCardToBinderModal
           binder={binder}
@@ -133,7 +145,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         />
       )}
 
-      {/* Slot action modal */}
       {view.activeSlot && (
         <SlotActionModal
           slot={view.activeSlot.slot}
@@ -146,9 +157,34 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         />
       )}
 
+      {view.viewingCardDef && (
+        <CardDetailModal
+          card={view.viewingCardDef}
+          inventoryItem={ownershipMap[view.viewingCardDef.id] ?? null}
+          templateFields={cardTemplateFields}
+          onOwn={() => handleOwn({
+            cardDefId: view.viewingCardDef.id,
+            collectionId: view.viewingCardDef.collectionId,
+          })}
+          onUnown={(inventoryId) => handleUnown(inventoryId)}
+          onUpdateAcquisition={handleUpdateAcquisition}
+          onToggleFavorite={handleToggleFavorite}
+          onEdit={() => handleEditCardFromBinder(view.viewingCardDef)}
+          onDelete={() => view.closeCardDetail()}
+          onClose={view.closeCardDetail}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete "${binder.name}"?`}
+          message="This binder will be moved to the trash bin. All slot placements will be removed."
+          confirmLabel="Delete Binder"
+          onConfirm={handleDeleteBinder}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
+
     </div>
   );
 }
-
-// === ISSUE #55 END: Binder Page View ===
-// === ISSUE #56 END: Binder Slot Actions ===
