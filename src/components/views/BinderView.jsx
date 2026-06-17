@@ -1,34 +1,27 @@
 /**
  * @fileoverview BinderView — slot-based binder view.
- *
- * Milestone 7: Replaced legacy card system with binder slots.
- * Slots reference CARD_DEFINITIONS directly.
- * Grey card logic: unowned = placeholder, owned = colored.
  */
 
 // === ISSUE #55 START: Binder Page View ===
 // === ISSUE #56 START: Binder Slot Actions ===
 
-import { useMemo } from 'react';
-import { Button } from '../ui/index.jsx';
+import { useMemo, useState } from 'react';
+import { Button, ConfirmModal } from '../ui/index.jsx';
 import { BinderPage } from '../collections/BinderPage.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { SlotActionModal } from '../modals/SlotActionModal.jsx';
+import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { buildPageSlotMap, getFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
-
-// === REFACTOR7a START: use useBinderView hook ===
 import { useBinderView } from '../../hooks/useBinderView.js';
-// === REFACTOR7a END ===
-// Refactor7c: removed unused useStore import
+import { useDispatch } from '../../hooks/useStore.js';
+import { ACTIONS } from '../../store/index.js';
 
 export function BinderView({ binder, binderSlots, cardDefinitions, collections, templateFields, inventory, toast }) {
-
-  // === REFACTOR7a START: state from hook ===
+  const dispatch = useDispatch();
   const view = useBinderView(binder);
-  // === REFACTOR7a END ===
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
@@ -52,9 +45,11 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
       onRemoveSuccess: view.closeSlotAction,
     });
 
-  const { handleOwn } = useInventoryActions(toast, {
-    onOwnSuccess: view.closeSlotAction,
-  });
+  const { handleOwn, handleUnown, handleUpdateAcquisition, handleToggleFavorite } =
+    useInventoryActions(toast, {
+      onOwnSuccess:   view.closeSlotAction,
+      onUnownSuccess: view.closeCardDetail,
+    });
 
   const handlePlaceCard = (cardDef, collectionId) => {
     handleAddToSlot({
@@ -73,6 +68,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
       collectionId: view.activeSlot.slot.collectionId,
     });
   };
+
 
   return (
     <div className="view">
@@ -145,6 +141,26 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           onClose={view.closeSlotAction}
         />
       )}
+
+      {/* === FIX1: CardDetailModal wired to viewingCardDef === */}
+      {view.viewingCardDef && (
+        <CardDetailModal
+          card={view.viewingCardDef}
+          inventoryItem={ownershipMap[view.viewingCardDef.id] ?? null}
+          templateFields={cardTemplateFields}
+          onOwn={() => handleOwn({
+            cardDefId: view.viewingCardDef.id,
+            collectionId: view.viewingCardDef.collectionId,
+          })}
+          onUnown={(inventoryId) => handleUnown(inventoryId)}
+          onUpdateAcquisition={handleUpdateAcquisition}
+          onToggleFavorite={handleToggleFavorite}
+          onEdit={() => view.closeCardDetail()}
+          onDelete={() => view.closeCardDetail()}
+          onClose={view.closeCardDetail}
+        />
+      )}
+
 
     </div>
   );
