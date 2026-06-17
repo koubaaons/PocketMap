@@ -1,13 +1,14 @@
 // === ISSUE #1 START: Split Views — HomeView ===
-// === ISSUE #58 START: Remove Legacy Card System — use binderSlots instead of cards ===
+// === ISSUE #81 START: Binder Color Picker — use cover_color on binder cards ===
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { Button, EmptyState, StatCard } from '../ui/index.jsx';
 import { CreateBinderModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
 import { binderCapacity } from '../../utils/index.js';
 import { getFilledSlotCount } from '../../selectors/binderSelectors.js';
+import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 
 export function HomeView({ binders, binderSlots = [], inventory = [], cardDefinitions = [], bin, toast, onNavigate }) {
   const dispatch = useDispatch();
@@ -19,9 +20,7 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
     setShowCreate(false);
   }, [dispatch, toast]);
 
-  // Stats derived from new system
-  const totalCards    = cardDefinitions.length;
-  const totalOwned    = inventory.length;
+  const totalCards     = cardDefinitions.length;
   const totalFavorites = inventory.filter(inv => inv.is_favorite).length;
 
   return (
@@ -70,23 +69,30 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
 }
 
 function BinderCard({ binder, cardCount, capacity, onClick }) {
-  const pct = capacity > 0 ? Math.round((cardCount / capacity) * 100) : 0;
+  const pct   = capacity > 0 ? Math.round((cardCount / capacity) * 100) : 0;
+  // === ISSUE #81: use cover_color, fall back to default for old binders ===
+  const color = binder.cover_color ?? DEFAULT_BINDER_COLOR;
+
   return (
     <button className="binder-card" onClick={onClick}>
-      <div className="binder-spine" />
+      {/* Spine uses the binder color */}
+      <div className="binder-spine" style={{ background: color }} />
       <div className="binder-card-body">
         <div className="binder-card-name">{binder.name}</div>
         <div className="binder-card-meta">
           {binder.pages} pages · {binder.rows}×{binder.cols} grid
         </div>
         <div className="binder-progress-bar">
-          <div className="binder-progress-fill" style={{ width: `${pct}%` }} />
+          <div
+            className="binder-progress-fill"
+            style={{ width: `${pct}%`, background: color }}
+          />
         </div>
-        <div className="binder-card-count">{cardCount} / {capacity} cards</div>
+        <div className="binder-card-count">{cardCount} / {capacity} cards · {pct}%</div>
       </div>
     </button>
   );
 }
 
-// === ISSUE #58 END: Remove Legacy Card System ===
+// === ISSUE #81 END: Binder Color Picker ===
 // === ISSUE #1 END: Split Views — HomeView ===

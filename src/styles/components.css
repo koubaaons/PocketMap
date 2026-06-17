@@ -1565,3 +1565,48 @@ textarea.form-input {
 .result-org-organised  { color: var(--info); }
 .result-org-unorganised { color: var(--warning); }
 .result-org-not-owned  { color: var(--text-hint); }
+
+/* ── Binder color picker ──────────────────────────────────────────────────── */
+
+.color-picker {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.color-swatch-active {
+  border-color: var(--text-primary);
+  transform: scale(1.15);
+}
+
+.capacity-hint {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--space-2) 0;
+}
+
+.form-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* ── Binder slot greyscale for unowned cards ─────────────────────────────── */
+.slot-card-image-grey {
+  filter: grayscale(100%);
+  opacity: 0.6;
+}
