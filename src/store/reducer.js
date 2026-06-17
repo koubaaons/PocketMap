@@ -110,7 +110,21 @@ export function reducer(state, action) {
       };
     }
 
-
+    // === FIX4: restore collection with all cards, fields, and inventory ===
+    case ACTIONS.BIN_RESTORE_COLLECTION: {
+      const { itemId } = action.payload;
+      const item = state.bin.find(c => c.id === itemId && c._type === 'collection');
+      if (!item) return state;
+      const { _type, deletedAt, _cardDefs, _templateFields, _inventoryItems, ...collection } = item;
+      return {
+        ...state,
+        collections:     [...state.collections, collection],
+        cardDefinitions: _cardDefs       ? [...state.cardDefinitions, ..._cardDefs]      : state.cardDefinitions,
+        templateFields:  _templateFields ? [...state.templateFields,  ..._templateFields] : state.templateFields,
+        inventory:       _inventoryItems ? [...state.inventory,        ..._inventoryItems] : state.inventory,
+        bin: state.bin.filter(c => c.id !== itemId),
+      };
+    }
 
     // === FIX3: restore card with owned and favorite state ===
     case ACTIONS.BIN_RESTORE_CARD: {
@@ -150,7 +164,35 @@ export function reducer(state, action) {
         ),
       };
 
-
+    // === FIX4: save cards, fields, inventory to bin on collection delete ===
+    case ACTIONS.COLLECTION_DELETE: {
+      const { collectionId } = action.payload;
+      const collection = state.collections.find(c => c.id === collectionId);
+      if (!collection) return state;
+      const affectedCardDefs      = state.cardDefinitions.filter(cd => cd.collectionId === collectionId);
+      const affectedCardDefIds    = new Set(affectedCardDefs.map(cd => cd.id));
+      const affectedTemplateFields = state.templateFields.filter(f => f.collectionId === collectionId);
+      const affectedInventoryItems = state.inventory.filter(inv => affectedCardDefIds.has(inv.cardDefId));
+      return {
+        ...state,
+        collections:     state.collections.filter(c => c.id !== collectionId),
+        templateFields:  state.templateFields.filter(f => f.collectionId !== collectionId),
+        cardDefinitions: state.cardDefinitions.filter(cd => cd.collectionId !== collectionId),
+        inventory:       state.inventory.filter(inv => !affectedCardDefIds.has(inv.cardDefId)),
+        binderSlots:     state.binderSlots.filter(s => s.collectionId !== collectionId),
+        bin: [...state.bin, {
+          ...collection,
+          _type:           'collection',
+          deletedAt:       Date.now(),
+          _cardDefs:        affectedCardDefs,
+          _templateFields:  affectedTemplateFields,
+          _inventoryItems:  affectedInventoryItems,
+        }],
+        nav: state.nav.currentView === 'collection' && state.nav.currentCollectionId === collectionId
+          ? { ...state.nav, currentView: 'collections', currentCollectionId: null }
+          : state.nav,
+      };
+    }
 
     case ACTIONS.TEMPLATE_FIELD_ADD:
       return { ...state, templateFields: [...state.templateFields, action.payload] };
