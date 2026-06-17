@@ -1,0 +1,78 @@
+/**
+ * @fileoverview Typography — headings, body text, and text utility classes.
+ * No layout. No colour hardcoding — tokens only.
+ */
+
+/* === ISSUE #72 START: Typography, Spacing & Base Components — typography === */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  line-height: var(--leading-tight);
+}
+
+h1 { font-size: var(--text-3xl); }
+h2 { font-size: var(--text-2xl); }
+h3 { font-size: var(--text-xl);  }
+h4 { font-size: var(--text-lg);  }
+h5 { font-size: var(--text-md);  }
+h6 { font-size: var(--text-base);}
+
+p {
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+}
+
+/* ── Text utility classes ─────────────────────────────────────────────────── */
+
+.text-primary   { color: var(--text-primary);   }
+.text-secondary { color: var(--text-secondary); }
+.text-muted     { color: var(--text-muted);     }
+.text-hint      { color: var(--text-hint);      }
+.text-accent    { color: var(--accent);         }
+.text-success   { color: var(--success);        }
+.text-danger    { color: var(--danger);         }
+.text-warning   { color: var(--warning);        }
+
+.text-xs   { font-size: var(--text-xs);   }
+.text-sm   { font-size: var(--text-sm);   }
+.text-base { font-size: var(--text-base); }
+.text-md   { font-size: var(--text-md);   }
+.text-lg   { font-size: var(--text-lg);   }
+.text-xl   { font-size: var(--text-xl);   }
+
+.font-regular  { font-weight: var(--weight-regular);  }
+.font-medium   { font-weight: var(--weight-medium);   }
+.font-semibold { font-weight: var(--weight-semibold); }
+
+.text-left   { text-align: left;   }
+.text-center { text-align: center; }
+.text-right  { text-align: right;  }
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uppercase {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Section labels (sidebar, panels) ────────────────────────────────────── */
+
+.section-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-hint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 var(--space-4);
+  margin-bottom: var(--space-1);
+  margin-top: var(--space-4);
+}
+
+/* === ISSUE #72 END: Typography === */
