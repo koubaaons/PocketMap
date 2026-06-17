@@ -4,8 +4,17 @@ import { useState, useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
+import { getSlotForCard } from '../../selectors/binderSelectors.js';
 
-export function SearchView({ cardDefinitions = [], collections = [], inventory = [], binders = [], binderSlots = [], toast, onNavigateToBinder }) {
+export function SearchView({
+  cardDefinitions = [],
+  collections = [],
+  inventory = [],
+  binders = [],
+  binderSlots = [],
+  toast,
+  onNavigateToBinder,
+}) {
   const [query, setQuery] = useState('');
 
   const collectionMap = useMemo(() => {
@@ -14,12 +23,44 @@ export function SearchView({ cardDefinitions = [], collections = [], inventory =
     return map;
   }, [collections]);
 
+  const binderMap = useMemo(() => {
+    const map = {};
+    binders.forEach(b => { map[b.id] = b; });
+    return map;
+  }, [binders]);
+
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
   const results = useMemo(() => {
     if (!query.trim()) return [];
     return applyCardDefinitionFilters(cardDefinitions, query, 'name_asc').slice(0, 50);
   }, [cardDefinitions, query]);
+
+  /**
+   * Returns the organisation status label for the left side of the result row.
+   * - Owned + in a binder  → "Binder Name · Page X · Slot Y"
+   * - Owned + no binder    → "Unorganised"
+   * - Not owned            → "Not owned"
+   */
+  const getOrganisationStatus = (card) => {
+    const isOwned = ownershipMap[card.id] !== undefined;
+    if (!isOwned) return { label: 'Not owned', type: 'not-owned' };
+
+    const slot = getSlotForCard(binderSlots, null, card.id);
+    if (slot) {
+      const binder = binderMap[slot.binderId];
+      return {
+        label: `${binder?.name ?? 'Binder'} · Page ${slot.pageNumber} · Slot ${slot.slotIndex + 1}`,
+        type: 'organised',
+        // Expose for future IoT feature — physical binder location
+        binderId: slot.binderId,
+        pageNumber: slot.pageNumber,
+        slotIndex: slot.slotIndex,
+      };
+    }
+
+    return { label: 'Unorganised', type: 'unorganised' };
+  };
 
   return (
     <div className="view">
@@ -57,10 +98,11 @@ export function SearchView({ cardDefinitions = [], collections = [], inventory =
           <p className="search-count">{results.length} result{results.length !== 1 ? 's' : ''}</p>
           <div className="results-list">
             {results.map(card => {
-              const collection = collectionMap[card.collectionId];
-              const inventoryItem = ownershipMap[card.id];
-              const isOwned = inventoryItem !== undefined;
-              const isFav = inventoryItem?.is_favorite ?? false;
+              const collection  = collectionMap[card.collectionId];
+              const isOwned     = ownershipMap[card.id] !== undefined;
+              const isFav       = ownershipMap[card.id]?.is_favorite ?? false;
+              const orgStatus   = getOrganisationStatus(card);
+
               return (
                 <div key={card.id} className="result-row">
                   <div className="result-info">
@@ -70,13 +112,18 @@ export function SearchView({ cardDefinitions = [], collections = [], inventory =
                     </span>
                     <span className="result-meta">
                       {collection?.name ?? '—'}
-                      {isOwned && (
-                        <span style={{ color: 'var(--success)', marginLeft: 6, fontSize: 'var(--text-xs)' }}>✓ Owned</span>
-                      )}
+                      {' · '}
+                      <span className={`result-org-status result-org-${orgStatus.type}`}>
+                        {orgStatus.type === 'organised'    && '📖 '}
+                        {orgStatus.type === 'unorganised'  && '○ '}
+                        {orgStatus.type === 'not-owned'    && '✕ '}
+                        {orgStatus.label}
+                      </span>
                     </span>
                   </div>
+                  {/* Owned badge on right stays */}
                   <span className={`badge ${isOwned ? 'badge-owned' : 'badge-missing'}`}>
-                    {isOwned ? 'Owned' : 'Missing'}
+                    {isOwned ? 'Owned' : 'Not owned'}
                   </span>
                 </div>
               );
