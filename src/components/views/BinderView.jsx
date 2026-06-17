@@ -23,6 +23,9 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   const dispatch = useDispatch();
   const view = useBinderView(binder);
 
+  // === FIX2: delete binder confirm state ===
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
   const cardDefMap = useMemo(() => {
@@ -69,6 +72,17 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     });
   };
 
+  // === FIX2: delete binder handler ===
+  const handleDeleteBinder = () => {
+    dispatch({ type: ACTIONS.BINDER_DELETE, payload: { binderId: binder.id } });
+    toast(`"${binder.name}" moved to trash`);
+    setConfirmDelete(false);
+  };
+
+  // Template fields for the card detail modal
+  const cardTemplateFields = view.viewingCardDef
+    ? templateFields.filter(f => f.collectionId === view.viewingCardDef.collectionId)
+    : [];
 
   return (
     <div className="view">
@@ -98,6 +112,10 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           <span className="page-fill-count">{filled}/{capacity}</span>
           <Button variant="ghost" size="sm" onClick={() => handleAddPage(binder.id)}>
             + Add Page
+          </Button>
+          {/* === FIX2: delete binder button === */}
+          <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
+            Delete Binder
           </Button>
         </div>
       </div>
@@ -161,6 +179,16 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         />
       )}
 
+      {/* === FIX2: delete binder confirm === */}
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete "${binder.name}"?`}
+          message="This binder will be moved to the trash bin. All slot placements will be removed."
+          confirmLabel="Delete Binder"
+          onConfirm={handleDeleteBinder}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
 
     </div>
   );
