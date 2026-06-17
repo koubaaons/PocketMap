@@ -1,89 +1,101 @@
 /**
- * @fileoverview Sidebar — navigation and binder list.
+ * @fileoverview Sidebar — navigation sidebar with all nav items.
+ *
+ * Nav structure:
+ *   Logo
+ *   ── menu ──
+ *   Home
+ *   Binders
+ *   Collections
+ *   Favorites
+ *   Search
+ *   ── account ──
+ *   Statistics
+ *   Trash Bin
+ *   Settings
+ *   ── (spacer) ──
+ *   User area
  */
 
-import { useState } from 'react';
-import { ACTIONS } from '../store/index.js';
-import { useDispatch } from '../hooks/useStore.js';
-import { ConfirmModal } from './ui/index.jsx';
+// === ISSUE #70 START: Sidebar ===
 
-// === ISSUE #1 START: Split Views — updated NAV_ITEMS with Collections and Account ===
 const NAV_ITEMS = [
-  { id: 'home',        label: 'Home',        icon: '⊞' },
-  { id: 'collections', label: 'Collections', icon: '◈' },
-  { id: 'search',      label: 'Search',      icon: '◎' },
-  { id: 'favorites',   label: 'Favorites',   icon: '★' },
-  { id: 'bin',         label: 'Trash Bin',   icon: '⊗' },
-  { id: 'account',     label: 'Account',     icon: '◉' },
+  { view: 'home',        label: 'Home',        icon: 'ti-home',       group: 'menu' },
+  { view: 'binders',     label: 'Binders',     icon: 'ti-books',      group: 'menu' },
+  { view: 'collections', label: 'Collections', icon: 'ti-cards',      group: 'menu' },
+  { view: 'favorites',   label: 'Favorites',   icon: 'ti-heart',      group: 'menu' },
+  { view: 'search',      label: 'Search',      icon: 'ti-search',     group: 'menu' },
+  { view: 'statistics',  label: 'Statistics',  icon: 'ti-chart-bar',  group: 'account' },
+  { view: 'bin',         label: 'Trash Bin',   icon: 'ti-trash',      group: 'account' },
+  { view: 'settings',    label: 'Settings',    icon: 'ti-settings',   group: 'account' },
 ];
-// === ISSUE #1 END: Split Views — updated NAV_ITEMS ===
 
 export function Sidebar({ nav, binders, bin, onNavigate }) {
-  const dispatch = useDispatch();
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const currentView = nav.currentView;
 
-  const handleDeleteBinder = (binderId) => {
-    dispatch({ type: ACTIONS.BINDER_DELETE, payload: { binderId } });
-    setConfirmDelete(null);
-    if (nav.currentBinderId === binderId) onNavigate('home', null);
-  };
+  const menuItems   = NAV_ITEMS.filter(i => i.group === 'menu');
+  const accountItems = NAV_ITEMS.filter(i => i.group === 'account');
+
+  const binCount = bin?.length ?? 0;
 
   return (
     <aside className="sidebar" aria-label="Main navigation">
+
+      {/* Logo */}
       <div className="sidebar-logo">
-        <span className="logo-mark">bindervault</span>
-        <span className="logo-sub">card collection manager</span>
+        <i className="ti ti-book-2" aria-hidden="true"></i>
+        Pinder<span className="sidebar-logo-accent">+</span>
       </div>
 
       <nav className="sidebar-nav">
-        <span className="sidebar-nav-label">Main</span>
-        {NAV_ITEMS.map(item => (
+
+        {/* Menu section */}
+        <div className="section-label">menu</div>
+        {menuItems.map(item => (
           <button
-            key={item.id}
-            className={`nav-item ${nav.currentView === item.id ? 'active' : ''}`}
-            onClick={() => onNavigate(item.id, null)}
-            aria-current={nav.currentView === item.id ? 'page' : undefined}
+            key={item.view}
+            className={`nav-item ${currentView === item.view ? 'active' : ''}`}
+            onClick={() => onNavigate(item.view)}
+            aria-current={currentView === item.view ? 'page' : undefined}
           >
-            <span className="nav-icon" aria-hidden="true">{item.icon}</span>
-            <span className="nav-label">{item.label}</span>
-            {item.id === 'bin' && bin.length > 0 && (
-              <span className="nav-badge">{bin.length}</span>
+            <i className={`ti ${item.icon}`} aria-hidden="true"></i>
+            {item.label}
+          </button>
+        ))}
+
+        {/* Account section */}
+        <div className="section-label">account</div>
+        {accountItems.map(item => (
+          <button
+            key={item.view}
+            className={`nav-item ${currentView === item.view ? 'active' : ''}`}
+            onClick={() => onNavigate(item.view)}
+            aria-current={currentView === item.view ? 'page' : undefined}
+          >
+            <i className={`ti ${item.icon}`} aria-hidden="true"></i>
+            {item.label}
+            {item.view === 'bin' && binCount > 0 && (
+              <span className="tab-count" style={{ marginLeft: 'auto' }}>{binCount}</span>
             )}
           </button>
         ))}
+
+        <div className="nav-spacer" />
+
       </nav>
 
-      <hr className="sidebar-divider" />
-
-      <div className="sidebar-binders">
-        <span className="sidebar-nav-label">My Binders</span>
-        {binders.length === 0 && (
-          <span className="sidebar-empty-hint">No binders yet</span>
-        )}
-        {binders.map(b => (
-          <div
-            key={b.id}
-            className={`binder-nav-item ${nav.currentView === 'binder' && nav.currentBinderId === b.id ? 'active' : ''}`}
-          >
-            <button className="binder-nav-name" onClick={() => onNavigate('binder', b.id)} title={b.name}>
-              <span className="binder-dot" />
-              <span className="binder-nav-label">{b.name}</span>
-            </button>
-            <button className="binder-nav-delete" onClick={() => setConfirmDelete(b.id)}
-              title={`Delete ${b.name}`} aria-label={`Delete ${b.name}`}>×</button>
-          </div>
-        ))}
+      {/* User area */}
+      <div className="user-area" onClick={() => onNavigate('account')}>
+        <div className="user-avatar" aria-hidden="true">ON</div>
+        <div className="user-info">
+          <div className="user-name">Ons</div>
+          <div className="user-role">View profile</div>
+        </div>
+        <i className="ti ti-chevron-right" style={{ fontSize: 14, color: 'var(--text-hint)', flexShrink: 0 }} aria-hidden="true"></i>
       </div>
 
-      {confirmDelete && (
-        <ConfirmModal
-          title="Delete Binder?"
-          message={`Delete "${binders.find(b => b.id === confirmDelete)?.name}"? All its cards will be moved to trash.`}
-          confirmLabel="Delete"
-          onConfirm={() => handleDeleteBinder(confirmDelete)}
-          onClose={() => setConfirmDelete(null)}
-        />
-      )}
     </aside>
   );
 }
+
+// === ISSUE #70 END: Sidebar ===
