@@ -1,30 +1,19 @@
 /**
  * @fileoverview CardDefinitionForm — dynamic form driven by template fields.
- *
- * Renders one input per template field based on field_type.
- * Used for both create and edit — mode prop switches behavior.
- *
- * field_type → input:
- *   text    → <input type="text">
- *   number  → <input type="number">
- *   boolean → <input type="checkbox">
- *   select  → <select> using field.options
+ * === ISSUE #80: image upload, preview, and persistence ===
  */
 
-// === ISSUE #14 START: Card Definition Form ===
-
+import { useState, useRef } from 'react';
 import { Button, Modal, ModalActions } from '../ui/index.jsx';
-
-// === REFACTOR4b START: use useCardDefinitionForm hook ===
 import { useCardDefinitionForm } from '../../hooks/useCardDefinitionForm.js';
-// === REFACTOR4b END ===
+
+const IMAGE_SIZE_WARNING_BYTES = 500 * 1024;
 
 export function CardDefinitionForm({ collection, templateFields, initialCard, mode = 'create', onSubmit, onClose }) {
   const sortedFields = [...templateFields]
     .filter(f => f.collectionId === collection.id)
     .sort((a, b) => a.order - b.order);
 
-  // === REFACTOR4b START: form logic in hook, component only renders ===
   const { values, errors, set, handleSubmit } = useCardDefinitionForm({
     collection,
     sortedFields,
@@ -32,16 +21,66 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
     mode,
     onSubmit,
   });
-  // === REFACTOR4b END ===
 
-  const title = mode === 'create'
-    ? `Add Card to ${collection.name}`
-    : 'Edit Card';
+  // === ISSUE #80: image preview syncs from values.image_url ===
+  const [imageSizeWarning, setImageSizeWarning] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageSizeWarning(file.size > IMAGE_SIZE_WARNING_BYTES);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      set('image_url', ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    set('image_url', null);
+    setImageSizeWarning(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const title = mode === 'create' ? `Add Card to ${collection.name}` : 'Edit Card';
 
   return (
     <Modal title={title} onClose={onClose}>
 
-      {/* Card name — always present regardless of template */}
+      {/* Image upload */}
+      <div className="form-group">
+        <label>Card Image</label>
+        <div className="image-upload-area">
+          {values.image_url ? (
+            <div className="image-preview-wrapper">
+              <img src={values.image_url} alt="Card preview" className="image-preview" />
+              <button className="image-remove-btn" onClick={handleRemoveImage} aria-label="Remove image">✕</button>
+            </div>
+          ) : (
+            <button className="image-upload-placeholder" onClick={() => fileInputRef.current?.click()} type="button">
+              <span className="image-upload-icon">🖼</span>
+              <span className="image-upload-label">Add card image</span>
+              <span className="image-upload-hint">JPG, PNG, WebP</span>
+            </button>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleImageChange}
+            style={{ display: 'none' }}
+            aria-label="Upload card image"
+          />
+        </div>
+        {imageSizeWarning && (
+          <span className="field-error-msg" style={{ color: 'var(--warning)' }}>
+            ⚠ Large image — may affect performance. In V2 this will move to cloud storage.
+          </span>
+        )}
+      </div>
+
+      {/* Card name */}
       <div className="form-group">
         <label htmlFor="card-def-name">Card Name *</label>
         <input
@@ -55,7 +94,7 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
         {errors.name && <span className="field-error-msg">{errors.name}</span>}
       </div>
 
-      {/* === ISSUE #14: Dynamic fields from template === */}
+      {/* Dynamic fields */}
       {sortedFields.map(field => (
         <DynamicField
           key={field.id}
@@ -76,7 +115,6 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
   );
 }
 
-// === ISSUE #14: DynamicField — renders the right input for each field_type ===
 function DynamicField({ field, value, error, onChange }) {
   const id = `field-${field.id}`;
   const label = field.field_name + (field.is_required ? ' *' : '');
@@ -84,28 +122,22 @@ function DynamicField({ field, value, error, onChange }) {
   return (
     <div className="form-group">
       <label htmlFor={id}>{label}</label>
-
       {field.field_type === 'text' && (
         <input id={id} className={`form-input ${error ? 'input-error' : ''}`}
           value={value ?? ''} onChange={e => onChange(e.target.value)}
           placeholder={`Enter ${field.field_name}`} />
       )}
-
       {field.field_type === 'number' && (
         <input id={id} type="number" className={`form-input ${error ? 'input-error' : ''}`}
           value={value ?? ''} onChange={e => onChange(e.target.value)}
           placeholder={`Enter ${field.field_name}`} />
       )}
-
       {field.field_type === 'boolean' && (
         <label className="checkbox-label">
-          <input id={id} type="checkbox"
-            checked={Boolean(value)}
-            onChange={e => onChange(e.target.checked)} />
+          <input id={id} type="checkbox" checked={Boolean(value)} onChange={e => onChange(e.target.checked)} />
           Yes
         </label>
       )}
-
       {field.field_type === 'select' && (
         <select id={id} className={`form-input ${error ? 'input-error' : ''}`}
           value={value ?? ''} onChange={e => onChange(e.target.value)}>
@@ -115,7 +147,6 @@ function DynamicField({ field, value, error, onChange }) {
           ))}
         </select>
       )}
-
       {error && <span className="field-error-msg">{error}</span>}
     </div>
   );

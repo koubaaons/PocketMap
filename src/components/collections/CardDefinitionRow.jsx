@@ -1,9 +1,10 @@
 /**
  * @fileoverview CardDefinitionRow — renders a single card definition in the list.
- * Receives pre-computed ownership state via props. No dispatch.
+ * === ISSUE #80: card image displayed on left side ===
  */
 
 // === ISSUE #15 START: Card Definitions List — CardDefinitionRow ===
+// === ISSUE #80 START: Card Images ===
 
 export function CardDefinitionRow({ card, templateFields, isOwned, isFavorite, onView, onEdit, onDelete }) {
   const previewFields = templateFields
@@ -17,14 +18,24 @@ export function CardDefinitionRow({ card, templateFields, isOwned, isFavorite, o
       onClick={onView}
       style={{ cursor: 'pointer' }}
     >
+      {/* === ISSUE #80: card image or placeholder === */}
+      {card.image_url ? (
+        <img
+          src={card.image_url}
+          alt={card.name}
+          className="card-def-image"
+          onClick={e => e.stopPropagation()}
+        />
+      ) : (
+        <div className="card-def-image-placeholder" aria-hidden="true">🃏</div>
+      )}
+
       <div className="card-def-ownership">
         {isOwned
           ? <span className="ownership-dot ownership-owned" title="Owned">✓</span>
           : <span className="ownership-dot ownership-missing" title="Not owned">○</span>
         }
-        {/* === ISSUE #38 START: Favorite indicator === */}
         {isFavorite && <span className="ownership-fav" title="Favorite">★</span>}
-        {/* === ISSUE #38 END === */}
       </div>
 
       <div className="card-def-info" style={{ flex: 1 }}>
@@ -65,4 +76,5 @@ export function CardDefinitionRow({ card, templateFields, isOwned, isFavorite, o
   );
 }
 
+// === ISSUE #80 END: Card Images ===
 // === ISSUE #15 END: Card Definitions List — CardDefinitionRow ===

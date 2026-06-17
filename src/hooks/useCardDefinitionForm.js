@@ -1,19 +1,6 @@
 /**
  * @fileoverview useCardDefinitionForm hook.
- *
- * Extracts all form logic from CardDefinitionForm so the component
- * is responsible only for rendering.
- *
- * Handles:
- * - Building initial values from template fields
- * - Field value state
- * - Validation (name required, required fields enforced)
- * - Building the final card definition object on submit
- *
- * Usage:
- *   const { values, errors, set, handleSubmit } = useCardDefinitionForm({
- *     collection, sortedFields, initialCard, mode, onSubmit
- *   });
+ * === ISSUE #80: image_url included in form state and submit ===
  */
 
 // === REFACTOR4b START: Extract useCardDefinitionForm hook ===
@@ -21,21 +8,14 @@
 import { useState } from 'react';
 import { createCardDefinition } from '../types/index.js';
 
-/**
- * @param {{
- *   collection: object,
- *   sortedFields: object[],
- *   initialCard?: object,
- *   mode: 'create' | 'edit',
- *   onSubmit: (cardDef) => void,
- * }} params
- */
 export function useCardDefinitionForm({ collection, sortedFields, initialCard, mode, onSubmit }) {
 
-  // ── Build initial values from template fields ─────────────────────────────
-
   const buildInitialValues = () => {
-    const values = { name: initialCard?.name ?? '' };
+    const values = {
+      name: initialCard?.name ?? '',
+      // === ISSUE #80: include image_url in initial values ===
+      image_url: initialCard?.image_url ?? null,
+    };
     sortedFields.forEach(f => {
       const existing = initialCard?.attributes?.[f.field_name];
       if (existing !== undefined) {
@@ -54,17 +34,12 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
   const [values, setValues] = useState(buildInitialValues);
   const [errors, setErrors] = useState({});
 
-  // ── Set a single field value ──────────────────────────────────────────────
-
   const set = (key, val) => {
     setValues(prev => ({ ...prev, [key]: val }));
-    // Clear error for this field on change
     if (errors[key]) {
       setErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
     }
   };
-
-  // ── Validate ──────────────────────────────────────────────────────────────
 
   const validate = () => {
     const newErrors = {};
@@ -80,8 +55,6 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
     return Object.keys(newErrors).length === 0;
   };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
-
   const handleSubmit = () => {
     if (!validate()) return;
 
@@ -92,6 +65,8 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
       const { cardDef, errors: createErrors } = createCardDefinition({
         collectionId: collection.id,
         name: values.name.trim(),
+        // === ISSUE #80: pass image_url to factory ===
+        image_url: values.image_url ?? null,
         attributes,
       });
       if (!cardDef) { console.error('Card creation failed:', createErrors); return; }
@@ -100,6 +75,8 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
       onSubmit({
         ...initialCard,
         name: values.name.trim(),
+        // === ISSUE #80: include image_url in update ===
+        image_url: values.image_url ?? null,
         attributes,
         updatedAt: Date.now(),
       });
@@ -109,4 +86,4 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
   return { values, errors, set, handleSubmit };
 }
 
-// === REFACTOR4b END: Extract useCardDefinitionForm hook ===
+// === REFACTOR4b END ===

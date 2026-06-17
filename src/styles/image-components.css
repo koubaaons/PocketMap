@@ -1,0 +1,125 @@
+/**
+ * @fileoverview Image component styles.
+ * === ISSUE #80: Card Images ===
+ */
+
+/* ── Image upload area ────────────────────────────────────────────────────── */
+
+.image-upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.image-upload-placeholder {
+  width: 100%;
+  max-width: 200px;
+  aspect-ratio: 2.5 / 3.5;
+  border: 1.5px dashed var(--border-secondary);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  background: var(--bg-secondary);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.image-upload-placeholder:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.image-upload-icon { font-size: 28px; }
+
+.image-upload-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.image-upload-hint {
+  font-size: var(--text-xs);
+  color: var(--text-hint);
+}
+
+/* ── Image preview ────────────────────────────────────────────────────────── */
+
+.image-preview-wrapper {
+  position: relative;
+  display: inline-block;
+  max-width: 200px;
+}
+
+.image-preview {
+  width: 100%;
+  aspect-ratio: 2.5 / 3.5;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  border: 0.5px solid var(--border-primary);
+  display: block;
+}
+
+.image-remove-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  color: white;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid var(--bg-primary);
+  transition: opacity var(--transition-fast);
+}
+
+.image-remove-btn:hover { opacity: 0.85; }
+
+/* ── Card detail image ────────────────────────────────────────────────────── */
+
+.card-detail-image-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-3);
+}
+
+.card-detail-image {
+  width: 140px;
+  aspect-ratio: 2.5 / 3.5;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  border: 0.5px solid var(--border-primary);
+}
+
+/* ── Card image in list/grid rows ─────────────────────────────────────────── */
+
+.card-def-image {
+  width: 36px;
+  aspect-ratio: 2.5 / 3.5;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.card-def-image-placeholder {
+  width: 36px;
+  aspect-ratio: 2.5 / 3.5;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--border-primary);
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  color: var(--text-hint);
+}
