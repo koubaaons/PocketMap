@@ -2,7 +2,6 @@
  * @fileoverview App root — composes the full application.
  */
 
-// === ISSUE #69 START: Theme Toggle ===
 // === ISSUE #71 START: Layout Shell ===
 
 import { useCallback } from 'react';
@@ -39,10 +38,7 @@ const VIEW_TITLES = {
 export default function App() {
   const dispatch = useDispatch();
   const { toasts, toast, dismiss } = useToast();
-
-  // === ISSUE #69: theme hook ===
   const { theme, toggleTheme, isDark } = useTheme();
-
   const binders         = useStore(s => s.binders);
   const bin             = useStore(s => s.bin);
   const nav             = useStore(s => s.nav);
@@ -212,6 +208,4 @@ export default function App() {
     </div>
   );
 }
-
-// === ISSUE #69 END: Theme Toggle ===
 // === ISSUE #71 END: Layout Shell ===
