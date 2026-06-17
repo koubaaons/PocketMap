@@ -1,22 +1,15 @@
 /**
  * @fileoverview CardDetailModal — shows a card definition with ownership info.
- *
- * Two states:
- *   Not owned → shows "I own it" button
- *   Owned     → shows acquisition summary, favorite toggle, edit/remove options
- *
- * Moved to modals/ in Refactor5d — it is a modal, not a collection component.
+ * === ISSUE #80: card image displayed prominently at top ===
  */
 
 // === ISSUE #36 START: Mark Card As Owned — CardDetailModal ===
+// === ISSUE #80 START: Card Images ===
 
 import { useState } from 'react';
 import { Button, Modal, ModalActions, ConfirmModal } from '../ui/index.jsx';
 import { AcquisitionForm } from '../collections/AcquisitionForm.jsx';
-
-// === REFACTOR5b START: use AcquisitionSummary component ===
 import { AcquisitionSummary } from '../collections/AcquisitionSummary.jsx';
-// === REFACTOR5b END ===
 
 export function CardDetailModal({
   card,
@@ -78,6 +71,17 @@ export function CardDetailModal({
   return (
     <Modal title={card.name} onClose={onClose}>
 
+      {/* === ISSUE #80: Card image displayed prominently === */}
+      {card.image_url && (
+        <div className="card-detail-image-wrapper">
+          <img
+            src={card.image_url}
+            alt={card.name}
+            className="card-detail-image"
+          />
+        </div>
+      )}
+
       {/* Ownership status + favorite toggle */}
       <div className="card-detail-status">
         {isOwned ? (
@@ -85,7 +89,6 @@ export function CardDetailModal({
         ) : (
           <span className="status-badge status-not-owned">Not owned</span>
         )}
-        {/* === ISSUE #38 START: Favorite toggle === */}
         {isOwned && (
           <button
             className={`fav-toggle ${inventoryItem.is_favorite ? 'fav-active' : ''}`}
@@ -95,7 +98,6 @@ export function CardDetailModal({
             {inventoryItem.is_favorite ? '★' : '☆'}
           </button>
         )}
-        {/* === ISSUE #38 END === */}
       </div>
 
       {/* Card attributes from template */}
@@ -116,9 +118,7 @@ export function CardDetailModal({
         </div>
       )}
 
-      {/* === REFACTOR5b START: use AcquisitionSummary instead of inline === */}
       {isOwned && <AcquisitionSummary inventoryItem={inventoryItem} />}
-      {/* === REFACTOR5b END === */}
 
       <hr className="modal-divider" />
 
@@ -135,6 +135,9 @@ export function CardDetailModal({
           )}
         </div>
         <div className="card-detail-actions-right">
+          {onEdit && (
+            <Button variant="ghost" size="sm" onClick={onEdit}>Edit Card</Button>
+          )}
           {isOwned && (
             <Button variant="ghost" size="sm" onClick={() => setConfirmUnown(true)}>
               Remove Ownership
@@ -149,3 +152,6 @@ export function CardDetailModal({
     </Modal>
   );
 }
+
+// === ISSUE #80 END: Card Images ===
+// === ISSUE #36 END: Mark Card As Owned ===

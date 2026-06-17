@@ -1,4 +1,11 @@
-// === ISSUE #15 START: Card Definitions List — CardDefinitionList ===
+/**
+ * @fileoverview CardDefinitionList — grid of card definition items.
+ * === ISSUE #80: displays card image in each row ===
+ * === ISSUE #84: fixed column grid layout ===
+ */
+
+// === ISSUE #15 START: Card Definitions List ===
+// === ISSUE #80 START: Card Images ===
 
 import { CardDefinitionRow } from './CardDefinitionRow.jsx';
 import { EmptyState } from '../ui/index.jsx';
@@ -42,4 +49,5 @@ export function CardDefinitionList({
   );
 }
 
-// === ISSUE #15 END: Card Definitions List — CardDefinitionList ===
+// === ISSUE #80 END ===
+// === ISSUE #15 END ===

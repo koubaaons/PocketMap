@@ -1,4 +1,5 @@
 // === ISSUE #1 START: Split Views — SearchView ===
+// === ISSUE #80 START: Card Images ===
 
 import { useState, useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
@@ -36,29 +37,20 @@ export function SearchView({
     return applyCardDefinitionFilters(cardDefinitions, query, 'name_asc').slice(0, 50);
   }, [cardDefinitions, query]);
 
-  /**
-   * Returns the organisation status label for the left side of the result row.
-   * - Owned + in a binder  → "Binder Name · Page X · Slot Y"
-   * - Owned + no binder    → "Unorganised"
-   * - Not owned            → "Not owned"
-   */
   const getOrganisationStatus = (card) => {
     const isOwned = ownershipMap[card.id] !== undefined;
     if (!isOwned) return { label: 'Not owned', type: 'not-owned' };
-
     const slot = getSlotForCard(binderSlots, null, card.id);
     if (slot) {
       const binder = binderMap[slot.binderId];
       return {
         label: `${binder?.name ?? 'Binder'} · Page ${slot.pageNumber} · Slot ${slot.slotIndex + 1}`,
         type: 'organised',
-        // Expose for future IoT feature — physical binder location
         binderId: slot.binderId,
         pageNumber: slot.pageNumber,
         slotIndex: slot.slotIndex,
       };
     }
-
     return { label: 'Unorganised', type: 'unorganised' };
   };
 
@@ -98,13 +90,21 @@ export function SearchView({
           <p className="search-count">{results.length} result{results.length !== 1 ? 's' : ''}</p>
           <div className="results-list">
             {results.map(card => {
-              const collection  = collectionMap[card.collectionId];
-              const isOwned     = ownershipMap[card.id] !== undefined;
-              const isFav       = ownershipMap[card.id]?.is_favorite ?? false;
-              const orgStatus   = getOrganisationStatus(card);
+              const collection = collectionMap[card.collectionId];
+              const isOwned    = ownershipMap[card.id] !== undefined;
+              const isFav      = ownershipMap[card.id]?.is_favorite ?? false;
+              const orgStatus  = getOrganisationStatus(card);
 
               return (
                 <div key={card.id} className="result-row">
+
+                  {/* === ISSUE #80: card image on left === */}
+                  {card.image_url ? (
+                    <img src={card.image_url} alt={card.name} className="card-def-image" />
+                  ) : (
+                    <div className="card-def-image-placeholder" aria-hidden="true">🃏</div>
+                  )}
+
                   <div className="result-info">
                     <span className="result-name">
                       {isFav && <span style={{ color: 'var(--favorite-color)', marginRight: 4 }}>★</span>}
@@ -114,17 +114,18 @@ export function SearchView({
                       {collection?.name ?? '—'}
                       {' · '}
                       <span className={`result-org-status result-org-${orgStatus.type}`}>
-                        {orgStatus.type === 'organised'    && '📖 '}
-                        {orgStatus.type === 'unorganised'  && '○ '}
-                        {orgStatus.type === 'not-owned'    && '✕ '}
+                        {orgStatus.type === 'organised'   && '📖 '}
+                        {orgStatus.type === 'unorganised' && '○ '}
+                        {orgStatus.type === 'not-owned'   && '✕ '}
                         {orgStatus.label}
                       </span>
                     </span>
                   </div>
-                  {/* Owned badge on right stays */}
+
                   <span className={`badge ${isOwned ? 'badge-owned' : 'badge-missing'}`}>
                     {isOwned ? 'Owned' : 'Not owned'}
                   </span>
+
                 </div>
               );
             })}
@@ -135,4 +136,5 @@ export function SearchView({
   );
 }
 
+// === ISSUE #80 END: Card Images ===
 // === ISSUE #1 END: Split Views — SearchView ===

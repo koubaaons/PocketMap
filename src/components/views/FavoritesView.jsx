@@ -1,15 +1,10 @@
-// === ISSUE #38 START: Favorite Cards — FavoritesView reads from inventory ===
+// === ISSUE #38 START: Favorite Cards — FavoritesView ===
+// === ISSUE #80 START: Card Images ===
 
 import { useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
 import { getFavoriteCards } from '../../selectors/inventorySelectors.js';
 
-/**
- * FavoritesView now reads favorites from inventory (is_favorite flag)
- * rather than from legacy binder cards.
- *
- * A card is a favorite when its USER_INVENTORY record has is_favorite = true.
- */
 export function FavoritesView({ inventory, cardDefinitions, collections, toast }) {
   const favorites = useMemo(
     () => getFavoriteCards(inventory, cardDefinitions),
@@ -44,8 +39,23 @@ export function FavoritesView({ inventory, cardDefinitions, collections, toast }
           const collection = collectionMap[cardDef.collectionId];
           return (
             <div key={inventoryItem.id} className="result-row">
+
+              {/* === ISSUE #80: card image on left === */}
+              {cardDef.image_url ? (
+                <img
+                  src={cardDef.image_url}
+                  alt={cardDef.name}
+                  className="card-def-image"
+                />
+              ) : (
+                <div className="card-def-image-placeholder" aria-hidden="true">🃏</div>
+              )}
+
               <div className="result-info">
-                <span className="result-name">★ {cardDef.name}</span>
+                <span className="result-name">
+                  <span style={{ color: 'var(--favorite-color)', marginRight: 4 }}>★</span>
+                  {cardDef.name}
+                </span>
                 <span className="result-meta">
                   {collection?.name ?? '—'}
                   {inventoryItem.condition_rating && (
@@ -53,6 +63,7 @@ export function FavoritesView({ inventory, cardDefinitions, collections, toast }
                   )}
                 </span>
               </div>
+
             </div>
           );
         })}
@@ -61,4 +72,5 @@ export function FavoritesView({ inventory, cardDefinitions, collections, toast }
   );
 }
 
+// === ISSUE #80 END: Card Images ===
 // === ISSUE #38 END: Favorite Cards ===
