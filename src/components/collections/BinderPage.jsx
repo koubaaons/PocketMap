@@ -1,29 +1,20 @@
 /**
- * @fileoverview BinderPage — renders the full slot grid for one binder page.
- * Receives pre-computed slot and card data via props. No dispatch.
+ * @fileoverview BinderPage — grid of slots for one page.
+ * === ISSUE #82: passes preview mode and selected slot props to each slot ===
  */
 
 // === ISSUE #55 START: Binder Page View — BinderPage ===
 
 import { BinderSlot } from './BinderSlot.jsx';
 
-/**
- * @param {{
- *   binder: object,
- *   pageNumber: number,
- *   pageSlotMap: Record<number, object>,   — slotIndex → slot
- *   cardDefMap: Record<string, object>,    — cardDefId → cardDef
- *   ownershipMap: Record<string, object>,  — cardDefId → inventoryItem
- *   onClickEmpty: (slotIndex) => void,
- *   onClickSlot: (slot, cardDef) => void,
- * }} props
- */
 export function BinderPage({
   binder,
   pageNumber,
   pageSlotMap,
   cardDefMap,
   ownershipMap,
+  isPreviewMode = false,
+  selectedSlot = null,
   onClickEmpty,
   onClickSlot,
 }) {
@@ -37,10 +28,13 @@ export function BinderPage({
         style={{ gridTemplateColumns: `repeat(${binder.cols}, 1fr)` }}
       >
         {Array.from({ length: totalSlots }, (_, slotIndex) => {
-          const slot    = pageSlotMap[slotIndex] ?? null;
-          const cardDef = slot ? (cardDefMap[slot.cardDefId] ?? null) : null;
-          const isOwned    = slot ? ownershipMap[slot.cardDefId] !== undefined : false;
-          const isFavorite = slot ? (ownershipMap[slot.cardDefId]?.is_favorite ?? false) : false;
+          const slot      = pageSlotMap[slotIndex] ?? null;
+          const cardDef   = slot ? (cardDefMap[slot.cardDefId] ?? null) : null;
+          const isOwned   = slot ? ownershipMap[slot.cardDefId] !== undefined : false;
+          const isFav     = slot ? (ownershipMap[slot.cardDefId]?.is_favorite ?? false) : false;
+          const isSelected  = selectedSlot?.id === slot?.id;
+          // A slot is a move target if something is selected and this slot is empty
+          const isMoveTarget = selectedSlot !== null && !slot;
 
           return (
             <BinderSlot
@@ -49,7 +43,10 @@ export function BinderPage({
               slot={slot}
               cardDef={cardDef}
               isOwned={isOwned}
-              isFavorite={isFavorite}
+              isFavorite={isFav}
+              isPreviewMode={isPreviewMode}
+              isSelected={isSelected}
+              isMoveTarget={isMoveTarget}
               onClickEmpty={() => onClickEmpty(slotIndex)}
               onClickSlot={(s) => onClickSlot(s, cardDef)}
             />
@@ -60,4 +57,4 @@ export function BinderPage({
   );
 }
 
-// === ISSUE #55 END: Binder Page View — BinderPage ===
+// === ISSUE #55 END ===

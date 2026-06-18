@@ -1,76 +1,63 @@
 /**
- * @fileoverview BinderSlot — renders a single slot in the binder grid.
- *
- * Three states:
- *   empty       — no card assigned, shows + to add
- *   placeholder — card assigned but not owned, greyscale image or grey text
- *   filled      — card assigned and owned, full color
+ * @fileoverview BinderSlot — single slot in the binder grid.
+ * === ISSUE #82: preview mode shows all cards in full color, selected state for move ===
  */
 
 // === ISSUE #55 START: Binder Page View — BinderSlot ===
-// === ISSUE #80: show greyscale image for unowned cards ===
 
-export function BinderSlot({ slotIndex, slot, cardDef, isOwned, isFavorite, onClickEmpty, onClickSlot }) {
+export function BinderSlot({
+  slotIndex,
+  slot,
+  cardDef,
+  isOwned,
+  isFavorite,
+  isPreviewMode = false,
+  isSelected = false,
+  isMoveTarget = false,
+  onClickEmpty,
+  onClickSlot,
+}) {
 
   // Empty slot
   if (!slot || !cardDef) {
     return (
       <button
-        className="binder-slot binder-slot-empty"
+        className={`binder-slot binder-slot-empty ${isMoveTarget ? 'binder-slot-move-target' : ''}`}
         onClick={onClickEmpty}
         aria-label={`Add card to slot ${slotIndex + 1}`}
       >
         <span className="slot-index">{slotIndex + 1}</span>
-        <span className="slot-add-icon">+</span>
+        <span className="slot-add-icon">{isMoveTarget ? '↓' : '+'}</span>
       </button>
     );
   }
 
-  // Placeholder — card assigned but not owned
-  if (!isOwned) {
-    return (
-      <button
-        className="binder-slot binder-slot-placeholder"
-        onClick={() => onClickSlot(slot)}
-        aria-label={`${cardDef.name} — not owned`}
-      >
-        <span className="slot-index">{slotIndex + 1}</span>
-        {cardDef.image_url ? (
-          // === ISSUE #80: show image in greyscale when not owned ===
-          <img
-            src={cardDef.image_url}
-            alt={cardDef.name}
-            className="slot-card-image slot-card-image-grey"
-          />
-        ) : (
-          <div className="slot-card-content">
-            <span className="slot-card-name">{cardDef.name}</span>
-            <span className="slot-placeholder-label">Not owned</span>
-          </div>
-        )}
-      </button>
-    );
-  }
+  // In preview mode all cards show in full color regardless of ownership
+  const showGrey = !isOwned && !isPreviewMode;
 
-  // Filled — card owned, full color
   return (
     <button
-      className="binder-slot binder-slot-filled"
+      className={`binder-slot ${showGrey ? 'binder-slot-placeholder' : 'binder-slot-filled'} ${isSelected ? 'binder-slot-selected' : ''}`}
       onClick={() => onClickSlot(slot)}
       aria-label={cardDef.name}
+      aria-pressed={isSelected}
     >
       <span className="slot-index">{slotIndex + 1}</span>
       {isFavorite && <span className="slot-fav-star" aria-label="Favorite">★</span>}
       {cardDef.image_url ? (
-        <img src={cardDef.image_url} alt={cardDef.name} className="slot-card-image" />
+        <img
+          src={cardDef.image_url}
+          alt={cardDef.name}
+          className={`slot-card-image ${showGrey ? 'slot-card-image-grey' : ''}`}
+        />
       ) : (
         <div className="slot-card-content">
           <span className="slot-card-name">{cardDef.name}</span>
+          {showGrey && <span className="slot-placeholder-label">Not owned</span>}
         </div>
       )}
     </button>
   );
 }
 
-// === ISSUE #80 END ===
-// === ISSUE #55 END: Binder Page View — BinderSlot ===
+// === ISSUE #55 END ===
