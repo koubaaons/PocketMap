@@ -25,15 +25,16 @@ export function BinderPage({
       <div className="binder-page-label">Page {pageNumber}</div>
       <div
         className="binder-page-grid"
-        style={{ gridTemplateColumns: `repeat(${binder.cols}, 1fr)` }}
+        style={{
+          gridTemplateColumns: `repeat(${binder.cols}, 1fr)`,
+        }}
       >
         {Array.from({ length: totalSlots }, (_, slotIndex) => {
-          const slot      = pageSlotMap[slotIndex] ?? null;
-          const cardDef   = slot ? (cardDefMap[slot.cardDefId] ?? null) : null;
-          const isOwned   = slot ? ownershipMap[slot.cardDefId] !== undefined : false;
-          const isFav     = slot ? (ownershipMap[slot.cardDefId]?.is_favorite ?? false) : false;
-          const isSelected  = selectedSlot?.id === slot?.id;
-          // A slot is a move target if something is selected and this slot is empty
+          const slot         = pageSlotMap[slotIndex] ?? null;
+          const cardDef      = slot ? (cardDefMap[slot.cardDefId] ?? null) : null;
+          const isOwned      = slot ? ownershipMap[slot.cardDefId] !== undefined : false;
+          const isFav        = slot ? (ownershipMap[slot.cardDefId]?.is_favorite ?? false) : false;
+          const isSelected   = selectedSlot?.id === slot?.id;
           const isMoveTarget = selectedSlot !== null && !slot;
 
           return (
