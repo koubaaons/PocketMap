@@ -1,5 +1,18 @@
 /**
- * @fileoverview BinderView — slot-based binder view.
+ * @fileoverview BinderView — physical book layout.
+ *
+ * Spread layout:
+ *   Spread 0: [Binder Cover] | [Page 1]
+ *   Spread 1: [Page 2]       | [Page 3]
+ *   Spread 2: [Page 4]       | [Page 5]
+ *
+ * Preview Mode:
+ *   - All cards show in full color (owned and unowned)
+ *   - Click filled slot to select, click another to swap
+ *   - Click empty slot to move selected card there
+ *   - Add cards to empty slots same as edit mode
+ *   - "Save Layout" commits all changes to store
+ *   - "Cancel" discards all preview changes
  */
 
 import { useMemo, useState } from 'react';
@@ -15,11 +28,15 @@ import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 import { useBinderView } from '../../hooks/useBinderView.js';
 import { useDispatch } from '../../hooks/useStore.js';
 import { ACTIONS } from '../../store/index.js';
+import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
+import { createBinderSlot } from '../../types/index.js';
 
 export function BinderView({ binder, binderSlots, cardDefinitions, collections, templateFields, inventory, toast, onNavigate }) {
-  const dispatch = useDispatch();
-  const view = useBinderView(binder);
+  const dispatch   = useDispatch();
+  const view       = useBinderView(binder, binderSlots);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const color = binder.cover_color ?? DEFAULT_BINDER_COLOR;
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
@@ -29,10 +46,33 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     return map;
   }, [cardDefinitions]);
 
-  const pageSlotMap = useMemo(
-    () => buildPageSlotMap(binderSlots, binder.id, view.page),
-    [binderSlots, binder.id, view.page]
-  );
+  // Use preview slots when in preview mode, real slots otherwise
+  const displaySlots = view.activeSlots;
+
+  const spread       = view.page;
+  const isCover      = spread === 0;
+  const leftPageNum  = isCover ? null : spread * 2;
+  const rightPageNum = isCover ? 1    : spread * 2 + 1;
+  const totalSpreads = Math.ceil(binder.pages / 2) + 1;
+
+  // Build slot maps from display slots (preview or real)
+  const leftSlotMap = useMemo(() => {
+    if (!leftPageNum) return {};
+    const map = {};
+    displaySlots
+      .filter(s => s.binderId === binder.id && s.pageNumber === leftPageNum)
+      .forEach(s => { map[s.slotIndex] = s; });
+    return map;
+  }, [displaySlots, binder.id, leftPageNum]);
+
+  const rightSlotMap = useMemo(() => {
+    if (!rightPageNum) return {};
+    const map = {};
+    displaySlots
+      .filter(s => s.binderId === binder.id && s.pageNumber === rightPageNum)
+      .forEach(s => { map[s.slotIndex] = s; });
+    return map;
+  }, [displaySlots, binder.id, rightPageNum]);
 
   const filled   = getFilledSlotCount(binderSlots, binder.id);
   const capacity = binder.rows * binder.cols * binder.pages;
@@ -49,22 +89,37 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
       onUnownSuccess: view.closeCardDetail,
     });
 
+  // ── Edit mode handlers ──────────────────────────────────────────────────
+
   const handlePlaceCard = (cardDef, collectionId) => {
-    handleAddToSlot({
-      binderId: binder.id,
-      cardDefId: cardDef.id,
-      collectionId,
-      pageNumber: view.page,
-      slotIndex: view.addingToSlot.slotIndex,
-    });
+    if (view.isPreviewMode) {
+      // Add to preview local state only
+      const { slot } = createBinderSlot({
+        binderId:     binder.id,
+        cardDefId:    cardDef.id,
+        collectionId,
+        pageNumber:   view.addingToSlot.pageNumber,
+        slotIndex:    view.addingToSlot.slotIndex,
+      });
+      if (slot) {
+        view.previewAddSlot(slot);
+        view.closeAddToSlot();
+        toast('Card added to preview');
+      }
+    } else {
+      handleAddToSlot({
+        binderId:     binder.id,
+        cardDefId:    cardDef.id,
+        collectionId,
+        pageNumber:   view.addingToSlot.pageNumber,
+        slotIndex:    view.addingToSlot.slotIndex,
+      });
+    }
   };
 
   const handleOwnFromSlot = () => {
     if (!view.activeSlot) return;
-    handleOwn({
-      cardDefId: view.activeSlot.cardDef.id,
-      collectionId: view.activeSlot.slot.collectionId,
-    });
+    handleOwn({ cardDefId: view.activeSlot.cardDef.id, collectionId: view.activeSlot.slot.collectionId });
   };
 
   const handleDeleteBinder = () => {
@@ -73,7 +128,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     setConfirmDelete(false);
   };
 
-  // === FIX: Edit Card navigates to the card's collection ===
   const handleEditCardFromBinder = (cardDef) => {
     view.closeCardDetail();
     if (onNavigate && cardDef?.collectionId) {
@@ -82,64 +136,226 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     }
   };
 
+  // ── Preview mode handlers ───────────────────────────────────────────────
+
+  const handleSlotClickInPreview = (slot, cardDef) => {
+    if (!view.selectedSlot) {
+      // Select this slot
+      view.selectSlotForMove(slot);
+    } else if (view.selectedSlot.id === slot.id) {
+      // Deselect
+      view.clearSelectedSlot();
+    } else {
+      // Swap with selected slot
+      view.previewMoveSlot(view.selectedSlot.id, slot.pageNumber, slot.slotIndex);
+    }
+  };
+
+  const handleEmptyClickInPreview = (slotIndex, pageNumber) => {
+    if (view.selectedSlot) {
+      // Move selected card to empty slot
+      view.previewMoveSlot(view.selectedSlot.id, pageNumber, slotIndex);
+    } else {
+      // Add a new card to this slot
+      view.openAddToSlot(slotIndex, pageNumber);
+    }
+  };
+
+  // ── Save layout — commit preview slots to store ─────────────────────────
+
+  const handleSaveLayout = () => {
+    if (!view.previewSlots) return;
+
+    // Find slots that moved — compare preview vs original
+    view.previewSlots.forEach(previewSlot => {
+      const original = binderSlots.find(s => s.id === previewSlot.id);
+      if (!original) {
+        // New slot added in preview — dispatch add
+        dispatch({ type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: previewSlot } });
+      } else if (
+        original.pageNumber !== previewSlot.pageNumber ||
+        original.slotIndex  !== previewSlot.slotIndex
+      ) {
+        // Slot moved — dispatch move
+        dispatch({
+          type: ACTIONS.BINDER_SLOT_MOVE,
+          payload: { slotId: previewSlot.id, pageNumber: previewSlot.pageNumber, slotIndex: previewSlot.slotIndex },
+        });
+      }
+    });
+
+    view.exitPreviewMode();
+    toast('Layout saved');
+  };
+
+  // ── Rendering helpers ───────────────────────────────────────────────────
+
   const cardTemplateFields = view.viewingCardDef
     ? templateFields.filter(f => f.collectionId === view.viewingCardDef.collectionId)
     : [];
 
+  const spreadLabel = isCover
+    ? 'Cover + Page 1'
+    : `Pages ${leftPageNum}–${Math.min(rightPageNum, binder.pages)}`;
+
+  const spreadList = useMemo(() => {
+    const list = [{ label: 'Cover', spread: 0 }];
+    for (let s = 1; s < totalSpreads; s++) {
+      const l = s * 2;
+      const r = s * 2 + 1;
+      list.push({ label: r <= binder.pages ? `${l}-${r}` : `${l}`, spread: s });
+    }
+    return list;
+  }, [totalSpreads, binder.pages]);
+
+  const makePageHandlers = (pageNumber) => ({
+    onClickEmpty: (slotIndex) =>
+      view.isPreviewMode
+        ? handleEmptyClickInPreview(slotIndex, pageNumber)
+        : view.openAddToSlot(slotIndex, pageNumber),
+    onClickSlot: (slot, cardDef) =>
+      view.isPreviewMode
+        ? handleSlotClickInPreview(slot, cardDef)
+        : view.openSlotAction(slot, cardDef),
+  });
+
   return (
-    <div className="view">
+    <div className="binder-view-root">
 
-      <div className="page-nav-bar">
-        <div className="page-nav-controls">
-          <Button variant="icon" size="sm"
-            onClick={view.goToPrevPage} disabled={view.page <= 1}>←</Button>
-          <span className="page-label">Page {view.page} of {binder.pages}</span>
-          <Button variant="icon" size="sm"
-            onClick={view.goToNextPage} disabled={view.page >= binder.pages}>→</Button>
+      {/* Topbar */}
+      <div className="binder-topbar">
+        <div className="binder-topbar-left">
+          <span className="binder-title" style={{ color }}>{binder.name}</span>
+          <span className="binder-fill-count">{filled}/{capacity} cards</span>
         </div>
-
-        <div className="page-jumper">
-          {Array.from({ length: Math.min(binder.pages, 30) }, (_, i) => (
-            <button key={i + 1}
-              className={`page-pip ${view.page === i + 1 ? 'active' : ''}`}
-              onClick={() => view.goToPage(i + 1)}>
-              {i + 1}
+        <div className="binder-topbar-right">
+          <div className="binder-mode-toggle">
+            <button
+              className={`mode-btn ${!view.isPreviewMode ? 'mode-btn-active' : ''}`}
+              onClick={view.exitPreviewMode}
+            >
+              Edit Mode
             </button>
-          ))}
-          {binder.pages > 30 && <span className="page-more">+{binder.pages - 30} more</span>}
-        </div>
+            <button
+              className={`mode-btn ${view.isPreviewMode ? 'mode-btn-active' : ''}`}
+              onClick={view.enterPreviewMode}
+            >
+              Preview Mode
+            </button>
+          </div>
 
-        <div className="page-nav-right">
-          <span className="page-fill-count">{filled}/{capacity}</span>
-          <Button variant="ghost" size="sm" onClick={() => handleAddPage(binder.id)}>
-            + Add Page
-          </Button>
-          <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
-            Delete Binder
-          </Button>
+          {/* Save Layout button — only in preview mode */}
+          {view.isPreviewMode && (
+            <Button variant="primary" size="sm" onClick={handleSaveLayout}>
+              Save Layout
+            </Button>
+          )}
+
+          {!view.isPreviewMode && (
+            <Button variant="ghost" size="sm" onClick={() => handleAddPage(binder.id)}>+ Page</Button>
+          )}
+          <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>Delete</Button>
         </div>
       </div>
 
-      <BinderPage
-        binder={binder}
-        pageNumber={view.page}
-        pageSlotMap={pageSlotMap}
-        cardDefMap={cardDefMap}
-        ownershipMap={ownershipMap}
-        onClickEmpty={view.openAddToSlot}
-        onClickSlot={view.openSlotAction}
-      />
+      {/* Page navigation */}
+      <div className="binder-page-nav">
+        <button className="binder-nav-arrow" onClick={() => view.goToPage(spread - 1)} disabled={spread === 0}>‹</button>
+        <span className="binder-page-indicator">{spreadLabel} / {binder.pages} pages</span>
+        <button className="binder-nav-arrow" onClick={() => view.goToPage(spread + 1)} disabled={spread >= totalSpreads - 1}>›</button>
+      </div>
 
+      {/* Book */}
+      <div className="binder-book-wrapper">
+        <div className="binder-book">
+
+          {/* LEFT — cover or left page */}
+          {isCover ? (
+            <div className="binder-book-page binder-book-page-left binder-cover-page" style={{ background: color }}>
+              <div className="binder-cover-content">
+                <div className="binder-cover-name">{binder.name}</div>
+                <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
+              </div>
+            </div>
+          ) : leftPageNum <= binder.pages ? (
+            <div className="binder-book-page binder-book-page-left">
+              <BinderPage
+                binder={binder}
+                pageNumber={leftPageNum}
+                pageSlotMap={leftSlotMap}
+                cardDefMap={cardDefMap}
+                ownershipMap={ownershipMap}
+                isPreviewMode={view.isPreviewMode}
+                selectedSlot={view.selectedSlot}
+                {...makePageHandlers(leftPageNum)}
+              />
+            </div>
+          ) : (
+            <div className="binder-book-page binder-book-page-left binder-page-empty-right" />
+          )}
+
+          {/* Spine */}
+          <div className="binder-spine-center" style={{ background: color }}>
+            <div className="binder-ring" />
+            <div className="binder-ring" />
+            <div className="binder-ring" />
+          </div>
+
+          {/* RIGHT — page 1 on cover spread, right page otherwise */}
+          {rightPageNum <= binder.pages ? (
+            <div className="binder-book-page binder-book-page-right">
+              <BinderPage
+                binder={binder}
+                pageNumber={rightPageNum}
+                pageSlotMap={rightSlotMap}
+                cardDefMap={cardDefMap}
+                ownershipMap={ownershipMap}
+                isPreviewMode={view.isPreviewMode}
+                selectedSlot={view.selectedSlot}
+                {...makePageHandlers(rightPageNum)}
+              />
+            </div>
+          ) : (
+            <div className="binder-book-page binder-book-page-right binder-page-empty-right" />
+          )}
+
+        </div>
+      </div>
+
+      {/* Thumbnails */}
+      <div className="binder-thumbnails-bar">
+        {spreadList.map(({ label, spread: s }) => (
+          <button
+            key={s}
+            className={`binder-thumb ${spread === s ? 'binder-thumb-active' : ''}`}
+            style={spread === s ? { borderColor: color, color } : {}}
+            onClick={() => view.goToPage(s)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Preview hint */}
+      {view.isPreviewMode && (
+        <div className="binder-preview-hint">
+          {view.selectedSlot
+            ? 'Click an empty slot to move · Click another card to swap · Click same card to deselect'
+            : 'Preview Mode — all cards in full color · Click a card to select for moving · Click empty slot to add'}
+        </div>
+      )}
+
+      {/* Modals */}
       {view.addingToSlot && (
         <AddCardToBinderModal
           binder={binder}
-          pageNumber={view.page}
+          pageNumber={view.addingToSlot.pageNumber}
           slotIndex={view.addingToSlot.slotIndex}
           cardDefinitions={cardDefinitions}
           collections={collections}
           templateFields={templateFields}
           inventory={inventory}
-          binderSlots={binderSlots}
+          binderSlots={view.isPreviewMode ? (view.previewSlots ?? binderSlots) : binderSlots}
           onSubmit={handlePlaceCard}
           onClose={view.closeAddToSlot}
         />
@@ -162,10 +378,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           card={view.viewingCardDef}
           inventoryItem={ownershipMap[view.viewingCardDef.id] ?? null}
           templateFields={cardTemplateFields}
-          onOwn={() => handleOwn({
-            cardDefId: view.viewingCardDef.id,
-            collectionId: view.viewingCardDef.collectionId,
-          })}
+          onOwn={() => handleOwn({ cardDefId: view.viewingCardDef.id, collectionId: view.viewingCardDef.collectionId })}
           onUnown={(inventoryId) => handleUnown(inventoryId)}
           onUpdateAcquisition={handleUpdateAcquisition}
           onToggleFavorite={handleToggleFavorite}
