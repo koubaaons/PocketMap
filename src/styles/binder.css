@@ -1,7 +1,6 @@
 /**
  * @fileoverview Binder physical layout styles.
  * === ISSUE #82: book layout, spine, thumbnails, preview mode ===
- * Dark premium binder aesthetic — dark pages, metallic rings, card sleeves.
  */
 
 /* ── Binder view root ─────────────────────────────────────────────────────── */
@@ -119,24 +118,54 @@
   padding-bottom: var(--space-4);
 }
 
-/* ── Book — dark premium binder ───────────────────────────────────────────── */
+/* ── Book — #4 cover thickness ────────────────────────────────────────────── */
 
 .binder-book {
   display: flex;
   align-items: stretch;
   width: 100%;
   max-width: 1100px;
-  /* Dark binder shell — color set via inline style from cover_color */
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 18px;
+  padding: 10px;
   gap: 0;
+  position: relative;
   box-shadow:
-    0 12px 40px rgba(0,0,0,0.5),
-    0 4px 12px rgba(0,0,0,0.3),
-    inset 0 1px 0 rgba(255,255,255,0.06);
+    inset 0 2px 4px rgba(255,255,255,0.25),
+    inset 0 -6px 10px rgba(0,0,0,0.25),
+    0 12px 30px rgba(0,0,0,0.35);
 }
 
-/* ── Book pages — dark sleeve background ──────────────────────────────────── */
+/* #4 Raised inner edge */
+.binder-book::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 14px;
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,0.08),
+    inset 0 0 20px rgba(0,0,0,0.2);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Texture overlay */
+.binder-book::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255,255,255,0.015) 0px,
+    rgba(255,255,255,0.015) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Book pages — #2 stacked + #7 slight tilt ─────────────────────────────── */
 
 .binder-book-page {
   flex: 1;
@@ -144,99 +173,120 @@
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  border-radius: 4px;
-  /* Subtle page shadow against the shell */
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  border-radius: 8px;
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.5),
+    0 2px 4px rgba(0,0,0,0.15);
 }
 
+/* #7 Slight page tilt */
 .binder-book-page-left {
-  margin-right: 4px;
+  margin-right: 2px;
+  transform: rotate(-0.3deg);
+  transform-origin: right center;
+  /* Inner edge curves toward spine */
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
+/* #2 Page stacking on right page + #7 tilt */
 .binder-book-page-right {
   position: relative;
-  margin-left: 4px;
-  /* Stacked page edges visible on right side */
-  box-shadow:
-    0 2px 8px rgba(0,0,0,0.2),
-    6px 0 0 rgba(200,200,200,0.4),
-    6px 0 4px rgba(0,0,0,0.1),
-    10px 0 0 rgba(180,180,180,0.25),
-    10px 0 4px rgba(0,0,0,0.08);
+  margin-left: 2px;
+  transform: rotate(0.3deg);
+  transform-origin: left center;
+  /* Inner edge curves toward spine */
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+.binder-book-page-right::before,
+.binder-book-page-right::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  border-radius: inherit;
+  z-index: -1;
+}
+
+.binder-book-page-right::before {
+  transform: translate(3px, 3px);
+  opacity: 0.7;
+}
+
+.binder-book-page-right::after {
+  transform: translate(6px, 6px);
+  opacity: 0.4;
 }
 
 .binder-page-empty-right {
-  background: #161616;
-  opacity: 0.8;
+  background: rgba(0,0,0,0.1);
+  opacity: 0.6;
 }
 
-/* ── Spine — dark with metallic rings ─────────────────────────────────────── */
+/* ── Spine — #1 no rings, just gutter seam ────────────────────────────────── */
 
 .binder-spine-center {
-  width: 40px;
-  min-width: 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-evenly;
-  padding: var(--space-6) 0;
+  width: 8px;
+  min-width: 8px;
   flex-shrink: 0;
-  /* Spine is part of the shell, slightly recessed */
-  background: #1a1a1a;
-  border-radius: 4px;
-  box-shadow:
-    inset 0 0 8px rgba(0,0,0,0.6);
-}
-
-/* Metallic chrome ring */
-.binder-ring {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
   position: relative;
-  background: radial-gradient(circle at 35% 30%,
-    #f0f0f0 0%,
-    #c0c0c0 25%,
-    #888 55%,
-    #555 80%,
-    #333 100%
-  );
-  box-shadow:
-    0 3px 10px rgba(0,0,0,0.7),
-    0 1px 3px rgba(0,0,0,0.5),
-    inset 0 1px 2px rgba(255,255,255,0.5),
-    inset 0 -1px 2px rgba(0,0,0,0.3);
-  flex-shrink: 0;
+  z-index: 2;
+  background: rgba(0,0,0,0.2);
+  opacity: 0.4;
 }
 
-/* Ring hole */
-.binder-ring::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 40%,
-    #222,
-    #0a0a0a
-  );
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.9);
-}
+.binder-ring { display: none; }
 
-/* ── Binder page grid inside book ─────────────────────────────────────────── */
+/* ── Page grid ────────────────────────────────────────────────────────────── */
 
 .binder-book-page .binder-page-wrapper {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  position: relative;
+  height: 100%;
+}
+
+/* Curved gutter shadow — paper bending toward spine */
+.binder-book-page-left .binder-page-wrapper::after {
+  content: '';
+  position: absolute;
+  right: -15px;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  background: radial-gradient(
+    ellipse at right,
+    rgba(0,0,0,0.18),
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 3;
+}
+
+.binder-book-page-right .binder-page-wrapper::before {
+  content: '';
+  position: absolute;
+  left: -15px;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  background: radial-gradient(
+    ellipse at left,
+    rgba(0,0,0,0.18),
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 3;
 }
 
 .binder-book-page .binder-page-label {
   font-size: var(--text-xs);
-  color: rgba(255,255,255,0.25);
+  color: rgba(0,0,0,0.25);
   text-align: center;
   flex-shrink: 0;
   letter-spacing: 0.08em;
@@ -248,75 +298,79 @@
   gap: var(--space-2);
 }
 
-/* Card slot — fixed width drives height via aspect ratio */
 .binder-book-page .binder-slot {
   aspect-ratio: 2.5 / 3.5;
   width: 100%;
   height: auto;
 }
 
-/* ── Slot states — dark sleeve aesthetic ──────────────────────────────────── */
+/* ── Slot states — #6 white borders ──────────────────────────────────────── */
 
-/* Empty slot — clear plastic welded pocket */
 .binder-book-page .binder-slot-empty {
-  background: rgba(255,255,255,0.5);
-  border: 1px solid rgba(0,0,0,0.07);
-  border-radius: 3px;
-  /* Crisp inner indent — hot-pressed seam lines */
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.06));
+  /* #6 visible white border */
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 6px;
   box-shadow:
-    inset 0 1px 3px rgba(0,0,0,0.06),
-    0 1px 1px rgba(255,255,255,0.9);
-  color: rgba(0,0,0,0.2);
+    inset 0 2px 4px rgba(255,255,255,0.05),
+    inset 0 -4px 6px rgba(0,0,0,0.2);
+  color: rgba(255,255,255,0.3);
+}
+
+/* Sleeve reflection — diagonal plastic sheen */
+.binder-book-page .binder-slot-empty::before {
+  content: '';
+  position: absolute;
+  left: 10%;
+  top: 0;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  transform: skewX(-15deg);
+  pointer-events: none;
 }
 
 .binder-book-page .binder-slot-empty:hover {
   border-color: var(--accent);
-  background: rgba(232, 98, 122, 0.08);
+  background: rgba(232, 98, 122, 0.12);
   color: var(--accent);
 }
 
-/* Filled slot — card in sleeve with gloss reflection */
 .binder-book-page .binder-slot-filled {
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
   position: relative;
-  box-shadow:
-    0 2px 8px rgba(0,0,0,0.5),
-    0 0 0 1px rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
-/* Plastic sleeve gloss overlay */
+/* Sleeve reflection on filled — diagonal plastic sheen */
 .binder-book-page .binder-slot-filled::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(
-    115deg,
-    rgba(255,255,255,0.18) 0%,
-    rgba(255,255,255,0.06) 30%,
-    transparent 50%,
-    transparent 100%
-  );
+  left: 10%;
+  top: 0;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  transform: skewX(-15deg);
   z-index: 2;
   pointer-events: none;
-  border-radius: 4px;
 }
 
 .binder-book-page .binder-slot-filled:hover {
-  box-shadow:
-    0 4px 16px rgba(0,0,0,0.6),
-    0 0 0 1.5px var(--accent);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4), 0 0 0 1.5px var(--accent);
 }
 
-/* Placeholder — unowned card sleeve */
 .binder-book-page .binder-slot-placeholder {
-  background: var(--binder-slot-placeholder, #1e1e1e);
-  border: 1px solid var(--binder-slot-border, rgba(255,255,255,0.06));
-  border-radius: 4px;
-  box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.08));
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
 }
 
-/* ── Slot states for preview/move ─────────────────────────────────────────── */
+/* ── Move/select states ───────────────────────────────────────────────────── */
 
 .binder-slot-selected {
   outline: 2px solid var(--accent);
@@ -331,7 +385,7 @@
   color: var(--accent);
 }
 
-/* ── Thumbnails bar ───────────────────────────────────────────────────────── */
+/* ── Thumbnails ───────────────────────────────────────────────────────────── */
 
 .binder-thumbnails-bar {
   display: flex;
@@ -363,7 +417,7 @@
   background: var(--accent-light);
 }
 
-/* ── Preview mode hint ────────────────────────────────────────────────────── */
+/* ── Preview hint ─────────────────────────────────────────────────────────── */
 
 .binder-preview-hint {
   font-size: var(--text-xs);
@@ -373,58 +427,76 @@
   flex-shrink: 0;
 }
 
-/* ── Binder cover page ────────────────────────────────────────────────────── */
+/* ── Cover page ───────────────────────────────────────────────────────────── */
 
 .binder-cover-page {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px 0 0 6px;
+  border-radius: 8px;
   position: relative;
   overflow: hidden;
-  /* Fine crosshatch texture */
-  background-image:
+  z-index: 1;
+  /* Depth shadows on all edges */
+  box-shadow:
+    inset 0 3px 16px rgba(255,255,255,0.15),
+    inset 0 -6px 16px rgba(0,0,0,0.35),
+    inset 3px 0 8px rgba(255,255,255,0.06),
+    inset -3px 0 12px rgba(0,0,0,0.2);
+}
+
+/* Leather grain texture + diagonal sheen */
+.binder-cover-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    /* Top-left to bottom-right sheen */
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.14) 0%,
+      rgba(255,255,255,0.04) 30%,
+      transparent 55%,
+      rgba(0,0,0,0.1) 80%,
+      rgba(0,0,0,0.2) 100%
+    ),
+    /* Fine leather grain */
     repeating-linear-gradient(
       0deg,
-      rgba(0,0,0,0.08) 0px,
-      rgba(0,0,0,0.08) 1px,
+      rgba(0,0,0,0.04) 0px,
+      rgba(0,0,0,0.04) 1px,
       transparent 1px,
-      transparent 5px
+      transparent 3px
     ),
     repeating-linear-gradient(
       90deg,
-      rgba(0,0,0,0.06) 0px,
-      rgba(0,0,0,0.06) 1px,
+      rgba(0,0,0,0.03) 0px,
+      rgba(0,0,0,0.03) 1px,
       transparent 1px,
-      transparent 5px
+      transparent 3px
     );
-  box-shadow:
-    inset -12px 0 24px rgba(0,0,0,0.3),
-    inset 4px 0 8px rgba(255,255,255,0.05),
-    inset 0 6px 12px rgba(0,0,0,0.2),
-    inset 0 -6px 12px rgba(0,0,0,0.2);
+  pointer-events: none;
+  z-index: 1;
 }
 
-/* Sheen highlight */
+/* Embossed inner frame */
 .binder-cover-page::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(255,255,255,0.08) 0%,
-    transparent 35%,
-    rgba(0,0,0,0.1) 100%
-  );
+  inset: 16px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.2),
+    inset 0 0 0 1px rgba(0,0,0,0.15),
+    inset 0 1px 3px rgba(255,255,255,0.1);
   pointer-events: none;
+  z-index: 4;
 }
 
 .binder-cover-content {
   position: relative;
-  z-index: 1;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -436,92 +508,42 @@
 .binder-cover-name {
   font-size: var(--text-2xl);
   font-weight: var(--weight-medium);
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255,255,255,0.95);
   text-shadow:
-    0 1px 3px rgba(0,0,0,0.4),
-    0 2px 8px rgba(0,0,0,0.3);
-  letter-spacing: 0.03em;
+    0 1px 2px rgba(0,0,0,0.5),
+    0 2px 8px rgba(0,0,0,0.4),
+    0 0 20px rgba(255,255,255,0.1);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .binder-cover-meta {
-  font-size: var(--text-sm);
-  color: rgba(255, 255, 255, 0.5);
-  letter-spacing: 0.05em;
+  font-size: var(--text-xs);
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
 }
 
 /* ── Page color themes ────────────────────────────────────────────────────── */
 
 /* Dark pages */
-.binder-pages-dark {
-  --binder-page-bg:          #2a2a2a;
-  --binder-slot-placeholder: #222222;
-}
-
-.binder-pages-dark .binder-book-page {
-  background: #2a2a2a;
-}
-
-.binder-pages-dark .binder-slot-empty {
-  background: rgba(255,255,255,0.05) !important;
-  border-color: rgba(255,255,255,0.08) !important;
-  box-shadow:
-    inset 0 1px 3px rgba(0,0,0,0.4),
-    0 1px 1px rgba(255,255,255,0.04) !important;
-  color: rgba(255,255,255,0.18) !important;
-}
-
-.binder-pages-dark .binder-slot-placeholder {
-  background: #222 !important;
-  border-color: rgba(255,255,255,0.06) !important;
-}
-
-.binder-pages-dark .binder-page-label {
-  color: rgba(255,255,255,0.25);
-}
+.binder-pages-dark .binder-book-page        { background: #1e1e1e; }
+.binder-pages-dark .binder-page-label       { color: rgba(255,255,255,0.2) !important; }
+.binder-pages-dark .binder-slot-filled      { box-shadow: 0 2px 8px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
+.binder-pages-dark .binder-book-page-right::before { background: rgba(30,30,30,0.9); }
+.binder-pages-dark .binder-book-page-right::after  { background: rgba(25,25,25,0.6); }
 
 /* Light pages */
-.binder-pages-light {
-  --binder-page-bg:          #f5f5f5;
-  --binder-slot-placeholder: #e8e4de;
+.binder-pages-light .binder-book-page       { background: #f5f5f5; }
+.binder-pages-light .binder-page-label      { color: rgba(0,0,0,0.25) !important; }
+.binder-pages-light .binder-slot-empty      {
+  background: rgba(255,255,255,0.7) !important;
+  border-color: rgba(0,0,0,0.1) !important;
+  color: rgba(0,0,0,0.2) !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.06) !important;
 }
-
-.binder-pages-light .binder-book-page {
-  background: #f5f5f5;
-}
-
-.binder-pages-light .binder-page-label {
-  color: rgba(0,0,0,0.3);
-}
-
-.binder-pages-light .binder-slot-filled {
-  box-shadow:
-    0 2px 8px rgba(0,0,0,0.12),
-    0 0 0 1px rgba(0,0,0,0.04);
-}
-
-.binder-pages-light .binder-page-label {
-  color: rgba(0,0,0,0.3);
-}
-
-.binder-pages-light .binder-slot-filled {
-  box-shadow:
-    0 2px 8px rgba(0,0,0,0.15),
-    0 0 0 1px rgba(0,0,0,0.06);
-}
-
-.binder-pages-light .binder-slot-empty {
-  box-shadow:
-    inset 0 2px 6px rgba(0,0,0,0.08),
-    inset 0 1px 0 rgba(255,255,255,0.8),
-    inset 0 -1px 0 rgba(0,0,0,0.06);
-}
-
-/* Light page sleeve gloss — softer */
-.binder-pages-light .binder-slot-filled::before {
-  background: linear-gradient(
-    115deg,
-    rgba(255,255,255,0.4) 0%,
-    rgba(255,255,255,0.1) 30%,
-    transparent 50%
-  );
-}
+.binder-pages-light .binder-slot-empty::before { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent) !important; }
+.binder-pages-light .binder-slot-placeholder   { background: #e8e4de !important; border-color: rgba(0,0,0,0.08) !important; }
+.binder-pages-light .binder-slot-filled        { box-shadow: 0 2px 8px rgba(0,0,0,0.12); border-color: rgba(0,0,0,0.06); }
+.binder-pages-light .binder-book-page-right::before { background: rgba(235,232,228,0.9); }
+.binder-pages-light .binder-book-page-right::after  { background: rgba(220,217,212,0.6); }
