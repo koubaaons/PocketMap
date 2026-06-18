@@ -267,7 +267,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
 
       {/* Book */}
       <div className="binder-book-wrapper">
-        <div className="binder-book">
+        <div className={`binder-book binder-pages-${binder.page_color ?? "dark"}`}>
 
           {/* LEFT — cover or left page */}
           {isCover ? (

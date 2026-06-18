@@ -9,10 +9,8 @@ import {
   validateInventoryItem, validateBinderSlot,
 } from '../types/index.js';
 
-const STORAGE_KEY   = 'bindervault';
-// === ISSUE #53 START: bump schema version for binder slots ===
+const STORAGE_KEY    = 'bindervault';
 const SCHEMA_VERSION = 2;
-// === ISSUE #53 END ===
 
 const DEFAULT_STATE = {
   version: SCHEMA_VERSION,
@@ -23,28 +21,21 @@ const DEFAULT_STATE = {
   templateFields: [],
   cardDefinitions: [],
   inventory: [],
-  // === ISSUE #53 START: binder slots default ===
   binderSlots: [],
-  // === ISSUE #53 END ===
 };
 
-// === ISSUE #53 START: migration v1 → v2 — add binderSlots, migrate legacy bin ===
 const MIGRATIONS = {
   2: (state) => ({
     ...state,
-    // Add binderSlots array if it doesn't exist
     binderSlots: state.binderSlots ?? [],
-    // Migrate legacy bin items — add _type field
     bin: (state.bin ?? []).map(item => ({
       ...item,
       _type: item._type ?? 'legacy_card',
     })),
-    // Drop legacy cards array — no longer needed
     cards: undefined,
     version: 2,
   }),
 };
-// === ISSUE #53 END ===
 
 function applyMigrations(state) {
   let current = state;
@@ -63,12 +54,16 @@ function sanitizeState(raw) {
     : DEFAULT_STATE.user;
 
   const binders = (raw.binders ?? []).filter(b => {
+    // === ISSUE #82: add defaults for old binders missing new fields ===
+    if (!b.page_color)  b.page_color  = 'dark';
+    if (!b.cover_color) b.cover_color = '#e8627a';
+    // === ISSUE #82 END ===
     const { valid, errors } = validateBinder(b);
     if (!valid) console.warn('[BinderVault] Dropping corrupt binder:', errors, b);
     return valid;
   });
 
-  const binderIds  = new Set(binders.map(b => b.id));
+  const binderIds = new Set(binders.map(b => b.id));
 
   const collections = (raw.collections ?? []).filter(c => {
     const { valid, errors } = validateCollection(c);
@@ -101,7 +96,6 @@ function sanitizeState(raw) {
     return true;
   });
 
-  // === ISSUE #53 START: sanitize binder slots ===
   const binderSlots = (raw.binderSlots ?? []).filter(s => {
     const { valid, errors } = validateBinderSlot(s);
     if (!valid) { console.warn('[BinderVault] Dropping corrupt binder slot:', errors, s); return false; }
@@ -109,9 +103,7 @@ function sanitizeState(raw) {
     if (!cardDefIds.has(s.cardDefId)) { console.warn('[BinderVault] Dropping orphan binder slot (no card def):', s.id); return false; }
     return true;
   });
-  // === ISSUE #53 END ===
 
-  // === ISSUE #57 START: sanitize bin — keep all _type items, drop corrupt ===
   const bin = (raw.bin ?? []).filter(item => {
     if (!item || typeof item !== 'object') return false;
     if (!item.id || typeof item.id !== 'string') return false;
@@ -119,7 +111,6 @@ function sanitizeState(raw) {
     if (!item.deletedAt || typeof item.deletedAt !== 'number') return false;
     return true;
   });
-  // === ISSUE #57 END ===
 
   return {
     ...raw,
