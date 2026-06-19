@@ -1,13 +1,14 @@
 /**
  * @fileoverview CardDefinitionForm — dynamic form driven by template fields.
  * === ISSUE #80: image upload, preview, and persistence ===
+ * === ISSUE #88: replaced FileReader with compressImage — size warning removed,
+ *     compression handles it automatically ===
  */
 
 import { useState, useRef } from 'react';
 import { Button, Modal, ModalActions } from '../ui/index.jsx';
 import { useCardDefinitionForm } from '../../hooks/useCardDefinitionForm.js';
-
-const IMAGE_SIZE_WARNING_BYTES = 500 * 1024;
+import { compressImage } from '../../utils/index.js';
 
 export function CardDefinitionForm({ collection, templateFields, initialCard, mode = 'create', onSubmit, onClose }) {
   const sortedFields = [...templateFields]
@@ -23,23 +24,27 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
   });
 
   // === ISSUE #80: image preview syncs from values.image_url ===
-  const [imageSizeWarning, setImageSizeWarning] = useState(false);
+  // === ISSUE #88: isCompressing replaces imageSizeWarning — compression
+  //     happens automatically, no size warning needed anymore ===
+  const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef(null);
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImageSizeWarning(file.size > IMAGE_SIZE_WARNING_BYTES);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      set('image_url', ev.target.result);
-    };
-    reader.readAsDataURL(file);
+    setIsCompressing(true);
+    try {
+      const compressed = await compressImage(file);
+      set('image_url', compressed);
+    } catch (err) {
+      console.error('Image compression failed:', err);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleRemoveImage = () => {
     set('image_url', null);
-    setImageSizeWarning(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -58,9 +63,14 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
               <button className="image-remove-btn" onClick={handleRemoveImage} aria-label="Remove image">✕</button>
             </div>
           ) : (
-            <button className="image-upload-placeholder" onClick={() => fileInputRef.current?.click()} type="button">
+            <button
+              className="image-upload-placeholder"
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+              disabled={isCompressing}
+            >
               <span className="image-upload-icon">🖼</span>
-              <span className="image-upload-label">Add card image</span>
+              <span className="image-upload-label">{isCompressing ? 'Compressing…' : 'Add card image'}</span>
               <span className="image-upload-hint">JPG, PNG, WebP</span>
             </button>
           )}
@@ -73,11 +83,6 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
             aria-label="Upload card image"
           />
         </div>
-        {imageSizeWarning && (
-          <span className="field-error-msg" style={{ color: 'var(--warning)' }}>
-            ⚠ Large image — may affect performance. In V2 this will move to cloud storage.
-          </span>
-        )}
       </div>
 
       {/* Card name */}

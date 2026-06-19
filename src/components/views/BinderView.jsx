@@ -267,11 +267,11 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
 
       {/* Book */}
       <div className="binder-book-wrapper">
-        <div className="binder-book">
+        <div className={`binder-book binder-pages-${binder.page_color ?? "dark"}`} style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
 
           {/* LEFT — cover or left page */}
           {isCover ? (
-            <div className="binder-book-page binder-book-page-left binder-cover-page" style={{ background: color }}>
+            <div className="binder-book-page binder-book-page-left binder-cover-page" style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
               <div className="binder-cover-content">
                 <div className="binder-cover-name">{binder.name}</div>
                 <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
@@ -295,7 +295,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           )}
 
           {/* Spine */}
-          <div className="binder-spine-center" style={{ background: color }}>
+          <div className="binder-spine-center" style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
             <div className="binder-ring" />
             <div className="binder-ring" />
             <div className="binder-ring" />
