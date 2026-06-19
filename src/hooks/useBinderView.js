@@ -10,6 +10,25 @@
  *   - Local copy of binderSlots — moves happen here only
  *   - Store untouched until "Save Layout" is pressed
  *   - Exit without saving discards all preview changes
+ *
+ * === FIX: swap-target stale-reference bug ===
+ *   previewMoveSlot used to re-derive "what's currently at the
+ *   destination" by re-searching pageNumber/slotIndex AFTER the click
+ *   already happened, using coordinates read from whatever slot object
+ *   the click handler's closure happened to be holding. If that closure
+ *   was even one render behind (e.g. clicking quickly right after a
+ *   previous swap, before the new positions had fully re-rendered into
+ *   fresh onClick handlers), the destination coordinates were stale —
+ *   pointing at a position that USED TO be occupied by the card you
+ *   meant to swap with, but had since moved elsewhere. The function would
+ *   then "swap" with whatever card now sat at that stale position
+ *   instead, silently shuffling an extra card the user never clicked.
+ *
+ *   Fix: previewMoveSlot now takes the target slot's id directly (or
+ *   null for an empty destination), passed by the caller at the moment
+ *   of the actual click — no re-deriving anything by position after the
+ *   fact. An id is a stable identity; a position is a snapshot that can
+ *   go stale between render and click.
  */
 
 import { useState, useCallback } from 'react';
@@ -56,28 +75,36 @@ export function useBinderView(binder, binderSlots) {
     setSelectedSlot(null);
   }, []);
 
-  // Move a slot in preview local state only
-  const previewMoveSlot = useCallback((slotId, pageNumber, slotIndex) => {
+  // === FIX: move a slot in preview local state, anchored by IDs only.
+  // targetSlotId is the id of the slot CURRENTLY occupying the
+  // destination, passed directly by the caller (BinderView already
+  // knows exactly which card it clicked — no need to re-derive it from
+  // pageNumber/slotIndex after the fact, which is what went stale).
+  // Pass null for targetSlotId when moving to a genuinely empty slot. ===
+  const previewMoveSlot = useCallback((movingSlotId, targetSlotId, pageNumber, slotIndex) => {
     setPreviewSlots(prev => {
       if (!prev) return prev;
-      // Check target not occupied
-      const target = prev.find(s => s.binderId === binder.id && s.pageNumber === pageNumber && s.slotIndex === slotIndex);
-      if (target) {
-        // Swap the two slots
+
+      const moving = prev.find(s => s.id === movingSlotId);
+      if (!moving) return prev;
+
+      if (targetSlotId) {
+        // Swap — both sides resolved by id, not by re-searching position.
+        const target = prev.find(s => s.id === targetSlotId);
+        if (!target) return prev;
+
         return prev.map(s => {
-          if (s.id === slotId) return { ...s, pageNumber, slotIndex };
-          if (s.id === target.id) {
-            const moving = prev.find(x => x.id === slotId);
-            return { ...s, pageNumber: moving.pageNumber, slotIndex: moving.slotIndex };
-          }
+          if (s.id === movingSlotId) return { ...s, pageNumber, slotIndex };
+          if (s.id === targetSlotId) return { ...s, pageNumber: moving.pageNumber, slotIndex: moving.slotIndex };
           return s;
         });
       }
-      // Move to empty slot
-      return prev.map(s => s.id === slotId ? { ...s, pageNumber, slotIndex } : s);
+
+      // Move to an empty slot — no swap partner.
+      return prev.map(s => s.id === movingSlotId ? { ...s, pageNumber, slotIndex } : s);
     });
     setSelectedSlot(null);
-  }, [binder.id]);
+  }, []);
 
   // Add a card in preview mode — adds to local preview slots
   const previewAddSlot = useCallback((newSlot) => {

@@ -3,6 +3,7 @@
  * === ISSUE #82: book layout, spine, thumbnails, preview mode ===
  * === FIX: theme-aware background on .binder-slot-filled (was undefined,
  *          fell back to black; inverted across light/dark themes) ===
+ * === ISSUE #93: fullscreen mode + side nav arrows ===
  */
 
 /* ── Binder view root ─────────────────────────────────────────────────────── */
@@ -15,6 +16,48 @@
   padding: var(--space-3) var(--space-4);
   gap: var(--space-2);
 }
+
+/* === ISSUE #93 (final approach): real OS-level fullscreen via the
+   browser's Fullscreen API on binder-view-root itself.
+   No portal, no scale transform, no JS measurement. When an element
+   becomes :fullscreen, the browser already makes it fill the entire
+   monitor — we just need its own layout to actually USE that space
+   (width/height: 100%) instead of keeping its normal-mode sizing. Every
+   existing rule below (centering the book, page nav, thumbnails) keeps
+   working completely unchanged; it just has more room now. */
+.binder-view-root:fullscreen,
+.binder-view-root-fullscreen {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  background: var(--bg-primary);
+}
+
+/* Book is allowed to grow past its normal 1100px cap in fullscreen, so
+   it actually fills more of a large monitor instead of staying small
+   and centered in extra empty space. Height isn't set directly here —
+   it's purely a function of width (each card slot keeps its own
+   aspect-ratio), so growing width alone grows height proportionally;
+   adding a separate max-height would risk clipping instead of scaling.
+   min(..., 90vw) keeps a little breathing room on the sides; if a tall
+   binder still overflows vertically on an unusual screen, that's a
+   visual edge case worth revisiting, not papered over with a height cap
+   that could silently crop content. */
+.binder-view-root:fullscreen .binder-book,
+.binder-view-root-fullscreen .binder-book {
+  max-width: min(1700px, 90vw);
+}
+
+/* FIX: no scroll in fullscreen — the JS-computed width cap (see
+   BinderView.jsx fullscreenMaxBookWidth) guarantees the book's height
+   fits within the available viewport height, so the old overflow-y:auto
+   inherited from normal mode would otherwise add an unwanted scrollbar
+   purely from rounding/fudge-factor slack. */
+.binder-view-root:fullscreen .binder-book-wrapper,
+.binder-view-root-fullscreen .binder-book-wrapper {
+  overflow: visible;
+}
+/* === ISSUE #93 END === */
 
 /* ── Binder topbar ────────────────────────────────────────────────────────── */
 
@@ -77,6 +120,8 @@
 }
 
 /* ── Page navigation ──────────────────────────────────────────────────────── */
+/* === ISSUE #93: now just holds the page indicator label —
+   arrows moved to binder-book-wrapper edges, see below === */
 
 .binder-page-nav {
   display: flex;
@@ -93,6 +138,9 @@
   border-radius: var(--radius-md);
   transition: color var(--transition-fast), background var(--transition-fast);
   line-height: 1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
 }
 
 .binder-nav-arrow:hover:not(:disabled) {
@@ -102,20 +150,36 @@
 
 .binder-nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.binder-page-indicator {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  white-space: nowrap;
-  min-width: 140px;
-  text-align: center;
+/* === ISSUE #93 START: side arrows, floating on book-wrapper edges === */
+.binder-nav-arrow-side {
+  flex-shrink: 0;
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  align-self: center;
 }
 
+.binder-nav-arrow-side:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+/* === ISSUE #93 END === */
+
+/* binder-page-indicator removed — replaced by the editable
+   binder-page-input + binder-page-indicator-suffix, see below */
+
 /* ── Book wrapper ─────────────────────────────────────────────────────────── */
+/* === ISSUE #93: now also hosts the side arrows, flex row with the book
+   centered between them === */
 
 .binder-book-wrapper {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
+  gap: var(--space-3);
   overflow-y: auto;
   padding-bottom: var(--space-4);
 }
@@ -125,7 +189,8 @@
 .binder-book {
   display: flex;
   align-items: stretch;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: 1100px;
   border-radius: 18px;
   padding: 10px;
@@ -391,36 +456,38 @@
   color: var(--accent);
 }
 
-/* ── Thumbnails ───────────────────────────────────────────────────────────── */
+/* ── Editable page-number jump ────────────────────────────────────────────── */
+/* Replaces the old thumbnails bar — click the number, type a new page,
+   Enter or blur jumps there. */
 
-.binder-thumbnails-bar {
-  display: flex;
-  gap: var(--space-1);
-  overflow-x: auto;
-  padding: var(--space-1) 0;
-  flex-shrink: 0;
-  scrollbar-width: thin;
-}
-
-.binder-thumb {
-  min-width: 36px;
-  padding: 3px var(--space-2);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
+.binder-page-input {
+  width: 48px;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  text-align: center;
+  background: var(--bg-secondary);
   border: 0.5px solid var(--border-primary);
   border-radius: var(--radius-sm);
-  background: var(--bg-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
+  padding: 2px var(--space-1);
+  /* Hide the native number spinner arrows for a cleaner look */
+  -moz-appearance: textfield;
 }
 
-.binder-thumb:hover { color: var(--text-primary); border-color: var(--border-secondary); }
+.binder-page-input::-webkit-outer-spin-button,
+.binder-page-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 
-.binder-thumb-active {
-  font-weight: var(--weight-medium);
-  background: var(--accent-light);
+.binder-page-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.binder-page-indicator-suffix {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 /* ── Preview hint ─────────────────────────────────────────────────────────── */
