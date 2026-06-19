@@ -1,6 +1,8 @@
 /**
  * @fileoverview Binder physical layout styles.
  * === ISSUE #82: book layout, spine, thumbnails, preview mode ===
+ * === FIX: theme-aware background on .binder-slot-filled (was undefined,
+ *          fell back to black; inverted across light/dark themes) ===
  */
 
 /* ── Binder view root ─────────────────────────────────────────────────────── */
@@ -337,12 +339,16 @@
   color: var(--accent);
 }
 
+/* FIX: explicit theme-aware default background — was previously undefined
+   here, so filled slots had no fallback color and showed black whenever the
+   card image hadn't painted yet (e.g. brief frame during page navigation). */
 .binder-book-page .binder-slot-filled {
   border-radius: 6px;
   overflow: hidden;
   position: relative;
   border: 1px solid rgba(255,255,255,0.12);
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  background: var(--binder-page-bg, #f5f5f5);
 }
 
 /* Sleeve reflection on filled — diagonal plastic sheen */
@@ -529,7 +535,9 @@
 /* Dark pages */
 .binder-pages-dark .binder-book-page        { background: #1e1e1e; }
 .binder-pages-dark .binder-page-label       { color: rgba(255,255,255,0.2) !important; }
-.binder-pages-dark .binder-slot-filled      { box-shadow: 0 2px 8px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
+/* FIX: explicit dark background added (was missing — caused light-mode-looking
+   black fallback to leak through inconsistently) */
+.binder-pages-dark .binder-slot-filled      { background: #1e1e1e; box-shadow: 0 2px 8px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
 .binder-pages-dark .binder-book-page-right::before { background: rgba(30,30,30,0.9); }
 .binder-pages-dark .binder-book-page-right::after  { background: rgba(25,25,25,0.6); }
 
@@ -544,6 +552,8 @@
 }
 .binder-pages-light .binder-slot-empty::before { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent) !important; }
 .binder-pages-light .binder-slot-placeholder   { background: #e8e4de !important; border-color: rgba(0,0,0,0.08) !important; }
-.binder-pages-light .binder-slot-filled        { box-shadow: 0 2px 8px rgba(0,0,0,0.12); border-color: rgba(0,0,0,0.06); }
+/* FIX: explicit light background added (was missing — this was the inverse
+   of the dark-mode symptom: black slots appearing while in light mode) */
+.binder-pages-light .binder-slot-filled        { background: #f5f5f5; box-shadow: 0 2px 8px rgba(0,0,0,0.12); border-color: rgba(0,0,0,0.06); }
 .binder-pages-light .binder-book-page-right::before { background: rgba(235,232,228,0.9); }
 .binder-pages-light .binder-book-page-right::after  { background: rgba(220,217,212,0.6); }
