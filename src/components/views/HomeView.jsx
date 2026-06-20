@@ -1,16 +1,31 @@
 // === ISSUE #1 START: Split Views — HomeView ===
 // === ISSUE #81 START: Binder Color Picker — use cover_color on binder cards ===
+// === ISSUE #83 START: Home Dashboard ===
+//   - 5 stat cards (Total Cards, Binders, Favorites, Unorganised, Recently Added)
+//   - Recently Added section — last 5 owned cards
+//   - Recent Activity feed — derived from existing timestamps, see
+//     selectors/homeStats.js for why this isn't a real event log
+//   - "View All" link for binders
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button, EmptyState, StatCard } from '../ui/index.jsx';
 import { CreateBinderModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
-import { binderCapacity } from '../../utils/index.js';
+import { binderCapacity, relativeDate } from '../../utils/index.js';
 import { getFilledSlotCount } from '../../selectors/binderSelectors.js';
+import { buildHomeStats, getRecentlyAddedCards, getRecentActivity } from '../../selectors/homeStats.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 
-export function HomeView({ binders, binderSlots = [], inventory = [], cardDefinitions = [], bin, toast, onNavigate }) {
+const MAX_BINDERS_SHOWN = 4;
+
+/**
+ * @param {string} [mode='dashboard'] - 'dashboard' shows the capped binder
+ *   grid plus stats/recently-added/activity widgets. 'all-binders' shows
+ *   every binder, unpaginated, with none of the dashboard widgets — this
+ *   is what the dashboard's "View All" link navigates to (route: 'binders').
+ */
+export function HomeView({ binders, binderSlots = [], inventory = [], cardDefinitions = [], collections = [], bin, toast, onNavigate, mode = 'dashboard' }) {
   const dispatch = useDispatch();
   const [showCreate, setShowCreate] = useState(false);
 
@@ -20,19 +35,41 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
     setShowCreate(false);
   }, [dispatch, toast]);
 
-  const totalCards     = cardDefinitions.length;
-  const totalFavorites = inventory.filter(inv => inv.is_favorite).length;
+  const isDashboard = mode === 'dashboard';
+
+  const stats = useMemo(
+    () => buildHomeStats(binders, cardDefinitions, inventory, binderSlots),
+    [binders, cardDefinitions, inventory, binderSlots]
+  );
+
+  const recentlyAddedCards = useMemo(
+    () => getRecentlyAddedCards(inventory, cardDefinitions, 5),
+    [inventory, cardDefinitions]
+  );
+
+  const recentActivity = useMemo(
+    () => getRecentActivity(inventory, cardDefinitions, collections, 8),
+    [inventory, cardDefinitions, collections]
+  );
+
+  // Dashboard caps the grid and offers "View All"; all-binders mode shows
+  // everything with no cap and no link back to itself.
+  const visibleBinders = isDashboard ? binders.slice(0, MAX_BINDERS_SHOWN) : binders;
+  const hasMoreBinders  = isDashboard && binders.length > MAX_BINDERS_SHOWN;
 
   return (
     <div className="view">
-      <div className="view-header">
-        <div className="stat-row">
-          <StatCard value={binders.length}   label="binders"   />
-          <StatCard value={totalCards}        label="cards"     />
-          <StatCard value={totalFavorites}    label="favorites" />
-          <StatCard value={bin.length}        label="in trash"  />
+      {isDashboard && (
+        <div className="view-header">
+          <div className="stat-row">
+            <StatCard value={stats.totalCards}     label="total cards"   />
+            <StatCard value={stats.totalBinders}    label="binders"       />
+            <StatCard value={stats.favorites}       label="favorites"     />
+            <StatCard value={stats.unorganised}     label="unorganised"   />
+            <StatCard value={stats.recentlyAdded}   label="recently added" />
+          </div>
         </div>
-      </div>
+      )}
 
       {binders.length === 0 ? (
         <EmptyState
@@ -44,11 +81,18 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
       ) : (
         <>
           <div className="section-header">
-            <h3 className="section-title">Your Binders</h3>
-            <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>+ New Binder</Button>
+            <h3 className="section-title">{isDashboard ? 'Your Binders' : 'All Binders'}</h3>
+            <div className="section-header-actions">
+              {hasMoreBinders && (
+                <button className="view-all-link" onClick={() => onNavigate('binders')}>
+                  View All
+                </button>
+              )}
+              <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>+ New Binder</Button>
+            </div>
           </div>
           <div className="binders-grid">
-            {binders.map(b => (
+            {visibleBinders.map(b => (
               <BinderCard
                 key={b.id}
                 binder={b}
@@ -59,6 +103,48 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
             ))}
           </div>
         </>
+      )}
+
+      {/* === ISSUE #83: Recently Added + Recent Activity — dashboard only === */}
+      {isDashboard && (recentlyAddedCards.length > 0 || recentActivity.length > 0) && (
+        <div className="home-dashboard-row">
+          {recentlyAddedCards.length > 0 && (
+            <div className="home-dashboard-panel">
+              <h3 className="section-title">Recently Added</h3>
+              <div className="recently-added-strip">
+                {recentlyAddedCards.map(({ inventoryItem, cardDef }) => (
+                  <button
+                    key={inventoryItem.id}
+                    className="recently-added-thumb"
+                    onClick={() => onNavigate('collection', cardDef.collectionId)}
+                    title={cardDef.name}
+                  >
+                    {cardDef.image_url ? (
+                      <img src={cardDef.image_url} alt={cardDef.name} />
+                    ) : (
+                      <span className="recently-added-thumb-fallback">{cardDef.name}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {recentActivity.length > 0 && (
+            <div className="home-dashboard-panel">
+              <h3 className="section-title">Recent Activity</h3>
+              <ul className="activity-feed">
+                {recentActivity.map(event => (
+                  <li key={event.id} className="activity-feed-item">
+                    <span className={`activity-feed-dot activity-feed-dot-${event.type}`} />
+                    <span className="activity-feed-label">{event.label}</span>
+                    <span className="activity-feed-time">{relativeDate(event.timestamp)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
 
       {showCreate && (
@@ -94,5 +180,6 @@ function BinderCard({ binder, cardCount, capacity, onClick }) {
   );
 }
 
+// === ISSUE #83 END: Home Dashboard ===
 // === ISSUE #81 END: Binder Color Picker ===
 // === ISSUE #1 END: Split Views — HomeView ===

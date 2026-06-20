@@ -1,0 +1,170 @@
+/**
+ * @fileoverview Home dashboard additions.
+ * === ISSUE #83: Home Dashboard ===
+ * Recently Added strip, Recent Activity feed, View All link.
+ * Append this file's contents to wherever HomeView's existing styles live
+ * (e.g. components.css or a dedicated home.css) — kept separate here so
+ * the diff against existing styles stays clean.
+ */
+
+/* ── Stat row override: 5 cards instead of the shared 4-column default ──── */
+/* .stat-row in components.css is hardcoded to repeat(4, 1fr) for its other
+   callers. The dashboard now needs 5 stat cards (Total Cards, Binders,
+   Favorites, Unorganised, Recently Added), so .view-header .stat-row
+   overrides the column count specifically for this context without
+   touching the shared base rule. */
+.view-header .stat-row {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+@media (max-width: 900px) {
+  .view-header .stat-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .view-header .stat-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Section header actions (View All + New Binder button together) ──────── */
+
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.view-all-link {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--transition-fast);
+}
+
+.view-all-link:hover {
+  color: var(--accent);
+}
+
+/* ── Dashboard row: Recently Added + Recent Activity side by side ────────── */
+
+.home-dashboard-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+@media (max-width: 900px) {
+  .home-dashboard-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-dashboard-panel {
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.home-dashboard-panel .section-title {
+  margin-bottom: var(--space-3);
+}
+
+/* ── Recently Added strip ──────────────────────────────────────────────── */
+
+.recently-added-strip {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scrollbar-width: thin;
+}
+
+.recently-added-thumb {
+  flex-shrink: 0;
+  width: 64px;
+  height: 90px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 0.5px solid var(--border-primary);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.recently-added-thumb:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.recently-added-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.recently-added-thumb-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* ── Recent Activity feed ─────────────────────────────────────────────── */
+
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.activity-feed-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.activity-feed-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+
+.activity-feed-dot-added       { background: var(--accent); }
+.activity-feed-dot-favorited   { background: #f5a623; }
+.activity-feed-dot-collection_created { background: #5b8def; }
+
+.activity-feed-label {
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-feed-time {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
+}

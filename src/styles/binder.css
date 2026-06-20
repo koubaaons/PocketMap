@@ -481,6 +481,7 @@
   padding: 2px var(--space-1);
   /* Hide the native number spinner arrows for a cleaner look */
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .binder-page-input::-webkit-outer-spin-button,

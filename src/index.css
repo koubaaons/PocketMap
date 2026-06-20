@@ -21,4 +21,7 @@
 @import './styles/utilities.css';
 @import './styles/image-components.css';
 @import './styles/binder.css';
+/* === ISSUE #83: Home Dashboard — view-specific styles, same pattern as
+   binder.css above (recently-added strip, activity feed, stat-row override) === */
+@import './styles/home.css';
 /* === ISSUE #68 END === */
