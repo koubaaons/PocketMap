@@ -1,13 +1,18 @@
 // === ISSUE #38 START: Favorite Cards — FavoritesView ===
 // === ISSUE #80 START: Card Images ===
 // === ISSUE #84 START: switched from row list to image-first grid ===
+// === ISSUE: click-to-favorite star — un-favoriting from here removes
+//     the card from this list immediately, since it filters by is_favorite ===
 
 import { useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
 import { CardGridItem } from '../collections/CardGridItem.jsx';
 import { getFavoriteCards } from '../../selectors/inventorySelectors.js';
+import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 
 export function FavoritesView({ inventory, cardDefinitions, collections, toast, onNavigate }) {
+  const { handleToggleFavorite } = useInventoryActions(toast);
+
   const favorites = useMemo(
     () => getFavoriteCards(inventory, cardDefinitions),
     [inventory, cardDefinitions]
@@ -35,9 +40,9 @@ export function FavoritesView({ inventory, cardDefinitions, collections, toast, 
           <CardGridItem
             key={inventoryItem.id}
             card={cardDef}
-            isOwned={true}
-            isFavorite={true}
+            inventoryItem={inventoryItem}
             onView={() => onNavigate && onNavigate('collection', cardDef.collectionId)}
+            onToggleFavorite={handleToggleFavorite}
           />
         ))}
       </div>

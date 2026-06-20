@@ -83,13 +83,34 @@
   color: var(--text-hint);
 }
 
-.card-grid-item-fav {
+.card-grid-item-fav-btn {
   position: absolute;
-  top: 5px;
-  right: 6px;
-  font-size: 13px;
-  color: var(--favorite-color);
+  top: 4px;
+  right: 5px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  color: rgba(255,255,255,0.85);
+  background: rgba(0,0,0,0.35);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
   text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  transition: color var(--transition-fast), transform var(--transition-fast), background var(--transition-fast);
+}
+
+.card-grid-item-fav-btn:hover {
+  color: var(--favorite-color);
+  background: rgba(0,0,0,0.5);
+  transform: scale(1.15);
+}
+
+.card-grid-item-fav-btn-active {
+  color: var(--favorite-color);
 }
 
 .card-grid-item-status {

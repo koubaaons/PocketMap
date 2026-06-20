@@ -19,6 +19,7 @@ export function CardDefinitionList({
   onView,
   onEdit,
   onDelete,
+  onToggleFavorite,
   emptyTitle = 'No cards yet',
   emptySubtitle = 'Add your first card to this collection',
 }) {
@@ -29,18 +30,15 @@ export function CardDefinitionList({
   return (
     <div className="card-grid-wrapper">
       <div className="card-grid">
-        {cards.map(card => {
-          const inventoryItem = ownershipMap[card.id] ?? null;
-          return (
-            <CardGridItem
-              key={card.id}
-              card={card}
-              isOwned={inventoryItem !== null}
-              isFavorite={inventoryItem?.is_favorite ?? false}
-              onView={() => onView(card)}
-            />
-          );
-        })}
+        {cards.map(card => (
+          <CardGridItem
+            key={card.id}
+            card={card}
+            inventoryItem={ownershipMap[card.id] ?? null}
+            onView={() => onView(card)}
+            onToggleFavorite={onToggleFavorite}
+          />
+        ))}
       </div>
       <p className="list-footer">
         Showing {cards.length} of {totalCount} card{totalCount !== 1 ? 's' : ''}

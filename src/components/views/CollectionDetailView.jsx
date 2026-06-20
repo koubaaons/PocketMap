@@ -5,6 +5,8 @@
  * Milestone 5: Ownership wired.
  * Milestone 6: All tabs wired.
  * Refactor7e: Tab content extracted into dedicated components.
+ * === ISSUE: click-to-favorite star in grid — wired handleToggleFavorite
+ *     (already existed for CardDetailModal) through to all tabs too ===
  */
 
 // === ISSUE #13 START: Card Definition Management — CollectionDetailView shell ===
@@ -78,6 +80,7 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
     onView:   ownership.openDetail,
     onEdit:   editor.openEdit,
     onDelete: editor.openDelete,
+    onToggleFavorite: handleToggleFavorite,
   };
 
   return (
@@ -129,6 +132,7 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
             onView={ownership.openDetail}
             onEdit={editor.openEdit}
             onDelete={editor.openDelete}
+            onToggleFavorite={handleToggleFavorite}
             emptyTitle={editor.query ? `No results for "${editor.query}"` : 'No cards yet'}
             emptySubtitle={editor.query ? 'Try a different search' : 'Add your first card to start building this collection'}
           />
@@ -180,4 +184,3 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
     </div>
   );
 }
-
