@@ -153,6 +153,7 @@
 .activity-feed-dot-added       { background: var(--accent); }
 .activity-feed-dot-favorited   { background: #f5a623; }
 .activity-feed-dot-collection_created { background: #5b8def; }
+.activity-feed-dot-added_to_binder    { background: #34d399; }
 
 .activity-feed-label {
   color: var(--text-primary);

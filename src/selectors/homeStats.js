@@ -20,11 +20,14 @@
  *                               as a "favorited" event if it happened to
  *                               touch a record that's also favorited)
  *   - "Created collection"   → collection.createdAt
+ *   - "Added to binder"      → binderSlot.createdAt
  *
- * No "moved", "traded", or "sold" events — those aren't timestamped
- * anywhere in the current data model. If richer history (undo, full
- * audit trail) becomes a real need later, that's the point to build an
- * actual activity-log store slice instead of extending this further.
+ * No "moved" or "traded"/"sold" events — slot MOVES don't update
+ * createdAt (only the initial placement does), and there's no
+ * trade/sell timestamp anywhere in the data model. If richer history
+ * (undo, full audit trail) becomes a real need later, that's the point
+ * to build an actual activity-log store slice instead of extending this
+ * further.
  */
 
 /**
@@ -79,12 +82,17 @@ export function getRecentlyAddedCards(inventory, cardDefinitions, limit = 5) {
  * @param {object[]} inventory
  * @param {object[]} cardDefinitions
  * @param {object[]} collections
+ * @param {object[]} [binderSlots=[]]
+ * @param {object[]} [binders=[]]
  * @param {number} [limit=8]
- * @returns {{ id: string, type: 'added'|'favorited'|'collection_created', label: string, timestamp: number }[]}
+ * @returns {{ id: string, type: 'added'|'favorited'|'collection_created'|'added_to_binder', label: string, timestamp: number }[]}
  */
-export function getRecentActivity(inventory, cardDefinitions, collections, limit = 8) {
+export function getRecentActivity(inventory, cardDefinitions, collections, binderSlots = [], binders = [], limit = 8) {
   const cardDefMap = {};
   cardDefinitions.forEach(cd => { cardDefMap[cd.id] = cd; });
+
+  const binderMap = {};
+  binders.forEach(b => { binderMap[b.id] = b; });
 
   const events = [];
 
@@ -120,6 +128,24 @@ export function getRecentActivity(inventory, cardDefinitions, collections, limit
       type: 'collection_created',
       label: `Created collection ${col.name}`,
       timestamp: col.createdAt,
+    });
+  });
+
+  // === Added to binder — binderSlot.createdAt is only set on initial
+  // placement, not on later moves (see useBinderView.js previewMoveSlot /
+  // reducer.js BINDER_SLOT_MOVE, neither touches createdAt) — so this
+  // accurately represents "added to binder" and never "moved within
+  // binder". ===
+  binderSlots.forEach(slot => {
+    const cardDef = cardDefMap[slot.cardDefId];
+    const binder  = binderMap[slot.binderId];
+    if (!cardDef || !binder) return;
+
+    events.push({
+      id: `slot-${slot.id}`,
+      type: 'added_to_binder',
+      label: `Added ${cardDef.name} to ${binder.name}`,
+      timestamp: slot.createdAt,
     });
   });
 

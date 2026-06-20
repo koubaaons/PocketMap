@@ -48,8 +48,8 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
   );
 
   const recentActivity = useMemo(
-    () => getRecentActivity(inventory, cardDefinitions, collections, 8),
-    [inventory, cardDefinitions, collections]
+    () => getRecentActivity(inventory, cardDefinitions, collections, binderSlots, binders, 8),
+    [inventory, cardDefinitions, collections, binderSlots, binders]
   );
 
   // Dashboard caps the grid and offers "View All"; all-binders mode shows
