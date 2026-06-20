@@ -246,12 +246,22 @@
   box-shadow:
     0 1px 0 rgba(255,255,255,0.5),
     0 2px 4px rgba(0,0,0,0.15);
+  /* FIX: isolate each page as its own compositing layer (backface-
+     visibility only here; translateZ is folded into the tilt transforms
+     below instead, since transform values don't combine across rules —
+     setting it here would have been silently overridden by the page-tilt
+     rotate()). Combined with key={pageNumber} forcing a fresh element on
+     every page change (see BinderView.jsx), this prevents the right
+     page's stacked-shadow pseudo-elements (::before/::after below) from
+     briefly compositing with stale pixels from the previous page — which
+     showed up as a faint grey flash on page navigation. */
+  backface-visibility: hidden;
 }
 
 /* #7 Slight page tilt */
 .binder-book-page-left {
   margin-right: 2px;
-  transform: rotate(-0.3deg);
+  transform: rotate(-0.3deg) translateZ(0);
   transform-origin: right center;
   /* Inner edge curves toward spine */
   border-top-right-radius: 12px;
@@ -262,7 +272,7 @@
 .binder-book-page-right {
   position: relative;
   margin-left: 2px;
-  transform: rotate(0.3deg);
+  transform: rotate(0.3deg) translateZ(0);
   transform-origin: left center;
   /* Inner edge curves toward spine */
   border-top-left-radius: 12px;

@@ -414,14 +414,14 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         >
 
           {isCover ? (
-            <div className="binder-book-page binder-book-page-left binder-cover-page" style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
+            <div key="cover" className="binder-book-page binder-book-page-left binder-cover-page" style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
               <div className="binder-cover-content">
                 <div className="binder-cover-name">{binder.name}</div>
                 <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
               </div>
             </div>
           ) : leftPageNum <= binder.pages ? (
-            <div className="binder-book-page binder-book-page-left">
+            <div key={`left-${leftPageNum}`} className="binder-book-page binder-book-page-left">
               <BinderPage
                 binder={binder}
                 pageNumber={leftPageNum}
@@ -434,7 +434,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
               />
             </div>
           ) : (
-            <div className="binder-book-page binder-book-page-left binder-page-empty-right" />
+            <div key={`left-empty-${leftPageNum}`} className="binder-book-page binder-book-page-left binder-page-empty-right" />
           )}
 
           <div className="binder-spine-center" style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
@@ -444,7 +444,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           </div>
 
           {rightPageNum <= binder.pages ? (
-            <div className="binder-book-page binder-book-page-right">
+            <div key={`right-${rightPageNum}`} className="binder-book-page binder-book-page-right">
               <BinderPage
                 binder={binder}
                 pageNumber={rightPageNum}
@@ -457,7 +457,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
               />
             </div>
           ) : (
-            <div className="binder-book-page binder-book-page-right binder-page-empty-right" />
+            <div key={`right-empty-${rightPageNum}`} className="binder-book-page binder-book-page-right binder-page-empty-right" />
           )}
 
         </div>

@@ -75,12 +75,6 @@ export function useBinderView(binder, binderSlots) {
     setSelectedSlot(null);
   }, []);
 
-  // === FIX: move a slot in preview local state, anchored by IDs only.
-  // targetSlotId is the id of the slot CURRENTLY occupying the
-  // destination, passed directly by the caller (BinderView already
-  // knows exactly which card it clicked — no need to re-derive it from
-  // pageNumber/slotIndex after the fact, which is what went stale).
-  // Pass null for targetSlotId when moving to a genuinely empty slot. ===
   const previewMoveSlot = useCallback((movingSlotId, targetSlotId, pageNumber, slotIndex) => {
     setPreviewSlots(prev => {
       if (!prev) return prev;

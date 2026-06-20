@@ -309,13 +309,44 @@ export function reducer(state, action) {
     case ACTIONS.BINDER_SLOT_REMOVE:
       return { ...state, binderSlots: state.binderSlots.filter(s => s.id !== action.payload.slotId) };
 
+    // === FIX: swap-aware move. The old version silently rejected any
+    // move to an occupied destination ("target slot occupied"), which
+    // meant Save Layout — dispatching one BINDER_SLOT_MOVE per changed
+    // slot, one at a time — would fail for any slot whose destination was
+    // still occupied by the OLD (pre-preview) position of another card
+    // that hadn't been moved yet in this same dispatch sequence. The
+    // failed move silently returned unchanged state, so that card
+    // appeared to "snap back" to its original position after saving —
+    // it never actually got its new position applied to the real store.
+    //
+    // Now: if the destination is occupied, swap both slots' positions in
+    // one atomic state update instead of rejecting. This matches how
+    // preview-mode swapping already works (see useBinderView.js
+    // previewMoveSlot), so save-time behavior is consistent with what the
+    // user saw and did during preview — no dispatch-order dependency.
     case ACTIONS.BINDER_SLOT_MOVE: {
       const { slotId, pageNumber, slotIndex } = action.payload;
+      const movingSlot = state.binderSlots.find(s => s.id === slotId);
+      if (!movingSlot) return state;
+
       const targetSlot = state.binderSlots.find(
-        s => s.binderId === state.binderSlots.find(x => x.id === slotId)?.binderId &&
-             s.pageNumber === pageNumber && s.slotIndex === slotIndex
+        s => s.binderId === movingSlot.binderId &&
+             s.pageNumber === pageNumber &&
+             s.slotIndex === slotIndex &&
+             s.id !== slotId
       );
-      if (targetSlot) { console.warn('[BinderVault] BINDER_SLOT_MOVE: target slot occupied'); return state; }
+
+      if (targetSlot) {
+        return {
+          ...state,
+          binderSlots: state.binderSlots.map(s => {
+            if (s.id === slotId) return { ...s, pageNumber, slotIndex };
+            if (s.id === targetSlot.id) return { ...s, pageNumber: movingSlot.pageNumber, slotIndex: movingSlot.slotIndex };
+            return s;
+          }),
+        };
+      }
+
       return {
         ...state,
         binderSlots: state.binderSlots.map(s =>
