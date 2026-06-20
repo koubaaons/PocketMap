@@ -24,4 +24,7 @@
 /* === ISSUE #83: Home Dashboard — view-specific styles, same pattern as
    binder.css above (recently-added strip, activity feed, stat-row override) === */
 @import './styles/home.css';
+/* === ISSUE #84: Card Grid Layout — shared grid/tile styles used by
+   Collections tabs and Favorites === */
+@import './styles/card-grid.css';
 /* === ISSUE #68 END === */

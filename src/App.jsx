@@ -141,6 +141,7 @@ export default function App() {
             cardDefinitions={cardDefinitions}
             collections={collections}
             toast={toast}
+            onNavigate={navigate}
           />
         );
 
