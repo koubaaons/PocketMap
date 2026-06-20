@@ -70,6 +70,9 @@ export default function App() {
   const renderView = () => {
     switch (nav.currentView) {
 
+      // === ISSUE #83: Home Dashboard — now passes collections (needed
+      // for the derived activity feed's "Created collection" events) and
+      // defaults to mode="dashboard" (5 stats, recently added, activity) ===
       case 'home':
         return (
           <HomeView
@@ -77,12 +80,18 @@ export default function App() {
             binderSlots={binderSlots}
             inventory={inventory}
             cardDefinitions={cardDefinitions}
+            collections={collections}
             bin={bin}
             toast={toast}
             onNavigate={navigate}
+            mode="dashboard"
           />
         );
 
+      // === ISSUE #83: "View All" on the dashboard links here. Same
+      // HomeView component, mode="all-binders" — shows every binder
+      // unpaginated, no stats/recently-added/activity widgets, no
+      // "View All" link back to itself. ===
       case 'binders':
         return (
           <HomeView
@@ -90,9 +99,11 @@ export default function App() {
             binderSlots={binderSlots}
             inventory={inventory}
             cardDefinitions={cardDefinitions}
+            collections={collections}
             bin={bin}
             toast={toast}
             onNavigate={navigate}
+            mode="all-binders"
           />
         );
 
@@ -172,9 +183,11 @@ export default function App() {
             binderSlots={binderSlots}
             inventory={inventory}
             cardDefinitions={cardDefinitions}
+            collections={collections}
             bin={bin}
             toast={toast}
             onNavigate={navigate}
+            mode="dashboard"
           />
         );
     }
