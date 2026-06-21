@@ -1,0 +1,25 @@
+/**
+ * @fileoverview Modal step text — intro/note paragraphs in multi-step modals.
+ * === ISSUE #89: Modal and Form Polish ===
+ * Replaces inline style={{ fontSize, color, marginTop/marginBottom }} that
+ * had accumulated in CollectionModals.jsx — every other modal already
+ * used classes exclusively.
+ */
+
+.modal-step-intro {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-5);
+  line-height: var(--leading-relaxed);
+}
+
+.modal-step-note {
+  font-size: var(--text-xs);
+  color: var(--text-hint);
+  margin-top: var(--space-2);
+}
+
+.modal-step-note-tight {
+  margin-top: calc(-1 * var(--space-2));
+  margin-bottom: var(--space-3);
+}
