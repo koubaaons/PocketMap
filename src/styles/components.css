@@ -385,6 +385,13 @@ textarea.form-input {
   max-width: 320px;
 }
 
+/* === ISSUE #89 FIX: EmptyState's action slot (e.g. a "Create Binder"
+   button) had no wrapper styling at all — referenced by the component
+   but never defined. === */
+.empty-state-action {
+  margin-top: var(--space-2);
+}
+
 /* ── Modals ───────────────────────────────────────────────────────────────── */
 
 .modal-overlay {
@@ -410,6 +417,13 @@ textarea.form-input {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* === ISSUE #89 FIX: Modal's size prop produces className modal-${size},
+   but .modal-sm was never defined — ConfirmModal passes size="sm" and was
+   silently falling back to the full 480px width above. === */
+.modal-sm {
+  max-width: 360px;
 }
 
 .modal-header {

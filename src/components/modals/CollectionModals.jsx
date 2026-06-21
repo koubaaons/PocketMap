@@ -8,6 +8,13 @@
  *
  * Collection is NOT saved until the final step.
  * On confirm, calls onSubmit({ collection, templateFields, cardDefinitions })
+ *
+ * === ISSUE #89: Modal and Form Polish ===
+ * Replaced every inline style={{ fontSize, color, marginTop/marginBottom }}
+ * with proper CSS classes (.modal-step-intro, .modal-step-note) using the
+ * same spacing/color tokens the rest of the app already uses — this file
+ * was the one inconsistency found during the #89 audit; every other modal
+ * already used classes exclusively.
  */
 
 import { useState } from 'react';
@@ -77,7 +84,6 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         field_type: f.field_type,
         is_required: f.is_required,
         order: idx,
-        // === FIX: pass options so select fields are not dropped by validator ===
         options: f.options ?? [],
       }).field)
       .filter(Boolean);
@@ -104,7 +110,6 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
         field_type: f.field_type,
         is_required: f.is_required,
         order: idx,
-        // === FIX: pass options for API select fields ===
         options: f.options ?? [],
       }).field)
       .filter(Boolean);
@@ -127,7 +132,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   if (step === 'choose') {
     return (
       <Modal title="Create New Collection" onClose={onClose}>
-        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
+        <p className="modal-step-intro">
           Choose how you want to create your collection.
         </p>
         <div className="collection-choose-grid">
@@ -155,7 +160,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     const apiSources = getApiSources();
     return (
       <Modal title="Import Collection from API" onClose={onClose}>
-        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
+        <p className="modal-step-intro">
           Choose a collection to import and confirm the template.
         </p>
         <div className="api-sources-grid">
@@ -192,11 +197,11 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     }));
     return (
       <Modal title={`Import "${selectedSource.name}"`} onClose={onClose}>
-        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
+        <p className="modal-step-intro">
           This will create the collection with the following field schema:
         </p>
         <TemplatePreview fields={previewFields} showValidation={false} />
-        <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 12 }}>
+        <p className="modal-step-note">
           {selectedSource.sampleCards.length > 0
             ? `${selectedSource.sampleCards.length} sample cards will be imported.`
             : 'Card definitions will be imported from the API.'}
@@ -230,7 +235,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
   if (step === 'custom-template') {
     return (
       <Modal title="Build Your Template" onClose={onClose}>
-        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
+        <p className="modal-step-intro">
           Define the fields every card in <strong>{collectionName}</strong> will have.
           Fields cannot be deleted later, only added.
         </p>
@@ -263,7 +268,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
           <div className="review-label">Field Schema</div>
           <TemplatePreview fields={templateFields} showValidation={true} />
         </div>
-        <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
+        <p className="modal-step-note">
           No cards yet — you'll add them after creating the collection.
         </p>
         <ModalActions>
@@ -295,7 +300,7 @@ export function EditCollectionModal({ collection, onSubmit, onClose }) {
       <Input id="edit-col-name" label="Collection Name *"
         value={name} onChange={e => setName(e.target.value)} error={nameError} autoFocus />
       {!collection.is_custom && collection.import_source && (
-        <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: -8, marginBottom: 14 }}>
+        <p className="modal-step-note modal-step-note-tight">
           Source: {collection.import_source}
         </p>
       )}

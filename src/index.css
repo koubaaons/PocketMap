@@ -29,4 +29,6 @@
 @import './styles/card-grid.css';
 /* === ISSUE #86: Search View Polish — results table === */
 @import './styles/search-table.css';
+/* === ISSUE #89: Modal and Form Polish === */
+@import './styles/modal-polish.css';
 /* === ISSUE #68 END === */
