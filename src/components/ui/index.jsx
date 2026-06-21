@@ -5,6 +5,19 @@
  * They have NO knowledge of app state — they receive everything via props.
  * This makes them fully reusable and independently testable.
  *
+ * === ISSUE #89: Modal and Form Polish — bug fixes found during audit ===
+ *   - EmptyState was rendering .empty-icon/.empty-title/.empty-subtitle/
+ *     .empty-action, but components.css only defines .empty-state-icon/
+ *     .empty-state-title/.empty-state-subtitle — every EmptyState in the
+ *     app was unstyled. Fixed to use the classes that actually exist.
+ *   - StatCard was rendering .stat-value/.stat-label, but components.css
+ *     only defines .stat-card-value/.stat-card-label — every StatCard
+ *     (including all 5 on the dashboard) was unstyled. Same fix.
+ *   - Modal's size prop produces className modal-${size}, but
+ *     components.css never defined .modal-sm — ConfirmModal passes
+ *     size="sm" and was silently falling back to full .modal width.
+ *     Added .modal-sm to components.css (see that file's diff).
+ *
  * === REFACTOR4c START: Export PlaceholderTab ===
  * PlaceholderTab is in its own file but re-exported from here
  * so imports stay consistent: import { PlaceholderTab } from '../ui/index.jsx'
@@ -138,25 +151,29 @@ export function ToastContainer({ toasts, dismiss }) {
 }
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
+// === ISSUE #89 FIX: class names corrected to match components.css
+// (.empty-state-icon, not .empty-icon — etc) ===
 
 export function EmptyState({ icon, title, subtitle, action }) {
   return (
     <div className="empty-state">
-      <div className="empty-icon">{icon}</div>
-      <h3 className="empty-title">{title}</h3>
-      {subtitle && <p className="empty-subtitle">{subtitle}</p>}
-      {action && <div className="empty-action">{action}</div>}
+      <div className="empty-state-icon">{icon}</div>
+      <h3 className="empty-state-title">{title}</h3>
+      {subtitle && <p className="empty-state-subtitle">{subtitle}</p>}
+      {action && <div className="empty-state-action">{action}</div>}
     </div>
   );
 }
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
+// === ISSUE #89 FIX: class names corrected to match components.css
+// (.stat-card-value/.stat-card-label, not .stat-value/.stat-label) ===
 
 export function StatCard({ value, label }) {
   return (
     <div className="stat-card">
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
+      <div className="stat-card-value">{value}</div>
+      <div className="stat-card-label">{label}</div>
     </div>
   );
 }

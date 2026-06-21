@@ -31,7 +31,4 @@
 @import './styles/search-table.css';
 /* === ISSUE #89: Modal and Form Polish === */
 @import './styles/modal-polish.css';
-/* === ISSUE #89: missing .modal-sm and .empty-state-action classes found
-   during audit === */
-@import './styles/modal-empty-state-fixes.css';
 /* === ISSUE #68 END === */
