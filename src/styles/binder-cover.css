@@ -1,0 +1,112 @@
+/**
+ * @fileoverview Binder cover — inline page-flip, sticker layer.
+ * === ISSUE #92: Binder close/open animation with sticker customisation ===
+ *
+ * The cover lives INLINE, directly on top of page 1's slot, as a real
+ * page-flip button. Page 1's actual content is already rendering
+ * underneath it at all times; opening is just rotating the cover button
+ * away to reveal what was already there — true visual continuity, no
+ * overlay, no separate branch, no timing-based swap.
+ *
+ * Cover starts flat (facing viewer, covering page 1). Clicking it
+ * rotates it around its LEFT edge (the spine) so it flips onto the left
+ * slot, showing its back face there, while page 1 becomes visible on
+ * the right — exactly like opening a real binder.
+ */
+
+.binder-cover-flip {
+  position: absolute;
+  /* Fixed 12px oversize on every side, rather than the slot's exact
+     size — predictable and consistent regardless of how big the
+     underlying slot is. */
+  inset: -12px;
+  z-index: 10;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  background: none;
+  perspective: 70rem;
+  transform-style: preserve-3d;
+}
+
+/* Flipping: PURE rotation around the LEFT edge — no translation at all.
+   Positive angle on a left-hinged element swings the free right edge
+   away from the viewer — the correct "lifting open" motion. */
+.binder-cover-flip.is-flipping {
+  pointer-events: none;
+  transform-origin: 0% 50%;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: rotateY(180deg);
+}
+
+/* ── Frame — border-radius + shadow, identical for both faces ───────────── */
+
+.binder-cover-frame {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow:
+    inset 0 3px 16px rgba(255,255,255,0.15),
+    inset 0 -6px 16px rgba(0,0,0,0.35),
+    0 12px 30px rgba(0,0,0,0.35);
+}
+
+.binder-cover-face-front {
+  transform: rotateY(0deg);
+}
+
+/* Back face — pre-rotated 180° so it only faces the viewer once the
+   rotation passes the midpoint — genuinely part of the same 3D
+   rotation as the front face. */
+.binder-cover-face-back {
+  transform: rotateY(180deg);
+}
+
+.binder-cover-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  position: relative;
+  z-index: 2;
+  padding: var(--space-4);
+}
+
+.binder-cover-name {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-medium);
+  color: rgba(255,255,255,0.95);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.binder-cover-meta {
+  font-size: var(--text-xs);
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+/* ── Sticker layer ─────────────────────────────────────────────────────────── */
+
+.binder-cover-sticker {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.binder-cover-sticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}

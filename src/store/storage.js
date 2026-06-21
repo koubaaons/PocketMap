@@ -58,6 +58,12 @@ function sanitizeState(raw) {
     if (!b.page_color)  b.page_color  = 'dark';
     if (!b.cover_color) b.cover_color = '#e8627a';
     // === ISSUE #82 END ===
+    // === ISSUE #92: same pattern — old binders predate stickers entirely.
+    // Without this, validateBinder's "stickers must be an array" check
+    // would reject every binder created before this feature shipped, and
+    // sanitizeState would silently drop them on the next app load. ===
+    if (!Array.isArray(b.stickers)) b.stickers = [];
+    // === ISSUE #92 END ===
     const { valid, errors } = validateBinder(b);
     if (!valid) console.warn('[BinderVault] Dropping corrupt binder:', errors, b);
     return valid;

@@ -57,6 +57,34 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   const view       = useBinderView(binder, binderSlots);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // === ISSUE #92: closed/open state. Always starts closed. The cover
+  // button is ALWAYS mounted (not freshly created only when animating —
+  // that was the old overlay approach's problem), so simply toggling
+  // isAnimatingOpen's class is enough; no hingeOpen double-rAF dance
+  // needed anymore, since there's no "missing starting state" issue when
+  // the element was already sitting there in its closed position the
+  // whole time. ===
+  const [isOpen, setIsOpen] = useState(false);
+  const [isAnimatingOpen, setIsAnimatingOpen] = useState(false);
+
+  const handleOpenBinder = () => {
+    console.log('[DEBUG] handleOpenBinder called. Current isOpen:', isOpen, 'isAnimatingOpen:', isAnimatingOpen);
+    setIsAnimatingOpen(true);
+    // isOpen is now set via onTransitionEnd on the actual button (see
+    // JSX below) instead of a fixed setTimeout — a guessed duration can
+    // drift out of sync with the real CSS transition (e.g. if closed
+    // and reopened quickly, browser scheduling variance), letting isOpen
+    // flip true slightly before or after the rotation visually finished.
+    // transitionend fires exactly when the browser confirms it's done.
+  };
+
+  const handleCloseBinder = () => {
+    console.log('[DEBUG] handleCloseBinder called. Current isOpen:', isOpen, 'isAnimatingOpen:', isAnimatingOpen, 'page:', view.page);
+    setIsOpen(false);
+    setIsAnimatingOpen(false);
+    view.goToPage(0);
+  };
+
   // === ISSUE #93: the whole root element goes fullscreen as-is ===
   const rootRef = useRef(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen(rootRef);
@@ -143,6 +171,11 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   const leftPageNum  = isCover ? null : spread * 2;
   const rightPageNum = isCover ? 1    : spread * 2 + 1;
   const totalSpreads = Math.ceil(binder.pages / 2) + 1;
+
+  // === ISSUE #92: closed = not yet opened and not mid-animation. While
+  // closed, topbar/page-nav are hidden and the side arrows are disabled
+  // — you can't navigate away from the cover spread until it's opened. ===
+  const isClosed = !isOpen && !isAnimatingOpen;
 
   // Build slot maps from display slots (preview or real)
   const leftSlotMap = useMemo(() => {
@@ -320,10 +353,19 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         : view.openSlotAction(slot, cardDef),
   });
 
+  // === ISSUE #92: no separate closed-cover branch anymore. The binder
+  // always renders its real spread structure (topbar, book, arrows);
+  // the cover itself lives inline on top of page 1's slot (see below),
+  // and the topbar/page-nav/thumbnails are hidden via CSS while closed,
+  // the same technique already used for fullscreen mode — true visual
+  // continuity, no separate render tree to swap between. ===
+
   return (
     <div ref={rootRef} className={`binder-view-root ${isFullscreen ? 'binder-view-root-fullscreen' : ''}`}>
 
-      {/* Topbar — stays visible in fullscreen, exactly as requested */}
+      {/* Topbar — hidden while closed (same technique as fullscreen mode
+          hiding chrome), stays visible in fullscreen otherwise */}
+      {!isClosed && (
       <div className="binder-topbar">
         <div className="binder-topbar-left">
           <span className="binder-title" style={{ color }}>{binder.name}</span>
@@ -361,13 +403,21 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
             {isFullscreen ? '✕' : '⛶'}
           </Button>
 
+          {/* === ISSUE #92: close binder — returns to the closed cover === */}
+          <Button variant="ghost" size="sm" onClick={handleCloseBinder}>
+            Close Binder
+          </Button>
+
           <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>Delete</Button>
         </div>
       </div>
+      )}
 
-      {/* Page navigation — editable page number, replaces the old
-          thumbnails bar entirely. Click the number, clear it, type a new
-          page (1-binder.pages), press Enter or click away to jump. */}
+      {/* Page navigation — hidden while closed, same as topbar. Editable
+          page number, replaces the old thumbnails bar entirely. Click
+          the number, clear it, type a new page (1-binder.pages), press
+          Enter or click away to jump. */}
+      {!isClosed && (
       <div className="binder-page-nav">
         <input
           type="number"
@@ -390,6 +440,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         />
         <span className="binder-page-indicator-suffix">/ {binder.pages} pages</span>
       </div>
+      )}
 
       {/* Book — unchanged from normal mode. The existing centering CSS on
           binder-book-wrapper handles fullscreen automatically since it's
@@ -406,20 +457,35 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
 
         <div
           ref={bookRef}
-          className={`binder-book binder-pages-${binder.page_color ?? "dark"}`}
+          className={`binder-book binder-pages-${binder.page_color ?? "dark"} ${isCover ? 'binder-book-closed' : ''}`}
           style={{
-            background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
+            // === ISSUE #92: book container background stays neutral on
+            // the cover spread — coloring the WHOLE container painted
+            // both left and right halves pink (the left half's content
+            // is visibility:hidden, but that doesn't stop the PARENT's
+            // own background from showing through behind it). The right
+            // slot itself now carries its own immediate pink background
+            // instead (see binder-book-page-right below) — only the
+            // side that should actually be pink, immediately. ===
+            background: isCover ? 'transparent' : `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
+            ...(isCover ? { boxShadow: 'none' } : {}),
             ...(fullscreenMaxBookWidth ? { maxWidth: `${fullscreenMaxBookWidth}px` } : {}),
           }}
         >
 
           {isCover ? (
-            <div key="cover" className="binder-book-page binder-book-page-left binder-cover-page" style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
-              <div className="binder-cover-content">
-                <div className="binder-cover-name">{binder.name}</div>
-                <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
-              </div>
-            </div>
+            // === ISSUE #92: left slot stays genuinely empty/neutral at
+            // all times. The ROTATING COVER'S OWN BACK FACE is the only
+            // thing that should ever show pink on the left — a separate
+            // static "pink placeholder" here was redundant, creating two
+            // visually competing pink elements (the cover's real
+            // rotating back face, AND this static one) instead of one
+            // coherent animation. ===
+            <div
+              key="cover-left-empty"
+              className="binder-book-page binder-book-page-left binder-cover-back-slot"
+              style={{ visibility: 'hidden' }}
+            />
           ) : leftPageNum <= binder.pages ? (
             <div key={`left-${leftPageNum}`} className="binder-book-page binder-book-page-left">
               <BinderPage
@@ -437,14 +503,30 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
             <div key={`left-empty-${leftPageNum}`} className="binder-book-page binder-book-page-left binder-page-empty-right" />
           )}
 
-          <div className="binder-spine-center" style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
+          <div
+            className="binder-spine-center"
+            style={{
+              background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
+              // === ISSUE #92: hidden entirely on the cover spread, not
+              // just while closed. Both pink elements here (cover's
+              // back face on the left, box-shadow ring on the right)
+              // are now independent, uniformly-rounded rectangles —
+              // they don't need a connecting spine piece between them
+              // the way a normal two-page spread does. ===
+              ...(isCover || (!isAnimatingOpen && !isOpen) ? { visibility: 'hidden' } : {}),
+            }}
+          >
             <div className="binder-ring" />
             <div className="binder-ring" />
             <div className="binder-ring" />
           </div>
 
           {rightPageNum <= binder.pages ? (
-            <div key={`right-${rightPageNum}`} className="binder-book-page binder-book-page-right">
+            <div
+              key={`right-${rightPageNum}`}
+              className="binder-book-page binder-book-page-right"
+              style={isCover ? { boxShadow: `0 0 0 10px ${color}`, borderRadius: '10px' } : undefined}
+            >
               <BinderPage
                 binder={binder}
                 pageNumber={rightPageNum}
@@ -455,6 +537,61 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
                 selectedSlot={view.selectedSlot}
                 {...makePageHandlers(rightPageNum)}
               />
+
+              {/* === ISSUE #92: the cover itself — sits on top of page 1
+                  (which is already rendering above), as a real page-flip.
+                  Closed: flat, facing viewer, fully covering page 1.
+                  Animating open: rotates around its LEFT edge (the spine)
+                  until it lands flipped onto the left slot, revealing
+                  page 1 underneath as it turns. No overlay, no separate
+                  floating layer — this IS page 1's slot, just with the
+                  cover on top of it until opened. === */}
+              {isCover && (
+                <button
+                  className={`binder-cover-flip ${(isAnimatingOpen || isOpen) ? 'is-flipping' : ''}`}
+                  onClick={!isAnimatingOpen && !isOpen ? handleOpenBinder : undefined}
+                  onTransitionEnd={(e) => {
+                    if (e.propertyName === 'transform' && isAnimatingOpen && !isOpen) {
+                      setIsOpen(true);
+                    }
+                  }}
+                  aria-label={`Open ${binder.name}`}
+                >
+                  <div
+                    className="binder-cover-face binder-cover-face-front binder-cover-frame"
+                    style={{
+                      backgroundColor: color,
+                      backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
+                    }}
+                  >
+                    <div className="binder-cover-content">
+                      <div className="binder-cover-name">{binder.name}</div>
+                      <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
+                      {(binder.stickers ?? []).map(sticker => (
+                        <div
+                          key={sticker.id}
+                          className="binder-cover-sticker"
+                          style={{
+                            left: `${sticker.x}%`,
+                            top: `${sticker.y}%`,
+                            transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg)`,
+                          }}
+                        >
+                          <img src={sticker.image_url} alt="" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Back face — genuinely part of the SAME rotation as
+                      the front face, pre-rotated 180° so it only faces
+                      the viewer once the rotation passes the midpoint. */}
+                  <div
+                    className="binder-cover-face binder-cover-face-back binder-cover-frame"
+                    style={{ backgroundColor: color }}
+                  />
+                </button>
+              )}
             </div>
           ) : (
             <div key={`right-empty-${rightPageNum}`} className="binder-book-page binder-book-page-right binder-page-empty-right" />
@@ -465,7 +602,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         <button
           className="binder-nav-arrow binder-nav-arrow-side binder-nav-arrow-right"
           onClick={() => view.goToPage(spread + 1)}
-          disabled={spread >= totalSpreads - 1}
+          disabled={spread >= totalSpreads - 1 || isClosed}
           aria-label="Next page"
         >
           ›

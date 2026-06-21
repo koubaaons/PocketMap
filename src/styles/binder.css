@@ -232,6 +232,15 @@
   z-index: 0;
 }
 
+/* === ISSUE #92: permanently disabled on the cover spread (.binder-book-
+   closed, applied whenever isCover is true, including once open) — this
+   asymmetric layout (flipped cover + grid, not a normal two-page
+   spread) doesn't suit the raised-edge/texture effect at all. === */
+.binder-book-closed::before,
+.binder-book-closed::after {
+  display: none;
+}
+
 /* ── Book pages — #2 stacked + #7 slight tilt ─────────────────────────────── */
 
 .binder-book-page {
@@ -481,7 +490,6 @@
   padding: 2px var(--space-1);
   /* Hide the native number spinner arrows for a cleaner look */
   -moz-appearance: textfield;
-  appearance: textfield;
 }
 
 .binder-page-input::-webkit-outer-spin-button,
