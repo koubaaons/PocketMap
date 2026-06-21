@@ -2,6 +2,10 @@
  * @fileoverview CardGridItem — single image-first tile in a card grid.
  * === ISSUE #84: fixed column grid layout, consistent card size everywhere ===
  * === ISSUE: click-to-favorite star, owned cards only ===
+ * === ISSUE #85: optional collectionName subtext, used by Favorites only —
+ *     Collections tabs are already scoped to one collection so it'd be
+ *     redundant there; Favorites spans multiple collections so it's
+ *     genuinely useful context there. ===
  *
  * Replaces the old row-style display (CardDefinitionRow, FavoritesView's
  * inline result-row markup) with one shared tile component used by every
@@ -17,7 +21,7 @@
  * the full item object, not just an id or a boolean.
  */
 
-export function CardGridItem({ card, inventoryItem, onView, onToggleFavorite }) {
+export function CardGridItem({ card, inventoryItem, collectionName, onView, onToggleFavorite }) {
   const isOwned    = inventoryItem !== null && inventoryItem !== undefined;
   const isFavorite = inventoryItem?.is_favorite ?? false;
 
@@ -65,7 +69,12 @@ export function CardGridItem({ card, inventoryItem, onView, onToggleFavorite }) 
         </span>
       </div>
 
-      <span className="card-grid-item-name">{card.name}</span>
+      <div className="card-grid-item-info">
+        <span className="card-grid-item-name">{card.name}</span>
+        {collectionName && (
+          <span className="card-grid-item-collection">{collectionName}</span>
+        )}
+      </div>
     </button>
   );
 }

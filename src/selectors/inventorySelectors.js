@@ -45,6 +45,79 @@ export function isFavorite(inventory, cardDefId) {
 
 // === ISSUE #38 END: Favorite Cards ===
 
+// === ISSUE #85 START: Favorites View Polish — sort favorites ===
+
+/**
+ * Available sort options for the Favorites view.
+ * 'recent' — most recently OWNED first (acquired_at ?? createdAt), not
+ *            most recently favorited — favoriting touches updatedAt,
+ *            which is a shared field also touched by other edits, so
+ *            it's not a reliable "favorited at" signal. Acquisition
+ *            date is unambiguous.
+ * 'name'   — card name, A → Z
+ *
+ * No 'collection' sort option — see getFavoriteCollections/the
+ * collection FILTER dropdown in FavoritesView instead. Sorting
+ * alphabetically by collection name was removed: once you can filter
+ * down to one collection, sorting "by collection" within an
+ * already-single-collection list is meaningless — it'd just fall back
+ * to sorting by name anyway.
+ */
+export const FAVORITES_SORT_OPTIONS = Object.freeze([
+  { value: 'recent', label: 'Recently Added' },
+  { value: 'name',   label: 'Name' },
+]);
+
+/**
+ * Sorts favorite card entries (as returned by getFavoriteCards) by the
+ * given sort key.
+ *
+ * @param {{ inventoryItem: object, cardDef: object }[]} favorites
+ * @param {string} sortBy - one of FAVORITES_SORT_OPTIONS values
+ * @returns {{ inventoryItem: object, cardDef: object }[]}
+ */
+export function sortFavoriteCards(favorites, sortBy) {
+  const copy = [...favorites];
+
+  switch (sortBy) {
+    case 'name':
+      return copy.sort((a, b) => a.cardDef.name.localeCompare(b.cardDef.name));
+
+    case 'recent':
+    default:
+      return copy.sort((a, b) => {
+        const aTime = a.inventoryItem.acquired_at ?? a.inventoryItem.createdAt;
+        const bTime = b.inventoryItem.acquired_at ?? b.inventoryItem.createdAt;
+        return bTime - aTime;
+      });
+  }
+}
+
+/**
+ * Returns the distinct collections that have at least one favorited
+ * card, sorted alphabetically — used to populate the collection FILTER
+ * dropdown (not a sort). Each entry includes a count so the dropdown can
+ * show "Yu-Gi-Oh (4)" style labels if desired.
+ *
+ * @param {{ inventoryItem: object, cardDef: object }[]} favorites
+ * @param {Record<string, object>} collectionMap
+ * @returns {{ id: string, name: string, count: number }[]}
+ */
+export function getFavoriteCollectionOptions(favorites, collectionMap) {
+  const counts = {};
+  favorites.forEach(({ cardDef }) => {
+    const col = collectionMap[cardDef.collectionId];
+    if (!col) return;
+    counts[col.id] = (counts[col.id] ?? 0) + 1;
+  });
+
+  return Object.entries(counts)
+    .map(([id, count]) => ({ id, name: collectionMap[id]?.name ?? 'Unknown', count }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// === ISSUE #85 END ===
+
 // === ISSUE #45 START: Collection Tabs — Owned & Missing — tab selectors ===
 
 /**
