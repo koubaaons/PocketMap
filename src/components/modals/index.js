@@ -13,3 +13,7 @@ export { AddCardToBinderModal } from './AddCardToBinderModal.jsx';
 // === ISSUE #56 START: Slot action modal ===
 export { SlotActionModal } from './SlotActionModal.jsx';
 // === ISSUE #56 END ===
+
+// === ISSUE #92 START: Cover customizer modal ===
+export { CustomizeCoverModal } from './CustomizeCoverModal.jsx';
+// === ISSUE #92 END ===

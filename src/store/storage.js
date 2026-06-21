@@ -63,6 +63,11 @@ function sanitizeState(raw) {
     // would reject every binder created before this feature shipped, and
     // sanitizeState would silently drop them on the next app load. ===
     if (!Array.isArray(b.stickers)) b.stickers = [];
+    // === ISSUE #92 STAGE 3: scale added to the sticker shape after
+    // some stickers may already have been saved without it (resize
+    // wasn't built yet) — same defaulting pattern, applied per-sticker
+    // this time instead of per-binder. ===
+    b.stickers = b.stickers.map(s => (typeof s.scale === 'number' ? s : { ...s, scale: 1 }));
     // === ISSUE #92 END ===
     const { valid, errors } = validateBinder(b);
     if (!valid) console.warn('[BinderVault] Dropping corrupt binder:', errors, b);

@@ -1,0 +1,280 @@
+/**
+ * @fileoverview Cover customizer — canvas, draggable stickers, controls.
+ * === ISSUE #92: Binder close/open animation with sticker customisation ===
+ */
+
+/* .modal-lg — missing alongside .modal-sm added earlier for #89. The
+   customizer canvas needs more room than the default 480px modal. */
+.modal-lg {
+  max-width: 720px;
+}
+
+.cover-customizer-canvas {
+  position: relative;
+  width: 320px;
+  /* aspect-ratio set inline per-binder now (binder.cols/rows), not
+     fixed here — see CustomizeCoverModal.jsx */
+  margin: 0 auto;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow:
+    inset 0 3px 16px rgba(255,255,255,0.15),
+    inset 0 -6px 16px rgba(0,0,0,0.35),
+    0 12px 30px rgba(0,0,0,0.25);
+  user-select: none;
+}
+
+.cover-customizer-sticker {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  cursor: grab;
+  touch-action: none;
+  /* === FIX: the actual bug, found by elimination. .binder-cover-content
+     (the WINX name/meta text, rendered as a sibling before stickers in
+     this same canvas) has z-index:2 — even though stickers paint
+     visually on top (later in DOM, default z-index:auto doesn't
+     override an ancestor's explicit stacking), .binder-cover-content's
+     stacking context was intercepting clicks in the canvas's center
+     region BEFORE they reached the sticker beneath it. A fixed-position
+     debug box placed outside that region worked fine, which is what
+     isolated this. z-index:5 here ensures stickers are genuinely on
+     top for both paint AND click purposes. */
+  z-index: 5;
+}
+
+.cover-customizer-sticker.is-dragging {
+  cursor: grabbing;
+}
+
+.cover-customizer-sticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  pointer-events: none;
+}
+
+.cover-customizer-sticker.is-selected::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 1.5px dashed rgba(255,255,255,0.7);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.cover-customizer-sticker-remove {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  color: white;
+  border: none;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.cover-customizer-sticker-rotate-handle {
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  border: 2px solid white;
+  cursor: grab;
+  z-index: 2;
+}
+
+.cover-customizer-sticker-rotate-handle:active {
+  cursor: grabbing;
+}
+
+.cover-customizer-sticker-resize-handle {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--accent);
+  border: 2px solid white;
+  cursor: nwse-resize;
+  z-index: 2;
+}
+
+.cover-customizer-sticker-resize-handle:active {
+  cursor: nwse-resize;
+}
+
+/* ── Hover-revealed "Customize Cover" entry points ────────────────────────── */
+/* === ISSUE #92: two separate trigger locations, same button styling —
+   the binders grid (BinderCard) and BinderView's closed-cover state.
+   Both are hidden by default, fading in on hover via the parent's
+   :hover selector, per explicit design decision (only on the CLOSED
+   cover, never once a binder is open). === */
+
+.binder-card-wrapper {
+  position: relative;
+}
+
+.binder-card-customize-btn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,0.55);
+  color: white;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 5;
+}
+
+.binder-card-wrapper:hover .binder-card-customize-btn {
+  opacity: 1;
+}
+
+.binder-cover-customize-btn {
+  position: absolute;
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,0.55);
+  color: white;
+  border: none;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 5;
+  white-space: nowrap;
+}
+
+.binder-cover-flip:hover .binder-cover-customize-btn {
+  opacity: 1;
+}
+
+/* ── Mini binder cover — replaces the old flat BinderCard rectangle ──────── */
+/* === ISSUE #94: home grid cover preview, reusing the real cover's
+   visual recipe (gradient sheen, inset shadows, rounded corners) at
+   card scale, with actual saved stickers rendered in position. === */
+
+.binder-mini-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2.5 / 3.5;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  perspective: 600px;
+}
+
+.binder-mini-cover-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 2px 8px rgba(255,255,255,0.15),
+    inset 0 -3px 8px rgba(0,0,0,0.35),
+    0 4px 12px rgba(0,0,0,0.25);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+/* Hover tilt/lift — echoes the depth of the real cover without a full
+   3D flip; a believable "pick this one up" affordance. */
+.binder-mini-cover:hover .binder-mini-cover-frame {
+  transform: rotateX(4deg) rotateY(-4deg) translateY(-3px);
+  box-shadow:
+    inset 0 2px 8px rgba(255,255,255,0.18),
+    inset 0 -3px 8px rgba(0,0,0,0.35),
+    0 10px 20px rgba(0,0,0,0.3);
+}
+
+.binder-mini-cover-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  padding: var(--space-3);
+  z-index: 2;
+}
+
+.binder-mini-cover-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: rgba(255,255,255,0.95);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.binder-mini-cover-meta {
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.binder-mini-cover-sticker {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.binder-mini-cover-sticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+
+.binder-mini-cover-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0,0,0,0.25);
+  z-index: 2;
+}
+
+.binder-mini-cover-progress-fill {
+  height: 100%;
+  background: rgba(255,255,255,0.85);
+  transition: width var(--transition-slow);
+}

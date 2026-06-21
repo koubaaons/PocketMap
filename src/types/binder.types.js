@@ -32,6 +32,14 @@ function validateSticker(sticker) {
   if (typeof sticker.x !== 'number' || sticker.x < 0 || sticker.x > 100) errors.push('sticker.x must be a number 0-100 (percentage)');
   if (typeof sticker.y !== 'number' || sticker.y < 0 || sticker.y > 100) errors.push('sticker.y must be a number 0-100 (percentage)');
   if (typeof sticker.rotation !== 'number') errors.push('sticker.rotation must be a number (degrees)');
+  // === ISSUE #92 STAGE 3: scale — multiplier on the base 56px display
+  // size, defaulting to 1. Bounded 0.4-10: the UI clamps resize to
+  // whatever the sticker's current position geometrically allows
+  // without clipping the cover's edge (a centered sticker on a typical
+  // cover can reach roughly 8x before that happens) — this validator
+  // bound is just the outer data-level safety net, set high enough to
+  // never be the actual limiting factor in normal use. ===
+  if (typeof sticker.scale !== 'number' || sticker.scale < 0.4 || sticker.scale > 10) errors.push('sticker.scale must be a number 0.4-10');
   return errors;
 }
 
@@ -89,13 +97,14 @@ export function createBinder({
  * @param {{ image_url: string, x: number, y: number, rotation?: number }} params
  * @returns {{ sticker: object|null, errors: string[] }}
  */
-export function createSticker({ image_url, x, y, rotation = 0 }) {
+export function createSticker({ image_url, x, y, rotation = 0, scale = 1 }) {
   const sticker = {
     id: generateId(),
     image_url,
     x: Number(x),
     y: Number(y),
     rotation: Number(rotation),
+    scale: Number(scale),
   };
   const errors = validateSticker(sticker);
   return errors.length === 0 ? { sticker, errors: [] } : { sticker: null, errors };

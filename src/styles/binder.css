@@ -325,6 +325,30 @@
   opacity: 0.4;
 }
 
+/* === ISSUE #92: soft shadow feathering out from each side of the
+   spine, blending into the pink panels on either side instead of
+   leaving a hard visual break — smooths the transition between left
+   and right. */
+.binder-spine-center::before,
+.binder-spine-center::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  pointer-events: none;
+}
+
+.binder-spine-center::before {
+  right: 100%;
+  background: linear-gradient(to left, rgba(0,0,0,0.18), transparent);
+}
+
+.binder-spine-center::after {
+  left: 100%;
+  background: linear-gradient(to right, rgba(0,0,0,0.18), transparent);
+}
+
 .binder-ring { display: none; }
 
 /* ── Page grid ────────────────────────────────────────────────────────────── */

@@ -6,10 +6,11 @@
 //   - Recent Activity feed — derived from existing timestamps, see
 //     selectors/homeStats.js for why this isn't a real event log
 //   - "View All" link for binders
+// === ISSUE #92 START: Customize Cover — hover-revealed button on BinderCard ===
 
 import { useState, useCallback, useMemo } from 'react';
 import { Button, EmptyState, StatCard } from '../ui/index.jsx';
-import { CreateBinderModal } from '../modals/index.js';
+import { CreateBinderModal, CustomizeCoverModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
 import { binderCapacity, relativeDate } from '../../utils/index.js';
@@ -28,11 +29,21 @@ const MAX_BINDERS_SHOWN = 4;
 export function HomeView({ binders, binderSlots = [], inventory = [], cardDefinitions = [], collections = [], bin, toast, onNavigate, mode = 'dashboard' }) {
   const dispatch = useDispatch();
   const [showCreate, setShowCreate] = useState(false);
+  // === ISSUE #92: which binder (if any) is currently being customized ===
+  const [customizingBinder, setCustomizingBinder] = useState(null);
 
   const handleCreate = useCallback((binder) => {
     dispatch({ type: ACTIONS.BINDER_ADD, payload: binder });
     toast(`Binder "${binder.name}" created`);
     setShowCreate(false);
+  }, [dispatch, toast]);
+
+  // === ISSUE #92: saving the customized cover just updates the binder's
+  // stickers — same dispatch pattern as any other binder edit. ===
+  const handleSaveCover = useCallback((updatedBinder) => {
+    dispatch({ type: ACTIONS.BINDER_UPDATE, payload: updatedBinder });
+    toast('Cover updated');
+    setCustomizingBinder(null);
   }, [dispatch, toast]);
 
   const isDashboard = mode === 'dashboard';
@@ -99,6 +110,7 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
                 cardCount={getFilledSlotCount(binderSlots, b.id)}
                 capacity={binderCapacity(b)}
                 onClick={() => onNavigate('binder', b.id)}
+                onCustomizeCover={() => setCustomizingBinder(b)}
               />
             ))}
           </div>
@@ -150,36 +162,87 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
       {showCreate && (
         <CreateBinderModal onSubmit={handleCreate} onClose={() => setShowCreate(false)} />
       )}
+
+      {/* === ISSUE #92: customize cover modal, opened from the hover
+          button on any BinderCard === */}
+      {customizingBinder && (
+        <CustomizeCoverModal
+          binder={customizingBinder}
+          color={customizingBinder.cover_color ?? DEFAULT_BINDER_COLOR}
+          onSubmit={handleSaveCover}
+          onClose={() => setCustomizingBinder(null)}
+        />
+      )}
     </div>
   );
 }
 
-function BinderCard({ binder, cardCount, capacity, onClick }) {
+function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) {
   const pct   = capacity > 0 ? Math.round((cardCount / capacity) * 100) : 0;
   // === ISSUE #81: use cover_color, fall back to default for old binders ===
   const color = binder.cover_color ?? DEFAULT_BINDER_COLOR;
 
+  // === ISSUE #94: mini-cover replaces the old flat rectangle entirely —
+  // reuses the same visual recipe as the real cover (binder-cover-frame:
+  // gradient sheen, inset shadows, rounded corners) at a smaller scale,
+  // with stickers rendered in their actual saved positions/rotations/
+  // scale so the home grid genuinely previews what the real cover looks
+  // like, not a simplified stand-in. ===
   return (
-    <button className="binder-card" onClick={onClick}>
-      {/* Spine uses the binder color */}
-      <div className="binder-spine" style={{ background: color }} />
-      <div className="binder-card-body">
-        <div className="binder-card-name">{binder.name}</div>
-        <div className="binder-card-meta">
-          {binder.pages} pages · {binder.rows}×{binder.cols} grid
+    <div className="binder-card-wrapper">
+      <button className="binder-mini-cover" onClick={onClick} aria-label={`Open ${binder.name}`}>
+        <div
+          className="binder-mini-cover-frame"
+          style={{
+            backgroundColor: color,
+            backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
+          }}
+        >
+          <div className="binder-mini-cover-content">
+            <div className="binder-mini-cover-name">{binder.name}</div>
+            <div className="binder-mini-cover-meta">{binder.pages}p · {pct}%</div>
+          </div>
+
+          {/* Stickers — same x/y/rotation/scale as the real cover, just
+              rendered at this smaller frame's own size so percentages
+              still line up correctly. */}
+          {(binder.stickers ?? []).map(sticker => (
+            <div
+              key={sticker.id}
+              className="binder-mini-cover-sticker"
+              style={{
+                left: `${sticker.x}%`,
+                top: `${sticker.y}%`,
+                transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale ?? 1})`,
+              }}
+            >
+              <img src={sticker.image_url} alt="" />
+            </div>
+          ))}
+
+          <div className="binder-mini-cover-progress">
+            <div className="binder-mini-cover-progress-fill" style={{ width: `${pct}%` }} />
+          </div>
         </div>
-        <div className="binder-progress-bar">
-          <div
-            className="binder-progress-fill"
-            style={{ width: `${pct}%`, background: color }}
-          />
-        </div>
-        <div className="binder-card-count">{cardCount} / {capacity} cards · {pct}%</div>
-      </div>
-    </button>
+      </button>
+
+      {/* === ISSUE #92: hover-revealed customize button — only visible
+          on hover via CSS (.binder-card-customize-btn), stopPropagation
+          so it doesn't also trigger onClick (navigating into the
+          binder) when clicked. === */}
+      <button
+        className="binder-card-customize-btn"
+        onClick={(e) => { e.stopPropagation(); onCustomizeCover(); }}
+        title="Customize cover"
+        aria-label="Customize cover"
+      >
+        🎨
+      </button>
+    </div>
   );
 }
 
+// === ISSUE #92 END: Customize Cover ===
 // === ISSUE #83 END: Home Dashboard ===
 // === ISSUE #81 END: Binder Color Picker ===
 // === ISSUE #1 END: Split Views — HomeView ===

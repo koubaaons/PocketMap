@@ -35,6 +35,7 @@ import { BinderPage } from '../collections/BinderPage.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { SlotActionModal } from '../modals/SlotActionModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
+import { CustomizeCoverModal } from '../modals/CustomizeCoverModal.jsx';
 import { buildPageSlotMap, getFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
@@ -46,6 +47,8 @@ import { useDispatch } from '../../hooks/useStore.js';
 import { ACTIONS } from '../../store/index.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 import { createBinderSlot } from '../../types/index.js';
+import { createSticker } from '../../types/index.js';
+import { compressImage } from '../../utils/index.js';
 
 // === ISSUE #93: breathing room reserved above/below the book in
 // fullscreen (accounts for the topbar + page-nav row still being visible,
@@ -67,6 +70,11 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimatingOpen, setIsAnimatingOpen] = useState(false);
 
+  // === ISSUE #92 STAGE 3: cover customize mode — entered via hover
+  // button on the closed cover, replaces the normal closed view with an
+  // editable canvas for placing/dragging stickers. ===
+  const [isCustomizingCover, setIsCustomizingCover] = useState(false);
+
   const handleOpenBinder = () => {
     console.log('[DEBUG] handleOpenBinder called. Current isOpen:', isOpen, 'isAnimatingOpen:', isAnimatingOpen);
     setIsAnimatingOpen(true);
@@ -79,10 +87,16 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   };
 
   const handleCloseBinder = () => {
-    console.log('[DEBUG] handleCloseBinder called. Current isOpen:', isOpen, 'isAnimatingOpen:', isAnimatingOpen, 'page:', view.page);
     setIsOpen(false);
     setIsAnimatingOpen(false);
     view.goToPage(0);
+  };
+
+  // === ISSUE #92 STAGE 3: saving the customized cover ===
+  const handleSaveCover = (updatedBinder) => {
+    dispatch({ type: ACTIONS.BINDER_UPDATE, payload: updatedBinder });
+    toast?.('Cover updated');
+    setIsCustomizingCover(false);
   };
 
   // === ISSUE #93: the whole root element goes fullscreen as-is ===
@@ -457,18 +471,18 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
 
         <div
           ref={bookRef}
-          className={`binder-book binder-pages-${binder.page_color ?? "dark"} ${isCover ? 'binder-book-closed' : ''}`}
+          className={`binder-book binder-pages-${binder.page_color ?? "dark"} ${isCover && !isAnimatingOpen && !isOpen ? 'binder-book-closed' : ''}`}
           style={{
-            // === ISSUE #92: book container background stays neutral on
-            // the cover spread — coloring the WHOLE container painted
-            // both left and right halves pink (the left half's content
-            // is visibility:hidden, but that doesn't stop the PARENT's
-            // own background from showing through behind it). The right
-            // slot itself now carries its own immediate pink background
-            // instead (see binder-book-page-right below) — only the
-            // side that should actually be pink, immediately. ===
-            background: isCover ? 'transparent' : `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
-            ...(isCover ? { boxShadow: 'none' } : {}),
+            // === ISSUE #92: book container background is the SINGLE
+            // source of pink framing both sides — exactly the same as
+            // every normal spread, not two independently-styled panels
+            // (a box-shadow ring vs a rotated panel) trying to visually
+            // match each other, which never looked truly seamless no
+            // matter how precisely tuned. Transparent only while
+            // genuinely closed (cover fully covers the right side, left
+            // side is hidden) — shows immediately once the flip starts. ===
+            background: (isCover && !isAnimatingOpen && !isOpen) ? 'transparent' : `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
+            ...((isCover && !isAnimatingOpen && !isOpen) ? { boxShadow: 'none' } : {}),
             ...(fullscreenMaxBookWidth ? { maxWidth: `${fullscreenMaxBookWidth}px` } : {}),
           }}
         >
@@ -484,7 +498,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
             <div
               key="cover-left-empty"
               className="binder-book-page binder-book-page-left binder-cover-back-slot"
-              style={{ visibility: 'hidden' }}
+              style={{ visibility: 'hidden', transform: 'none' }}
             />
           ) : leftPageNum <= binder.pages ? (
             <div key={`left-${leftPageNum}`} className="binder-book-page binder-book-page-left">
@@ -524,7 +538,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
             <div
               key={`right-${rightPageNum}`}
               className="binder-book-page binder-book-page-right"
-              style={isCover ? { boxShadow: `0 0 0 12px ${color}`, borderRadius: '10px' } : undefined}
+              style={isCover ? { transform: 'none' } : undefined}
             >
               <BinderPage
                 binder={binder}
@@ -546,14 +560,22 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
                   floating layer — this IS page 1's slot, just with the
                   cover on top of it until opened. === */}
               {isCover && (
-                <button
+                <div
                   className={`binder-cover-flip ${(isAnimatingOpen || isOpen) ? 'is-flipping' : ''}`}
                   onClick={!isAnimatingOpen && !isOpen ? handleOpenBinder : undefined}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isAnimatingOpen && !isOpen) {
+                      e.preventDefault();
+                      handleOpenBinder();
+                    }
+                  }}
                   onTransitionEnd={(e) => {
                     if (e.propertyName === 'transform' && isAnimatingOpen && !isOpen) {
                       setIsOpen(true);
                     }
                   }}
+                  role="button"
+                  tabIndex={!isAnimatingOpen && !isOpen ? 0 : -1}
                   aria-label={`Open ${binder.name}`}
                 >
                   <div
@@ -573,13 +595,33 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
                           style={{
                             left: `${sticker.x}%`,
                             top: `${sticker.y}%`,
-                            transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg)`,
+                            transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale ?? 1})`,
                           }}
                         >
                           <img src={sticker.image_url} alt="" />
                         </div>
                       ))}
                     </div>
+
+                    {/* === ISSUE #92 STAGE 3: hover-triggered Customize
+                        Cover entry point. Only shown while genuinely
+                        closed (not mid-flip/open), fades in on hover via
+                        CSS. stopPropagation prevents this click from
+                        bubbling to the cover button's own onClick
+                        (which would otherwise also trigger
+                        handleOpenBinder). === */}
+                    {!isAnimatingOpen && !isOpen && (
+                      <button
+                        className="binder-cover-customize-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsCustomizingCover(true);
+                        }}
+                        aria-label="Customize cover"
+                      >
+                        ✎ Customize
+                      </button>
+                    )}
                   </div>
 
                   {/* Back face — genuinely part of the SAME rotation as
@@ -589,7 +631,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
                     className="binder-cover-face binder-cover-face-back binder-cover-frame"
                     style={{ backgroundColor: color }}
                   />
-                </button>
+                </div>
               )}
             </div>
           ) : (
@@ -668,6 +710,17 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           confirmLabel="Delete Binder"
           onConfirm={handleDeleteBinder}
           onClose={() => setConfirmDelete(false)}
+        />
+      )}
+
+      {/* === ISSUE #92 STAGE 3: cover customizer, opened from the hover
+          button on the closed cover === */}
+      {isCustomizingCover && (
+        <CustomizeCoverModal
+          binder={binder}
+          color={color}
+          onSubmit={handleSaveCover}
+          onClose={() => setIsCustomizingCover(false)}
         />
       )}
 
