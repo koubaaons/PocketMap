@@ -1,0 +1,92 @@
+/**
+ * @fileoverview Search results table.
+ * === ISSUE #86: Search View Polish ===
+ */
+
+.search-table-wrapper {
+  overflow-x: auto;
+  border: 0.5px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+}
+
+.search-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.search-table thead th {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-bottom: 0.5px solid var(--border-primary);
+  white-space: nowrap;
+}
+
+.search-table-row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.search-table-row:hover {
+  background: var(--bg-hover);
+}
+
+.search-table-row:not(:last-child) .search-cell {
+  border-bottom: 0.5px solid var(--border-primary);
+}
+
+.search-cell {
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.search-cell-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 200px;
+}
+
+.search-thumb {
+  width: 32px;
+  height: 45px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.search-thumb-placeholder {
+  width: 32px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text-hint);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.search-card-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-fav-dot {
+  color: var(--favorite-color);
+  margin-right: 4px;
+}
+
+.search-cell-owned {
+  white-space: nowrap;
+}

@@ -131,6 +131,7 @@ export default function App() {
             inventory={inventory}
             toast={toast}
             onNavigateToBinder={(id) => navigate('binder', id)}
+            onNavigateToCollection={(id) => navigate('collection', id)}
           />
         );
 
