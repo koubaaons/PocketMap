@@ -507,13 +507,12 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
             className="binder-spine-center"
             style={{
               background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
-              // === ISSUE #92: hidden entirely on the cover spread, not
-              // just while closed. Both pink elements here (cover's
-              // back face on the left, box-shadow ring on the right)
-              // are now independent, uniformly-rounded rectangles —
-              // they don't need a connecting spine piece between them
-              // the way a normal two-page spread does. ===
-              ...(isCover || (!isAnimatingOpen && !isOpen) ? { visibility: 'hidden' } : {}),
+              // === ISSUE #92: spine restored on the cover spread too —
+              // it should connect the two pink panels seamlessly, the
+              // exact same way it already does on every normal spread
+              // (see page 2/3 for reference). Only hidden while the
+              // binder hasn't been opened/animated at all yet. ===
+              ...(!isAnimatingOpen && !isOpen ? { visibility: 'hidden' } : {}),
             }}
           >
             <div className="binder-ring" />
@@ -525,7 +524,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
             <div
               key={`right-${rightPageNum}`}
               className="binder-book-page binder-book-page-right"
-              style={isCover ? { boxShadow: `0 0 0 10px ${color}`, borderRadius: '10px' } : undefined}
+              style={isCover ? { boxShadow: `0 0 0 12px ${color}`, borderRadius: '10px' } : undefined}
             >
               <BinderPage
                 binder={binder}
