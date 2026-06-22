@@ -170,7 +170,16 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
   // like, not a simplified stand-in. ===
   return (
     <div className="binder-card-wrapper">
-      <button className="binder-mini-cover" onClick={onClick} aria-label={`Open ${binder.name}`}>
+      {/* === FIX: style={{ color }} added here — this was missing
+          entirely. The 3D mini-cover effect's CSS (rear-cover fill,
+          hover glow) uses currentColor on .binder-mini-cover's own
+          ::before/::after pseudo-elements and on .binder-mini-cover-
+          frame's hover box-shadow, all of which need `color` set HERE,
+          on this exact button, to resolve to the binder's actual
+          cover_color. Without it, color falls back to its default
+          (black), which is exactly why the rear edge and hover glow
+          were rendering solid black instead of the binder's pink. === */}
+      <button className="binder-mini-cover" onClick={onClick} aria-label={`Open ${binder.name}`} style={{ color }}>
         <div
           className="binder-mini-cover-frame"
           style={{

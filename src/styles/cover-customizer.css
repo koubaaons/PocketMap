@@ -228,9 +228,21 @@
 }
 
 /* ── Mini binder cover — replaces the old flat BinderCard rectangle ──────── */
-/* === ISSUE #94: home grid cover preview, reusing the real cover's
-   visual recipe (gradient sheen, inset shadows, rounded corners) at
-   card scale, with actual saved stickers rendered in position. === */
+/* === 3D book effect, adapted from a CodePen "flat-cover-to-3D-book"
+   technique. Mapping onto this project's real structure:
+   - their .book-3d        -> .binder-mini-cover (perspective host)
+   - their .book-3d__inner -> .binder-mini-cover itself also carries the
+     rotation + preserve-3d (collapsed into one element since there's no
+     need for a separate wrapper here)
+   - their .book-3d__cover (a flat <img>) -> .binder-mini-cover-frame
+     (real DOM content: name, meta, stickers — not a flat image)
+   - their --cover-color custom property -> currentColor, which
+     resolves to binder.cover_color via the inline style={{ color }}
+     already set on the <button class="binder-mini-cover"> in
+     HomeView.jsx — no new CSS variable needed, no JSX change required
+     beyond what's already there.
+   Purely decorative: clicking still opens the binder exactly as
+   before, nothing about that behavior changes. === */
 
 .binder-mini-cover {
   position: relative;
@@ -240,9 +252,63 @@
   padding: 0;
   background: none;
   cursor: pointer;
-  perspective: 600px;
+  perspective: 1000px;
+  --book-thickness: 10px;
+  transform-style: preserve-3d;
+  animation: binder-mini-cover-open 1s ease forwards;
 }
 
+@keyframes binder-mini-cover-open {
+  from { transform: rotateY(0); }
+  to   { transform: rotateY(-25deg); }
+}
+
+.binder-mini-cover:hover {
+  transform: rotateY(0deg);
+  transition: transform 0.4s ease;
+}
+
+/* === Genuinely flat on hover, not just rotated to face the viewer
+   while still technically having depth. Per explicit request: hover
+   should show ONLY the front cover, 2D, no perspective/thickness
+   effect at all — not a 3D object viewed head-on. ===*/
+.binder-mini-cover:hover::before,
+.binder-mini-cover:hover::after {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.binder-mini-cover::before,
+.binder-mini-cover::after {
+  transition: opacity 0.3s ease;
+}
+
+/* === FIX: filter:drop-shadow() on the PARENT (.binder-mini-cover,
+   which has transform-style:preserve-3d and rotated 3D children) was
+   causing the whole card to render as a solid black silhouette on
+   hover in at least one browser — CSS filter forces its own
+   compositing layer, which conflicts with how 3D-transformed children
+   underneath it get painted, apparently hiding the real content and
+   showing only a flat black shape with the glow color bleeding around
+   its edge. Moved the glow to a plain box-shadow on the FRONT FACE
+   alone instead (.binder-mini-cover-frame, a flat 2D element, not the
+   3D-rotating parent) — this avoids the filter/3D conflict entirely.
+   translateZ(0) here removes this layer's own depth offset too, so
+   on hover there's genuinely zero 3D thickness left anywhere, not
+   just a rotation facing the viewer while still technically having
+   depth. ===*/
+.binder-mini-cover:hover .binder-mini-cover-frame {
+  transform: translateZ(0);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  /* === FIX: dropped the original dark drop-shadow on hover entirely
+     (it was layered together with the colored glow below, and the two
+     combined were reading as dominantly dark rather than as a clean
+     colored highlight). Hover now shows ONLY the colored glow. ===*/
+  box-shadow: 0 0 20px 4px currentColor;
+}
+
+/* Front face — the real cover content (name, meta, stickers render
+   inside this exact element, unchanged from before). */
 .binder-mini-cover-frame {
   position: relative;
   width: 100%;
@@ -252,21 +318,50 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow:
-    inset 0 2px 8px rgba(255,255,255,0.15),
-    inset 0 -3px 8px rgba(0,0,0,0.35),
-    0 4px 12px rgba(0,0,0,0.25);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 5px 5px 20px rgba(0,0,0,0.15);
+  transform: translateZ(var(--book-thickness));
+  transition: box-shadow 0.4s ease;
 }
 
-/* Hover tilt/lift — echoes the depth of the real cover without a full
-   3D flip; a believable "pick this one up" affordance. */
-.binder-mini-cover:hover .binder-mini-cover-frame {
-  transform: rotateX(4deg) rotateY(-4deg) translateY(-3px);
-  box-shadow:
-    inset 0 2px 8px rgba(255,255,255,0.18),
-    inset 0 -3px 8px rgba(0,0,0,0.35),
-    0 10px 20px rgba(0,0,0,0.3);
+/* Page edges — thin striped sliver suggesting the stack of pages
+   inside, visible on the right side as the cover tilts away. */
+.binder-mini-cover::before {
+  position: absolute;
+  content: '';
+  left: 100%;
+  top: 1%;
+  width: calc(var(--book-thickness) * 2);
+  height: 98%;
+  transform: translate(-55%, 0) rotateY(90deg);
+  background: linear-gradient(
+    90deg,
+    #fff 0%, hsl(0, 0%, 94%) 5%, #fff 10%, hsl(0, 0%, 94%) 15%,
+    #fff 20%, hsl(0, 0%, 94%) 25%, #fff 30%, hsl(0, 0%, 94%) 35%,
+    #fff 40%, hsl(0, 0%, 94%) 45%, #fff 50%, hsl(0, 0%, 94%) 55%,
+    #fff 60%, hsl(0, 0%, 94%) 65%, #fff 70%, hsl(0, 0%, 94%) 75%,
+    #fff 80%, hsl(0, 0%, 94%) 85%, #fff 90%, hsl(0, 0%, 94%) 95%, #fff 100%
+  );
+  /* === FIX (visible in light mode): a single boundary line on the
+     near edge so the page-edge strip reads as distinct from whatever
+     sits behind it, even if the binder's own colors happen to be
+     pale/white too. ===*/
+  border-left: 1px solid rgba(0,0,0,0.25);
+}
+
+/* Rear cover — sits behind the front face in 3D space, using the
+   binder's OWN cover color (currentColor, via style={{color}} already
+   set on the button in HomeView.jsx) rather than a hardcoded color, so
+   each binder's rear face genuinely matches its own front cover. */
+.binder-mini-cover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 1%;
+  width: 100%;
+  height: 100%;
+  transform: translateZ(calc(var(--book-thickness) * -1));
+  background-color: currentColor;
+  border-radius: 0 8px 8px 0;
 }
 
 .binder-mini-cover-content {
