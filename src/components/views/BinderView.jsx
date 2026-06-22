@@ -32,6 +32,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { BinderPage } from '../collections/BinderPage.jsx';
+import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { SlotActionModal } from '../modals/SlotActionModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
@@ -81,6 +82,9 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   const [isUploadingSticker, setIsUploadingSticker] = useState(false);
   const [stickerUploadError, setStickerUploadError] = useState('');
   const coverRef = useRef(null);
+  // Separate ref for BinderBookFlip's own cover face — see
+  // flipCoverFrontContent below for why this can't reuse coverRef.
+  const flipCoverRef = useRef(null);
   const stickerFileInputRef = useRef(null);
   const isUploadingStickerRef = useRef(false);
 
@@ -156,7 +160,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   }, []);
 
   const handleOpenBinder = () => {
-    console.log('[DEBUG] handleOpenBinder called. Current isOpen:', isOpen, 'isAnimatingOpen:', isAnimatingOpen);
     setIsAnimatingOpen(true);
     // isOpen is now set via onTransitionEnd on the actual button (see
     // JSX below) instead of a fixed setTimeout — a guessed duration can
@@ -164,6 +167,23 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     // and reopened quickly, browser scheduling variance), letting isOpen
     // flip true slightly before or after the rotation visually finished.
     // transitionend fires exactly when the browser confirms it's done.
+
+    // === FIX: BinderBookFlip's cover-flip is driven ENTIRELY by
+    // spread/view.page (isFlipped(0) = 0 < spread) — it has no separate
+    // cosmetic "isAnimatingOpen" flag the way the original book's CSS
+    // class does. The original book's open animation only ever toggled
+    // isOpen/isAnimatingOpen and left view.page untouched, because its
+    // own cover's look never depended on view.page. That's why clicking
+    // BinderBookFlip's cover correctly set isOpen/isAnimatingOpen (and
+    // the ORIGINAL book, which watches those flags, visually opened) but
+    // BinderBookFlip's own cover never flipped — confirmed via console:
+    // page input stayed at 1 (spread 0) even after isOpen became true.
+    // Advancing view.page here keeps both books in sync from a single
+    // click, without changing anything about how the original book
+    // already used these flags. ===
+    if (view.page === 0) {
+      view.goToPage(1);
+    }
   };
 
   const handleCloseBinder = () => {
@@ -440,6 +460,108 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         : view.openSlotAction(slot, cardDef),
   });
 
+  // === BinderBookFlip cover content: reuses the SAME draftStickers /
+  // isEditingCover / sticker handlers the original cover already has —
+  // just rendered into BinderBookFlip's own cover-pair face instead of
+  // the original book's coverRef element, since the two covers are
+  // separate DOM nodes (BinderBookFlip is a standalone test harness,
+  // not yet replacing the original). flipCoverRef plays the same role
+  // coverRef does for the original cover: the containing block
+  // CustomizerSticker measures its percentage-based x/y/width against.
+  const flipCoverFrontContent = (
+    <div
+      ref={flipCoverRef}
+      className={`binder-cover-face binder-cover-face-front binder-cover-frame ${!isAnimatingOpen && !isOpen && !isEditingCover ? 'binder-cover-resting-tilt' : ''}`}
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        backgroundColor: color,
+        backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
+      }}
+      onClick={isEditingCover ? (e) => e.stopPropagation() : undefined}
+      onMouseDown={isEditingCover ? () => setSelectedStickerId(null) : undefined}
+    >
+      <div className="binder-cover-content">
+        <div className="binder-cover-name">{binder.name}</div>
+        <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
+      </div>
+
+      {(isEditingCover ? draftStickers : (binder.stickers ?? [])).map(sticker => (
+        <CustomizerSticker
+          key={sticker.id}
+          sticker={sticker}
+          containerRef={flipCoverRef}
+          editable={isEditingCover}
+          isSelected={isEditingCover && selectedStickerId === sticker.id}
+          onSelect={isEditingCover ? () => setSelectedStickerId(sticker.id) : undefined}
+          onChange={isEditingCover ? (patch) => handleChangeDraftSticker(sticker.id, patch) : undefined}
+          onRemove={isEditingCover ? () => handleRemoveDraftSticker(sticker.id) : undefined}
+        />
+      ))}
+
+      {!isAnimatingOpen && !isOpen && !isEditingCover && (
+        <button
+          className="binder-cover-customize-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleEnterCoverEdit();
+          }}
+          aria-label="Customize cover"
+        >
+          ✎ Customize
+        </button>
+      )}
+
+      {isEditingCover && (
+        <div className="binder-cover-edit-controls" onMouseDown={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="binder-cover-edit-btn"
+            onClick={handleAddStickerClick}
+            disabled={isUploadingSticker || draftStickers.length >= MAX_STICKERS}
+          >
+            {isUploadingSticker ? 'Adding…' : `+ Sticker (${draftStickers.length}/${MAX_STICKERS})`}
+          </button>
+          <button type="button" className="binder-cover-edit-btn" onClick={handleCancelCoverEdit}>
+            Cancel
+          </button>
+          <button type="button" className="binder-cover-edit-btn binder-cover-edit-btn-primary" onClick={handleSaveCoverEdit}>
+            Save Cover
+          </button>
+        </div>
+      )}
+
+      {stickerUploadError && isEditingCover && (
+        <p className="binder-cover-edit-error">{stickerUploadError}</p>
+      )}
+    </div>
+  );
+
+  // Inside-of-cover (back face) — plain surface in the binder's color
+  // family, just dialed back so it reads as "inside the cover" rather
+  // than a second front. The original book never had a literal
+  // inside-cover surface (it skipped straight to page 1 visually), so
+  // this is new but intentionally simple — happy to adjust the look.
+  const flipCoverBackContent = (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        // === FIX: `${color}55` is alpha-blended over the page's white
+        // background, so it mathematically can never reach the binder's
+        // actual color no matter how high the alpha goes short of 100%
+        // — it always reads as a washed-out pastel. Using the binder
+        // color directly as a SOLID background (with a soft inset
+        // gradient for depth, echoing the cover front's own treatment)
+        // gives the inside-of-cover a real, full-strength color instead
+        // of a translucent tint. ===
+        background: color,
+        backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 100%)`,
+      }}
+    />
+  );
+
   // === ISSUE #92: no separate closed-cover branch anymore. The binder
   // always renders its real spread structure (topbar, book, arrows);
   // the cover itself lives inline on top of page 1's slot (see below),
@@ -544,34 +666,42 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
 
         <div
           ref={bookRef}
-          className={`binder-book binder-pages-${binder.page_color ?? "dark"} ${isCover && !isAnimatingOpen && !isOpen ? 'binder-book-closed' : ''}`}
+          className={`binder-book binder-pages-${binder.page_color ?? "dark"} ${isCover ? 'binder-book-closed' : ''}`}
           style={{
-            // === ISSUE #92: book container background is the SINGLE
-            // source of pink framing both sides — exactly the same as
-            // every normal spread, not two independently-styled panels
-            // (a box-shadow ring vs a rotated panel) trying to visually
-            // match each other, which never looked truly seamless no
-            // matter how precisely tuned. Transparent only while
-            // genuinely closed (cover fully covers the right side, left
-            // side is hidden) — shows immediately once the flip starts. ===
-            background: (isCover && !isAnimatingOpen && !isOpen) ? 'transparent' : `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
-            ...((isCover && !isAnimatingOpen && !isOpen) ? { boxShadow: 'none' } : {}),
+            // === FIX: book background transparent on the cover spread —
+            // each zone (left, spine+right) supplies its own background
+            // independently below, on its own timing, instead of one
+            // shared value that can't have different reveal timing for
+            // left vs. right. ===
+            background: isCover ? 'transparent' : `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
+            ...(isCover ? { boxShadow: 'none' } : {}),
             ...(fullscreenMaxBookWidth ? { maxWidth: `${fullscreenMaxBookWidth}px` } : {}),
           }}
         >
 
           {isCover ? (
-            // === ISSUE #92: left slot stays genuinely empty/neutral at
-            // all times. The ROTATING COVER'S OWN BACK FACE is the only
-            // thing that should ever show pink on the left — a separate
-            // static "pink placeholder" here was redundant, creating two
-            // visually competing pink elements (the cover's real
-            // rotating back face, AND this static one) instead of one
-            // coherent animation. ===
+            // === FIX: left slot's own background, revealed the moment
+            // the flip STARTS (isAnimatingOpen) — matching the spine's
+            // timing, since the rotating cover's back face is already
+            // covering this exact spot from the first frame, so nothing
+            // is ever visible prematurely. The book's own padding:10px
+            // (unchanged, still in effect regardless of the book's own
+            // background being transparent here) is what gives this
+            // slot the same border inset as every other page — no extra
+            // radius/padding override needed on this element itself. ===
             <div
               key="cover-left-empty"
               className="binder-book-page binder-book-page-left binder-cover-back-slot"
-              style={{ visibility: 'hidden', transform: 'none' }}
+              style={{
+                visibility: 'hidden',
+                transform: 'none',
+                background: (isAnimatingOpen || isOpen) ? `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` : 'transparent',
+                // === FIX (the actual border-size request): outer-left
+                // corners match the same 12px radius .binder-book-page-
+                // left already uses for its own inner-right radius. ===
+                borderTopLeftRadius: '12px',
+                borderBottomLeftRadius: '12px',
+              }}
             />
           ) : leftPageNum <= binder.pages ? (
             <div key={`left-${leftPageNum}`} className="binder-book-page binder-book-page-left">
@@ -590,58 +720,83 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
             <div key={`left-empty-${leftPageNum}`} className="binder-book-page binder-book-page-left binder-page-empty-right" />
           )}
 
-          <div
-            className="binder-spine-center"
-            style={{
-              background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
-              // === ISSUE #92: spine restored on the cover spread too —
-              // it should connect the two pink panels seamlessly, the
-              // exact same way it already does on every normal spread
-              // (see page 2/3 for reference). Only hidden while the
-              // binder hasn't been opened/animated at all yet. ===
-              ...(!isAnimatingOpen && !isOpen ? { visibility: 'hidden' } : {}),
-            }}
-          >
-            <div className="binder-ring" />
-            <div className="binder-ring" />
-            <div className="binder-ring" />
-          </div>
-
-          {rightPageNum <= binder.pages ? (
+          {/* === Spine + right page as one entity sharing a single
+              background, only on the cover spread. No overflow property
+              set here (defaults to visible) — overflow:hidden was tried
+              previously and broke the cover's 3D rotation by clipping it
+              right at this wrapper's edge before it could swing onto the
+              left slot. No radius on the wrapper itself either — the
+              right page panel below supplies its own outer-right radius
+              directly, the same way it already gets its inner-left
+              radius from existing CSS (.binder-book-page-right), just
+              mirrored to the outer edge. === */}
+          {isCover ? (
             <div
-              key={`right-${rightPageNum}`}
-              className="binder-book-page binder-book-page-right"
-              style={isCover ? { transform: 'none' } : undefined}
+              className="binder-cover-spine-and-right"
+              style={{
+                display: 'flex',
+                flex: '1 1 auto',
+                minWidth: 0,
+                background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
+              }}
             >
-              <BinderPage
-                binder={binder}
-                pageNumber={rightPageNum}
-                pageSlotMap={rightSlotMap}
-                cardDefMap={cardDefMap}
-                ownershipMap={ownershipMap}
-                isPreviewMode={view.isPreviewMode}
-                selectedSlot={view.selectedSlot}
-                {...makePageHandlers(rightPageNum)}
-              />
+              <div
+                className="binder-spine-center"
+                style={{
+                  background: 'transparent',
+                  ...(!isAnimatingOpen && !isOpen ? { visibility: 'hidden' } : {}),
+                }}
+              >
+                <div className="binder-ring" />
+                <div className="binder-ring" />
+                <div className="binder-ring" />
+              </div>
 
-              {/* === ISSUE #92: the cover itself — sits on top of page 1
-                  (which is already rendering above), as a real page-flip.
-                  Closed: flat, facing viewer, fully covering page 1.
-                  Animating open: rotates around its LEFT edge (the spine)
-                  until it lands flipped onto the left slot, revealing
-                  page 1 underneath as it turns. No overlay, no separate
-                  floating layer — this IS page 1's slot, just with the
-                  cover on top of it until opened. === */}
-              {isCover && (
+              {rightPageNum <= binder.pages ? (
                 <div
-                  className={`binder-cover-flip ${(isAnimatingOpen || isOpen) ? 'is-flipping' : ''}`}
-                  onClick={!isAnimatingOpen && !isOpen && !isEditingCover ? handleOpenBinder : undefined}
-                  onKeyDown={(e) => {
-                    if ((e.key === 'Enter' || e.key === ' ') && !isAnimatingOpen && !isOpen && !isEditingCover) {
-                      e.preventDefault();
-                      handleOpenBinder();
-                    }
+                  key={`right-${rightPageNum}`}
+                  className="binder-book-page binder-book-page-right"
+                  style={{
+                    transform: 'none',
+                    background: 'transparent',
+                    // === FIX (the actual border-size request): outer-
+                    // right corners now match the same 12px radius
+                    // .binder-book-page-right already uses for its own
+                    // inner-left radius (in the real CSS) — consistent
+                    // rounding on both corners of this panel, instead of
+                    // a guessed/mismatched value. ===
+                    borderTopRightRadius: '12px',
+                    borderBottomRightRadius: '12px',
                   }}
+                >
+                  <BinderPage
+                    binder={binder}
+                    pageNumber={rightPageNum}
+                    pageSlotMap={rightSlotMap}
+                    cardDefMap={cardDefMap}
+                    ownershipMap={ownershipMap}
+                    isPreviewMode={view.isPreviewMode}
+                    selectedSlot={view.selectedSlot}
+                    {...makePageHandlers(rightPageNum)}
+                  />
+
+                  {/* === ISSUE #92: the cover itself — sits on top of page 1
+                      (which is already rendering above), as a real page-flip.
+                      Closed: flat, facing viewer, fully covering page 1.
+                      Animating open: rotates around its LEFT edge (the spine)
+                      until it lands flipped onto the left slot, revealing
+                      page 1 underneath as it turns. No overlay, no separate
+                      floating layer — this IS page 1's slot, just with the
+                      cover on top of it until opened. === */}
+                  <div
+                    className={`binder-cover-flip ${(isAnimatingOpen || isOpen) ? 'is-flipping' : ''}`}
+                    onClick={!isAnimatingOpen && !isOpen && !isEditingCover ? handleOpenBinder : undefined}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ' ') && !isAnimatingOpen && !isOpen && !isEditingCover) {
+                        e.preventDefault();
+                        handleOpenBinder();
+                      }
+                    }}
                   onTransitionEnd={(e) => {
                     if (e.propertyName === 'transform' && isAnimatingOpen && !isOpen) {
                       setIsOpen(true);
@@ -651,14 +806,14 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
                   tabIndex={!isAnimatingOpen && !isOpen && !isEditingCover ? 0 : -1}
                   aria-label={`Open ${binder.name}`}
                 >
-                  <div
-                    ref={coverRef}
-                    className="binder-cover-face binder-cover-face-front binder-cover-frame"
-                    style={{
-                      backgroundColor: color,
-                      backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
-                    }}
-                    onClick={isEditingCover ? (e) => e.stopPropagation() : undefined}
+                    <div
+                      ref={coverRef}
+                      className={`binder-cover-face binder-cover-face-front binder-cover-frame ${!isAnimatingOpen && !isOpen && !isEditingCover ? 'binder-cover-resting-tilt' : ''}`}
+                      style={{
+                        backgroundColor: color,
+                        backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
+                      }}
+                      onClick={isEditingCover ? (e) => e.stopPropagation() : undefined}
                     onMouseDown={isEditingCover ? () => setSelectedStickerId(null) : undefined}
                   >
                     <div className="binder-cover-content">
@@ -749,10 +904,40 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
                     style={{ backgroundColor: color }}
                   />
                 </div>
+                </div>
+              ) : (
+                <div key={`right-empty-${rightPageNum}`} className="binder-book-page binder-book-page-right binder-page-empty-right" />
               )}
             </div>
           ) : (
-            <div key={`right-empty-${rightPageNum}`} className="binder-book-page binder-book-page-right binder-page-empty-right" />
+            // === Phase 3: every spread AFTER the cover. Plain spine +
+            // right page, exactly as before — no wrapper, no dedicated
+            // background, since the book's own shared background (set
+            // above) already paints this whole spread uniformly. ===
+            <>
+              <div className="binder-spine-center">
+                <div className="binder-ring" />
+                <div className="binder-ring" />
+                <div className="binder-ring" />
+              </div>
+
+              {rightPageNum <= binder.pages ? (
+                <div key={`right-${rightPageNum}`} className="binder-book-page binder-book-page-right">
+                  <BinderPage
+                    binder={binder}
+                    pageNumber={rightPageNum}
+                    pageSlotMap={rightSlotMap}
+                    cardDefMap={cardDefMap}
+                    ownershipMap={ownershipMap}
+                    isPreviewMode={view.isPreviewMode}
+                    selectedSlot={view.selectedSlot}
+                    {...makePageHandlers(rightPageNum)}
+                  />
+                </div>
+              ) : (
+                <div key={`right-empty-${rightPageNum}`} className="binder-book-page binder-book-page-right binder-page-empty-right" />
+              )}
+            </>
           )}
 
         </div>
@@ -765,6 +950,38 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         >
           ›
         </button>
+      </div>
+
+      {/* === TEST HARNESS: new BinderBookFlip mechanism, side by side
+          with the existing book above. Not wired into any real
+          behavior yet — just proving out the new flip mechanism with
+          real binder data before deciding whether to replace the
+          original above. Safe to delete this whole block at any time;
+          it doesn't affect anything else on the page. === */}
+      <div style={{ width: '500px', height: '400px', margin: '40px auto' }}>
+        <BinderBookFlip
+          binder={binder}
+          binderSlots={view.activeSlots}
+          cardDefMap={cardDefMap}
+          ownershipMap={ownershipMap}
+          spread={view.page}
+          isPreviewMode={view.isPreviewMode}
+          selectedSlot={view.selectedSlot}
+          makePageHandlers={makePageHandlers}
+          coverColor={color}
+          pageColor={binder.page_color ?? 'dark'}
+          coverFrontContent={flipCoverFrontContent}
+          coverBackContent={flipCoverBackContent}
+          /* === Click-to-open: reuses the SAME handleOpenBinder /
+             isOpen state that already drives the original book above,
+             so both books open together and stay in sync. isClickable
+             mirrors the same guard the original cover's onClick uses
+             (!isAnimatingOpen && !isOpen && !isEditingCover), so this
+             cover doesn't try to re-open while already opening/open
+             or while the sticker editor is active. === */
+          onCoverClick={handleOpenBinder}
+          isClickable={!isAnimatingOpen && !isOpen && !isEditingCover}
+        />
       </div>
 
 

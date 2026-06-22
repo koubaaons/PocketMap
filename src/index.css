@@ -36,3 +36,4 @@
 /* === ISSUE #92: Cover customizer — sticker upload/drag/rotate === */
 @import './styles/cover-customizer.css';
 /* === ISSUE #68 END === */
+@import './styles/binder-book-flip.css';

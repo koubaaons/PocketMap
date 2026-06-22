@@ -1,0 +1,148 @@
+/**
+ * @fileoverview Styles for BinderBookFlip — the new stacked page-pair
+ * flip mechanism, adapted from a CodePen reference (credit: Nidhanshu
+ * Sharma).
+ *
+ * === Geometry mapping from the reference ===
+ * Reference: .container is the whole book box; each .right div takes
+ * the RIGHT HALF of that box, hinged at its own left edge
+ * (transform-origin: left), holding one image on .front (facing the
+ * viewer) and one on .back (pre-rotated 180deg, only visible once
+ * flipped). Flipping rotates the whole .right div -180deg, swinging it
+ * onto the left half.
+ *
+ * Here: .book-flip-container is the whole two-page spread's bounding
+ * box. Each .book-page-pair takes the right half of that box (one
+ * page's width), hinged at its own left edge — same mechanism, just
+ * holding a real BinderPage (a 3x3+ slot grid) on each face instead of
+ * a background-image.
+ */
+
+.book-flip-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  perspective: 2400px;
+  display: flex;
+  overflow: hidden;
+}
+
+/* === Fixed left panel — NOT part of the 3D flipping stack at all.
+   Plain, static, occupies the left half of the spread permanently;
+   its CONTENT changes (cover-back, or whichever page was most
+   recently flipped past) but it never rotates itself. === */
+.book-left-panel {
+  position: relative;
+  width: 50%;
+  height: 100%;
+  flex-shrink: 0;
+  /* === FIX: .binder-book-page (the second class on this element,
+     needed for BinderPage's own CSS to apply) sets flex:1 — which in
+     this flex ROW container overrides the intended width:50% entirely,
+     making the panel grow to consume the WHOLE container instead of
+     just its half. That's exactly why the cover's absolutely
+     positioned box (sitting on the right half) appeared to be hiding
+     this panel's content — the panel was actually rendering at full
+     width underneath it, with the cover's pink box simply painted on
+     top of its right half. flex: none !important forces this panel
+     back to its fixed 50% width regardless of binder-book-page's own
+     flex rule. ===*/
+  flex: none !important;
+}
+
+.book-page-pair {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  transition: transform 0.7s ease-in-out;
+}
+
+.book-page-pair.is-flipped {
+  transform: rotateY(-180deg);
+}
+
+.book-page-pair-face {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  overflow: hidden;
+  /* === FIX (pink flash): every face needs an explicit OPAQUE
+     background, not just the cover's. Previously only the cover pair
+     declared a background-color (var(--cover-color)); every content
+     pair's .front/.back was left transparent. During the ~90°
+     edge-on moment of a flip, a transparent face lets whatever sits
+     behind it in the absolutely-positioned stack show through —
+     and the only strongly-colored thing anywhere in this stack is
+     the cover's pink fallback (#e8627a), which is what became
+     momentarily visible. Giving every face its own opaque page
+     background closes that gap, regardless of stacking order, and
+     keeps the flip visually consistent with the static (non-flip)
+     book, which already paints its page background this same way. */
+  background-color: var(--binder-page-bg, #fff);
+}
+
+.book-page-pair-front {
+  /* Faces the viewer directly while this pair is unflipped, sitting
+     on the right side of the spread. */
+  transform: rotateY(0deg);
+}
+
+.book-page-pair-back {
+  /* Pre-rotated 180deg so it only becomes visible once the pair has
+     actually rotated past the midpoint — same trick the cover's own
+     front/back faces already use elsewhere in this project. */
+  transform: rotateY(180deg);
+}
+
+/* A subtle shading overlay on the currently-turning page, echoing the
+   reference's .flip::before — gives a slight sense of depth/shadow
+   during the turn itself rather than a perfectly flat rotation. */
+.book-page-pair.is-flipped .book-page-pair-front::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+
+/* Cover pair's front face — the OUTSIDE of the cover (name, stickers,
+   customize controls), facing the viewer while the binder is closed.
+   Content itself is passed in via the coverFrontContent prop from
+   BinderView. This selector is more specific than the bare
+   .book-page-pair-face rule above, so it wins and overrides the
+   generic page background with the cover's own color — no
+   !important needed for that override. */
+.book-page-pair-cover .book-page-pair-front {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--cover-color, #e8627a);
+}
+
+/* === FIX (pink panel over Page 2): the cover's BACK face is the
+   INSIDE of the cover — what's visible once the cover has been
+   flipped open and lies against the left panel. It is a different
+   physical surface from the front and must not share the front's
+   cover-color background. Previously both faces used
+   var(--cover-color), so once flipped, an (often content-less) pink
+   box sat directly on top of whatever the left panel was showing
+   underneath it — not a z-index or transparency bug, just the wrong
+   background on the face that ends up on top. Using the same page
+   background var as every other page-pair face keeps the inside of
+   the cover visually consistent with the rest of the book, and lets
+   coverBackContent (whatever BinderView passes in — currently nothing
+   in the test harness, hence appearing fully empty/pink before this
+   fix) render on a normal page-colored surface instead. ===*/
+.book-page-pair-cover .book-page-pair-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--binder-page-bg, #fff);
+}
