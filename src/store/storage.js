@@ -68,6 +68,12 @@ function sanitizeState(raw) {
     // wasn't built yet) — same defaulting pattern, applied per-sticker
     // this time instead of per-binder. ===
     b.stickers = b.stickers.map(s => (typeof s.scale === 'number' ? s : { ...s, scale: 1 }));
+    // === ISSUE #94 FIX: size added after some stickers were saved with
+    // an implicit fixed 56px instead of a cover-relative percentage —
+    // same migration pattern. 17.5 matches the old 56px on the 320px
+    // customizer canvas, so existing stickers keep their visual size
+    // there while finally being consistent everywhere else too. ===
+    b.stickers = b.stickers.map(s => (typeof s.size === 'number' ? s : { ...s, size: 17.5 }));
     // === ISSUE #92 END ===
     const { valid, errors } = validateBinder(b);
     if (!valid) console.warn('[BinderVault] Dropping corrupt binder:', errors, b);

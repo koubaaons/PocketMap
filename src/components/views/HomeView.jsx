@@ -10,7 +10,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { Button, EmptyState, StatCard } from '../ui/index.jsx';
-import { CreateBinderModal, CustomizeCoverModal } from '../modals/index.js';
+import { CreateBinderModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useDispatch } from '../../hooks/useStore.js';
 import { binderCapacity, relativeDate } from '../../utils/index.js';
@@ -29,21 +29,11 @@ const MAX_BINDERS_SHOWN = 4;
 export function HomeView({ binders, binderSlots = [], inventory = [], cardDefinitions = [], collections = [], bin, toast, onNavigate, mode = 'dashboard' }) {
   const dispatch = useDispatch();
   const [showCreate, setShowCreate] = useState(false);
-  // === ISSUE #92: which binder (if any) is currently being customized ===
-  const [customizingBinder, setCustomizingBinder] = useState(null);
 
   const handleCreate = useCallback((binder) => {
     dispatch({ type: ACTIONS.BINDER_ADD, payload: binder });
     toast(`Binder "${binder.name}" created`);
     setShowCreate(false);
-  }, [dispatch, toast]);
-
-  // === ISSUE #92: saving the customized cover just updates the binder's
-  // stickers — same dispatch pattern as any other binder edit. ===
-  const handleSaveCover = useCallback((updatedBinder) => {
-    dispatch({ type: ACTIONS.BINDER_UPDATE, payload: updatedBinder });
-    toast('Cover updated');
-    setCustomizingBinder(null);
   }, [dispatch, toast]);
 
   const isDashboard = mode === 'dashboard';
@@ -110,7 +100,7 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
                 cardCount={getFilledSlotCount(binderSlots, b.id)}
                 capacity={binderCapacity(b)}
                 onClick={() => onNavigate('binder', b.id)}
-                onCustomizeCover={() => setCustomizingBinder(b)}
+                onCustomizeCover={() => onNavigate('binder', b.id)}
               />
             ))}
           </div>
@@ -163,16 +153,6 @@ export function HomeView({ binders, binderSlots = [], inventory = [], cardDefini
         <CreateBinderModal onSubmit={handleCreate} onClose={() => setShowCreate(false)} />
       )}
 
-      {/* === ISSUE #92: customize cover modal, opened from the hover
-          button on any BinderCard === */}
-      {customizingBinder && (
-        <CustomizeCoverModal
-          binder={customizingBinder}
-          color={customizingBinder.cover_color ?? DEFAULT_BINDER_COLOR}
-          onSubmit={handleSaveCover}
-          onClose={() => setCustomizingBinder(null)}
-        />
-      )}
     </div>
   );
 }
@@ -203,9 +183,13 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
             <div className="binder-mini-cover-meta">{binder.pages}p · {pct}%</div>
           </div>
 
-          {/* Stickers — same x/y/rotation/scale as the real cover, just
-              rendered at this smaller frame's own size so percentages
-              still line up correctly. */}
+          {/* === ISSUE #94 FIX: width now a percentage of the mini
+              cover's own width (same sticker.size field used
+              everywhere else), with aspect-ratio:1 to stay square
+              regardless of the cover's own taller-than-wide shape —
+              previously a fixed 24px here was just as disconnected
+              from the actual rendered size as the real cover's old
+              fixed 56px was. === */}
           {(binder.stickers ?? []).map(sticker => (
             <div
               key={sticker.id}
@@ -213,6 +197,8 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
               style={{
                 left: `${sticker.x}%`,
                 top: `${sticker.y}%`,
+                width: `${sticker.size ?? 17.5}%`,
+                aspectRatio: '1',
                 transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale ?? 1})`,
               }}
             >

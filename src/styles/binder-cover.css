@@ -95,11 +95,20 @@
 }
 
 /* ── Sticker layer ─────────────────────────────────────────────────────────── */
-
+/* === FIX (the long-standing 56px bug, finally found in its actual
+   file): this rule used to hardcode width/height: 56px — a leftover
+   from before stickers were percentage-based at all. A fixed height
+   here silently overrides the aspect-ratio (or, when set, the inline
+   percentage width) on whatever renders the sticker, since an explicit
+   height declaration always wins over aspect-ratio filling in the same
+   dimension. This produced a squashed box: full percentage width, but
+   pinned to 56px tall — proportionally tiny on the real (much wider
+   than 320px) binder cover, which is exactly the "shrinks when saved"
+   symptom chased across this entire session. No width/height belongs
+   here at all anymore — every render site (BinderView.jsx, HomeView.jsx,
+   CustomizerSticker.jsx) sets its own sizing inline now. ===*/
 .binder-cover-sticker {
   position: absolute;
-  width: 56px;
-  height: 56px;
   z-index: 3;
   pointer-events: none;
 }

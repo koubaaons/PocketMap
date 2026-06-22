@@ -29,8 +29,8 @@
 
 .cover-customizer-sticker {
   position: absolute;
-  width: 56px;
-  height: 56px;
+  /* width/height set inline per-sticker now (sticker.size, a % of cover
+     width) — not fixed here, see CustomizeCoverModal.jsx */
   cursor: grab;
   touch-action: none;
   /* === FIX: the actual bug, found by elimination. .binder-cover-content
@@ -178,6 +178,55 @@
   opacity: 1;
 }
 
+/* === IN-PLACE COVER EDITING: shown directly on the real cover while
+   BinderView's isEditingCover is true — replaces the old
+   CustomizeCoverModal popup. Always visible while editing (not
+   hover-revealed, unlike .binder-cover-customize-btn above), since the
+   person is actively mid-edit. === */
+.binder-cover-edit-controls {
+  position: absolute;
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--space-2);
+  z-index: 6;
+  white-space: nowrap;
+}
+
+.binder-cover-edit-btn {
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,0.55);
+  color: white;
+  border: none;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.binder-cover-edit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.binder-cover-edit-btn-primary {
+  background: var(--accent, #e8627a);
+}
+
+.binder-cover-edit-error {
+  position: absolute;
+  bottom: calc(var(--space-3) + 34px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--text-xs);
+  color: white;
+  background: rgba(0,0,0,0.6);
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-sm, 4px);
+  z-index: 6;
+  white-space: nowrap;
+}
+
 /* ── Mini binder cover — replaces the old flat BinderCard rectangle ──────── */
 /* === ISSUE #94: home grid cover preview, reusing the real cover's
    visual recipe (gradient sheen, inset shadows, rounded corners) at
@@ -250,8 +299,8 @@
 
 .binder-mini-cover-sticker {
   position: absolute;
-  width: 24px;
-  height: 24px;
+  /* width/height set inline now (sticker.size %, aspect-ratio:1) — not
+     fixed here, see HomeView.jsx */
   z-index: 1;
   pointer-events: none;
 }

@@ -29,13 +29,13 @@
  *   this view later works in fullscreen automatically, with no extra code.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { BinderPage } from '../collections/BinderPage.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { SlotActionModal } from '../modals/SlotActionModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
-import { CustomizeCoverModal } from '../modals/CustomizeCoverModal.jsx';
+import { CustomizerSticker } from '../modals/CustomizerSticker.jsx';
 import { buildPageSlotMap, getFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
@@ -48,7 +48,7 @@ import { ACTIONS } from '../../store/index.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 import { createBinderSlot } from '../../types/index.js';
 import { createSticker } from '../../types/index.js';
-import { compressImage } from '../../utils/index.js';
+import { compressImage, compressStickerImage } from '../../utils/index.js';
 
 // === ISSUE #93: breathing room reserved above/below the book in
 // fullscreen (accounts for the topbar + page-nav row still being visible,
@@ -70,10 +70,90 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimatingOpen, setIsAnimatingOpen] = useState(false);
 
-  // === ISSUE #92 STAGE 3: cover customize mode — entered via hover
-  // button on the closed cover, replaces the normal closed view with an
-  // editable canvas for placing/dragging stickers. ===
-  const [isCustomizingCover, setIsCustomizingCover] = useState(false);
+  // === IN-PLACE COVER EDITING: replaces the old CustomizeCoverModal
+  // popup. The cover already on screen becomes editable directly — the
+  // upload/state logic below is moved VERBATIM from the modal, only the
+  // container it renders into changed (the real cover's own slot,
+  // referenced via coverRef, instead of a separate modal canvas). ===
+  const [isEditingCover, setIsEditingCover] = useState(false);
+  const [draftStickers, setDraftStickers] = useState(binder.stickers ?? []);
+  const [selectedStickerId, setSelectedStickerId] = useState(null);
+  const [isUploadingSticker, setIsUploadingSticker] = useState(false);
+  const [stickerUploadError, setStickerUploadError] = useState('');
+  const coverRef = useRef(null);
+  const stickerFileInputRef = useRef(null);
+  const isUploadingStickerRef = useRef(false);
+
+  const STICKER_MAX_WIDTH = 400;
+  const MAX_STICKERS = 10;
+
+  const handleEnterCoverEdit = () => {
+    setDraftStickers(binder.stickers ?? []);
+    setSelectedStickerId(null);
+    setIsEditingCover(true);
+  };
+
+  const handleCancelCoverEdit = () => {
+    setDraftStickers(binder.stickers ?? []);
+    setSelectedStickerId(null);
+    setIsEditingCover(false);
+  };
+
+  const handleSaveCoverEdit = () => {
+    dispatch({ type: ACTIONS.BINDER_UPDATE, payload: { ...binder, stickers: draftStickers, updatedAt: Date.now() } });
+    toast?.('Cover updated');
+    setSelectedStickerId(null);
+    setIsEditingCover(false);
+  };
+
+  const handleAddStickerClick = () => {
+    if (draftStickers.length >= MAX_STICKERS) {
+      setStickerUploadError(`Maximum ${MAX_STICKERS} stickers per cover.`);
+      return;
+    }
+    stickerFileInputRef.current?.click();
+  };
+
+  const handleStickerFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (isUploadingStickerRef.current) return;
+    isUploadingStickerRef.current = true;
+
+    setIsUploadingSticker(true);
+    setStickerUploadError('');
+    try {
+      const image_url = await compressStickerImage(file, STICKER_MAX_WIDTH);
+      // Slight random offset around center so multiple stickers don't
+      // land exactly on top of each other — still fully draggable
+      // anywhere on the cover afterward.
+      const offsetX = 50 + (Math.random() * 20 - 10);
+      const offsetY = 50 + (Math.random() * 20 - 10);
+      const { sticker, errors } = createSticker({ image_url, x: offsetX, y: offsetY, rotation: 0 });
+      if (!sticker) {
+        setStickerUploadError('Could not add that image — ' + errors.join(', '));
+        return;
+      }
+      setDraftStickers(prev => [...prev, sticker]);
+      setSelectedStickerId(sticker.id);
+    } catch (err) {
+      setStickerUploadError('Could not read that image. Try a different file.');
+    } finally {
+      setIsUploadingSticker(false);
+      isUploadingStickerRef.current = false;
+    }
+  };
+
+  const handleRemoveDraftSticker = (id) => {
+    setDraftStickers(prev => prev.filter(s => s.id !== id));
+    if (selectedStickerId === id) setSelectedStickerId(null);
+  };
+
+  const handleChangeDraftSticker = useCallback((id, patch) => {
+    setDraftStickers(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
+  }, []);
 
   const handleOpenBinder = () => {
     console.log('[DEBUG] handleOpenBinder called. Current isOpen:', isOpen, 'isAnimatingOpen:', isAnimatingOpen);
@@ -90,13 +170,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     setIsOpen(false);
     setIsAnimatingOpen(false);
     view.goToPage(0);
-  };
-
-  // === ISSUE #92 STAGE 3: saving the customized cover ===
-  const handleSaveCover = (updatedBinder) => {
-    dispatch({ type: ACTIONS.BINDER_UPDATE, payload: updatedBinder });
-    toast?.('Cover updated');
-    setIsCustomizingCover(false);
   };
 
   // === ISSUE #93: the whole root element goes fullscreen as-is ===
@@ -562,9 +635,9 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
               {isCover && (
                 <div
                   className={`binder-cover-flip ${(isAnimatingOpen || isOpen) ? 'is-flipping' : ''}`}
-                  onClick={!isAnimatingOpen && !isOpen ? handleOpenBinder : undefined}
+                  onClick={!isAnimatingOpen && !isOpen && !isEditingCover ? handleOpenBinder : undefined}
                   onKeyDown={(e) => {
-                    if ((e.key === 'Enter' || e.key === ' ') && !isAnimatingOpen && !isOpen) {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isAnimatingOpen && !isOpen && !isEditingCover) {
                       e.preventDefault();
                       handleOpenBinder();
                     }
@@ -575,53 +648,97 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
                     }
                   }}
                   role="button"
-                  tabIndex={!isAnimatingOpen && !isOpen ? 0 : -1}
+                  tabIndex={!isAnimatingOpen && !isOpen && !isEditingCover ? 0 : -1}
                   aria-label={`Open ${binder.name}`}
                 >
                   <div
+                    ref={coverRef}
                     className="binder-cover-face binder-cover-face-front binder-cover-frame"
                     style={{
                       backgroundColor: color,
                       backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
                     }}
+                    onClick={isEditingCover ? (e) => e.stopPropagation() : undefined}
+                    onMouseDown={isEditingCover ? () => setSelectedStickerId(null) : undefined}
                   >
                     <div className="binder-cover-content">
                       <div className="binder-cover-name">{binder.name}</div>
                       <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
-                      {(binder.stickers ?? []).map(sticker => (
-                        <div
-                          key={sticker.id}
-                          className="binder-cover-sticker"
-                          style={{
-                            left: `${sticker.x}%`,
-                            top: `${sticker.y}%`,
-                            transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale ?? 1})`,
-                          }}
-                        >
-                          <img src={sticker.image_url} alt="" />
-                        </div>
-                      ))}
                     </div>
 
-                    {/* === ISSUE #92 STAGE 3: hover-triggered Customize
-                        Cover entry point. Only shown while genuinely
-                        closed (not mid-flip/open), fades in on hover via
-                        CSS. stopPropagation prevents this click from
-                        bubbling to the cover button's own onClick
-                        (which would otherwise also trigger
-                        handleOpenBinder). === */}
-                    {!isAnimatingOpen && !isOpen && (
+                    {/* === FIX (real root cause of the resize-feels-too-
+                        small issue): stickers must be DIRECT CHILDREN of
+                        the coverRef element (.binder-cover-face), NOT
+                        nested inside .binder-cover-content. That inner
+                        div is itself `position: relative` and only wraps
+                        the name/meta text — much smaller than the full
+                        cover — so a sticker's percentage-based
+                        left/top/width was resolving against THAT small
+                        box instead of the full cover coverRef actually
+                        measures for drag math. Moving stickers here
+                        (sibling of binder-cover-content, direct child of
+                        the coverRef element) makes sizing and dragging
+                        agree on the same containing block. === */}
+                    {(isEditingCover ? draftStickers : (binder.stickers ?? [])).map(sticker => (
+                        <CustomizerSticker
+                          key={sticker.id}
+                          sticker={sticker}
+                          containerRef={coverRef}
+                          editable={isEditingCover}
+                          isSelected={isEditingCover && selectedStickerId === sticker.id}
+                          onSelect={isEditingCover ? () => setSelectedStickerId(sticker.id) : undefined}
+                          onChange={isEditingCover ? (patch) => handleChangeDraftSticker(sticker.id, patch) : undefined}
+                          onRemove={isEditingCover ? () => handleRemoveDraftSticker(sticker.id) : undefined}
+                        />
+                      ))}
+
+                    {/* === IN-PLACE EDITING: no modal anywhere. Not
+                        editing: hover-revealed Customize entry button,
+                        same as before. Editing: Add Sticker / Cancel /
+                        Save controls directly on the cover. === */}
+                    {!isAnimatingOpen && !isOpen && !isEditingCover && (
                       <button
                         className="binder-cover-customize-btn"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setIsCustomizingCover(true);
+                          handleEnterCoverEdit();
                         }}
                         aria-label="Customize cover"
                       >
                         ✎ Customize
                       </button>
                     )}
+
+                    {isEditingCover && (
+                      <div className="binder-cover-edit-controls" onMouseDown={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className="binder-cover-edit-btn"
+                          onClick={handleAddStickerClick}
+                          disabled={isUploadingSticker || draftStickers.length >= MAX_STICKERS}
+                        >
+                          {isUploadingSticker ? 'Adding…' : `+ Sticker (${draftStickers.length}/${MAX_STICKERS})`}
+                        </button>
+                        <button type="button" className="binder-cover-edit-btn" onClick={handleCancelCoverEdit}>
+                          Cancel
+                        </button>
+                        <button type="button" className="binder-cover-edit-btn binder-cover-edit-btn-primary" onClick={handleSaveCoverEdit}>
+                          Save Cover
+                        </button>
+                      </div>
+                    )}
+
+                    {stickerUploadError && isEditingCover && (
+                      <p className="binder-cover-edit-error">{stickerUploadError}</p>
+                    )}
+
+                    <input
+                      ref={stickerFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleStickerFileSelected}
+                    />
                   </div>
 
                   {/* Back face — genuinely part of the SAME rotation as
@@ -710,17 +827,6 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
           confirmLabel="Delete Binder"
           onConfirm={handleDeleteBinder}
           onClose={() => setConfirmDelete(false)}
-        />
-      )}
-
-      {/* === ISSUE #92 STAGE 3: cover customizer, opened from the hover
-          button on the closed cover === */}
-      {isCustomizingCover && (
-        <CustomizeCoverModal
-          binder={binder}
-          color={color}
-          onSubmit={handleSaveCover}
-          onClose={() => setIsCustomizingCover(false)}
         />
       )}
 

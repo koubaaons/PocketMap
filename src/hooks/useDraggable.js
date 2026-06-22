@@ -1,52 +1,39 @@
 /**
  * @fileoverview useDraggable — generic drag-to-position hook.
- * === ISSUE #92: Binder close/open animation with sticker customisation ===
  *
  * Reusable, no sticker-specific logic at all — takes a container ref
  * (the bounding box dragging happens within) and the item's current
  * position, returns handlers to wire onto the draggable element plus a
  * live position during drag. Position is always expressed as PERCENTAGES
- * (0-100) of the container's own width/height, not raw pixels — this is
- * what keeps a dragged item's position correct regardless of how large
- * the container renders on different screens/zoom levels (the same
- * reasoning already used for sticker x/y in binder.types.js).
+ * (0-100) of the container's own width/height.
  *
- * Two independent pieces, both optional:
- *   - Position dragging: drag the item itself to move it.
- *   - Rotation dragging: drag a separate "handle" element to rotate the
- *     item around its own center, independent of position.
- *
- * Usage:
- *   const containerRef = useRef(null);
- *   const { dragHandlers, rotateHandlers, isDragging } = useDraggable({
- *     containerRef,
- *     position: { x: sticker.x, y: sticker.y },
- *     rotation: sticker.rotation,
- *     onPositionChange: (x, y) => updateSticker(sticker.id, { x, y }),
- *     onRotationChange: (rotation) => updateSticker(sticker.id, { rotation }),
- *   });
- *   <div ref={containerRef}>
- *     <div {...dragHandlers} style={{ left: `${sticker.x}%`, top: `${sticker.y}%` }}>
- *       <div {...rotateHandlers} className="rotate-handle" />
- *     </div>
- *   </div>
+ * Fixes included:
+ * 1. Touch-event coordinates: TouchEvent has no clientX/clientY of its
+ *    own (they live on e.touches[0]) — getClientCoords normalizes
+ *    mouse and touch events so dragging works on both.
+ * 2. NaN-safe starting position: if position.x/position.y is ever
+ *    undefined/NaN (e.g. stale or malformed sticker data), the drag
+ *    starts from 50/50 instead of silently propagating NaN through
+ *    every subsequent calculation, which froze the element in place
+ *    no matter how far the pointer moved.
  */
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 
-/**
- * @param {{
- *   containerRef: React.RefObject<HTMLElement>,
- *   position: { x: number, y: number },
- *   rotation?: number,
- *   scale?: number,
- *   onPositionChange?: (x: number, y: number) => void,
- *   onRotationChange?: (rotation: number) => void,
- *   onScaleChange?: (scale: number) => void,
- *   scaleBounds?: { min: number, max: number },
- *   disabled?: boolean,
- * }} params
- */
+function getClientCoords(e) {
+  if (e.touches && e.touches.length > 0) {
+    return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  if (e.changedTouches && e.changedTouches.length > 0) {
+    return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+  }
+  return { x: e.clientX, y: e.clientY };
+}
+
+function safePct(n) {
+  return Number.isFinite(n) ? n : 50;
+}
+
 export function useDraggable({
   containerRef,
   position,
@@ -62,10 +49,6 @@ export function useDraggable({
   const [isRotating, setIsRotating] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
 
-  // Refs (not state) for in-flight drag math — avoids re-render churn on
-  // every mousemove; only onPositionChange/onRotationChange/onScaleChange
-  // calls cause the actual sticker data to update, which the parent
-  // re-renders from.
   const dragState = useRef(null);
   const rotateState = useRef(null);
   const resizeState = useRef(null);
@@ -82,12 +65,13 @@ export function useDraggable({
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
+    const coords = getClientCoords(e);
     dragState.current = {
       rect,
-      startX: e.clientX,
-      startY: e.clientY,
-      startPctX: position.x,
-      startPctY: position.y,
+      startX: coords.x,
+      startY: coords.y,
+      startPctX: safePct(position.x),
+      startPctY: safePct(position.y),
     };
     setIsDragging(true);
   }, [containerRef, position.x, position.y, disabled]);
@@ -99,8 +83,9 @@ export function useDraggable({
       const state = dragState.current;
       if (!state) return;
       const { rect, startX, startY, startPctX, startPctY } = state;
-      const deltaXPct = ((e.clientX - startX) / rect.width) * 100;
-      const deltaYPct = ((e.clientY - startY) / rect.height) * 100;
+      const coords = getClientCoords(e);
+      const deltaXPct = ((coords.x - startX) / rect.width) * 100;
+      const deltaYPct = ((coords.y - startY) / rect.height) * 100;
       const nextX = clampPercent(startPctX + deltaXPct);
       const nextY = clampPercent(startPctY + deltaYPct);
       onPositionChange?.(nextX, nextY);
@@ -123,23 +108,20 @@ export function useDraggable({
     };
   }, [isDragging, onPositionChange]);
 
-  // ── Rotation dragging (separate handle, drags around the item's own
-  //    center rather than the container) ──────────────────────────────────
+  // ── Rotation dragging ────────────────────────────────────────────────────
 
   const handleRotatePointerDown = useCallback((e) => {
     if (disabled) return;
     e.preventDefault();
     e.stopPropagation();
-    // The rotate handle's own parent (the sticker element) is what we
-    // rotate around the center of — find it via currentTarget's
-    // offsetParent, which is the sticker wrapper in normal usage.
     const stickerEl = e.currentTarget.offsetParent;
     if (!stickerEl) return;
     const rect = stickerEl.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-    rotateState.current = { centerX, centerY, startAngle, startRotation: rotation };
+    const coords = getClientCoords(e);
+    const startAngle = Math.atan2(coords.y - centerY, coords.x - centerX) * (180 / Math.PI);
+    rotateState.current = { centerX, centerY, startAngle, startRotation: Number.isFinite(rotation) ? rotation : 0 };
     setIsRotating(true);
   }, [rotation, disabled]);
 
@@ -150,7 +132,8 @@ export function useDraggable({
       const state = rotateState.current;
       if (!state) return;
       const { centerX, centerY, startAngle, startRotation } = state;
-      const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+      const coords = getClientCoords(e);
+      const currentAngle = Math.atan2(coords.y - centerY, coords.x - centerX) * (180 / Math.PI);
       const delta = currentAngle - startAngle;
       onRotationChange?.(startRotation + delta);
     };
@@ -172,8 +155,7 @@ export function useDraggable({
     };
   }, [isRotating, onRotationChange]);
 
-  // ── Resize dragging (separate handle, distance-from-center maps to
-  //    scale rather than position) ────────────────────────────────────────
+  // ── Resize dragging ──────────────────────────────────────────────────────
 
   const handleResizePointerDown = useCallback((e) => {
     if (disabled) return;
@@ -184,8 +166,9 @@ export function useDraggable({
     const rect = stickerEl.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const startDistance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
-    resizeState.current = { centerX, centerY, startDistance, startScale: scale };
+    const coords = getClientCoords(e);
+    const startDistance = Math.hypot(coords.x - centerX, coords.y - centerY);
+    resizeState.current = { centerX, centerY, startDistance, startScale: Number.isFinite(scale) ? scale : 1 };
     setIsResizing(true);
   }, [scale, disabled]);
 
@@ -196,10 +179,8 @@ export function useDraggable({
       const state = resizeState.current;
       if (!state) return;
       const { centerX, centerY, startDistance, startScale } = state;
-      const currentDistance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
-      // Avoid division by zero if the pointer starts exactly on center
-      // (shouldn't normally happen since the handle sits at the corner,
-      // but guards against a stuck/NaN scale either way).
+      const coords = getClientCoords(e);
+      const currentDistance = Math.hypot(coords.x - centerX, coords.y - centerY);
       const ratio = startDistance > 0 ? currentDistance / startDistance : 1;
       onScaleChange?.(clampScale(startScale * ratio));
     };

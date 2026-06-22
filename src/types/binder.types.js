@@ -40,6 +40,16 @@ function validateSticker(sticker) {
   // bound is just the outer data-level safety net, set high enough to
   // never be the actual limiting factor in normal use. ===
   if (typeof sticker.scale !== 'number' || sticker.scale < 0.4 || sticker.scale > 10) errors.push('sticker.scale must be a number 0.4-10');
+  // === ISSUE #94 FIX: size — PERCENTAGE of the cover's own width, not a
+  // fixed pixel value. A fixed 56px looked correct only on the one
+  // canvas width (320px) it happened to be tuned for — on the real
+  // binder cover (renders up to ~540px+) the same 56px sticker covers
+  // proportionally less area, looking smaller; on a 24px mini home-grid
+  // preview it would be comically oversized. Storing size as a % of
+  // cover width (default 17.5, i.e. 56/320) keeps it visually
+  // consistent across every container, the same reasoning already
+  // applied to x/y. ===
+  if (typeof sticker.size !== 'number' || sticker.size < 5 || sticker.size > 60) errors.push('sticker.size must be a number 5-60 (percentage of cover width)');
   return errors;
 }
 
@@ -97,7 +107,7 @@ export function createBinder({
  * @param {{ image_url: string, x: number, y: number, rotation?: number }} params
  * @returns {{ sticker: object|null, errors: string[] }}
  */
-export function createSticker({ image_url, x, y, rotation = 0, scale = 1 }) {
+export function createSticker({ image_url, x, y, rotation = 0, scale = 1, size = 17.5 }) {
   const sticker = {
     id: generateId(),
     image_url,
@@ -105,6 +115,7 @@ export function createSticker({ image_url, x, y, rotation = 0, scale = 1 }) {
     y: Number(y),
     rotation: Number(rotation),
     scale: Number(scale),
+    size: Number(size),
   };
   const errors = validateSticker(sticker);
   return errors.length === 0 ? { sticker, errors: [] } : { sticker: null, errors };
