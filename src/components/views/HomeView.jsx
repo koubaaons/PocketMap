@@ -200,19 +200,7 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
               from the actual rendered size as the real cover's old
               fixed 56px was. === */}
           {(binder.stickers ?? []).map(sticker => (
-            <div
-              key={sticker.id}
-              className="binder-mini-cover-sticker"
-              style={{
-                left: `${sticker.x}%`,
-                top: `${sticker.y}%`,
-                width: `${sticker.size ?? 17.5}%`,
-                aspectRatio: '1',
-                transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale ?? 1})`,
-              }}
-            >
-              <img src={sticker.image_url} alt="" />
-            </div>
+            <MiniCoverSticker key={sticker.id} sticker={sticker} />
           ))}
 
           <div className="binder-mini-cover-progress">
@@ -233,6 +221,42 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
       >
         🎨
       </button>
+    </div>
+  );
+}
+
+// === FIX: a tall/narrow source image (e.g. a standing character with
+// most of its width unused) inside a forced aspectRatio:'1' box gets
+// shrunk dramatically by object-fit:contain to fit the box's narrower
+// dimension — leaving visible empty space above/below and making it
+// look much smaller than a squarer image at the IDENTICAL stored
+// scale, even though the math/data was never wrong. Rather than special
+// -case any specific image, this component measures whatever image is
+// actually uploaded (via the img's own onLoad — naturalWidth/
+// naturalHeight, the same technique already used on the real cover's
+// CustomizerSticker) and sizes the box to match THAT image's real
+// shape automatically. Works the same way for every future upload —
+// tall, wide, or square — with no per-image logic at all. ===
+function MiniCoverSticker({ sticker }) {
+  const [aspectRatio, setAspectRatio] = useState(1);
+
+  const handleImageLoad = useCallback((e) => {
+    const { naturalWidth, naturalHeight } = e.target;
+    if (naturalWidth > 0 && naturalHeight > 0) setAspectRatio(naturalWidth / naturalHeight);
+  }, []);
+
+  return (
+    <div
+      className="binder-mini-cover-sticker"
+      style={{
+        left: `${sticker.x}%`,
+        top: `${sticker.y}%`,
+        width: `${sticker.size ?? 17.5}%`,
+        aspectRatio: `${aspectRatio}`,
+        transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale ?? 1})`,
+      }}
+    >
+      <img src={sticker.image_url} alt="" onLoad={handleImageLoad} />
     </div>
   );
 }
