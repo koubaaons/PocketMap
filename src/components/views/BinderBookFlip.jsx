@@ -147,6 +147,19 @@ export function BinderBookFlip({
       style={{ '--cover-color': coverColor }}
     >
 
+      {/* === Background frame halves — sit BEHIND every page-pair as
+          their own layer. Always mounted (never conditionally
+          rendered) so the opacity transition below can actually
+          animate; conditional mounting removes elements from the DOM
+          instantly with no way to transition that. RIGHT half is
+          visible from spread 1 onward (Page 1 at spread 1, and every
+          page after). LEFT half is visible only from spread 2 onward
+          — spread 1's left side is the cover's freshly-opened back
+          face, which must read as empty, not already framed.
+          Neither is visible at spread 0 (closed). === */}
+      <div className={`book-flip-frame-half book-flip-frame-half-right ${spread >= 1 ? 'book-flip-frame-half-visible' : ''}`} />
+      <div className={`book-flip-frame-half book-flip-frame-half-left ${spread >= 2 ? 'book-flip-frame-half-visible' : ''}`} />
+
       {/* === Back cover — fills the right side once every pair has
           flipped (spread has reached/passed the last pair), since at
           that point there's no remaining unflipped pair to show a
@@ -172,13 +185,15 @@ export function BinderBookFlip({
           className="book-page-pair-back-cover"
           style={{
             position: 'absolute',
-            top: 0,
-            left: '50%',
-            width: '50%',
-            height: '100%',
+            top: '14px',
+            left: 'calc(50% + 14px)',
+            right: '14px',
+            bottom: '14px',
+            boxSizing: 'border-box',
             zIndex: -1,
             background: coverColor,
             backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
+            borderRadius: '0 16px 16px 0',
           }}
         />
       )}
@@ -226,16 +241,36 @@ export function BinderBookFlip({
           BinderPage's own CSS (height:100% etc, scoped to
           .binder-book-page .binder-page-wrapper) applies — without
           it, page content collapses to zero height since it never
-          gets that ancestor class in this structure. === */}
+          gets that ancestor class in this structure.
+          INSET: each face leaves a 14px gap on its own outer edge so
+          the background frame halves (above) can show through —
+          matching their own visibility rules exactly: front (right
+          side) insets once spread >= 1, back (left side) insets once
+          spread >= 2 (spread 1's left side is the cover's freshly-
+          opened back, not a content pair's back at all, so this
+          exactly tracks when each side's frame half is shown). === */}
       {pagePairs.map(({ spreadIndex, frontPageNum, backPageNum }) => {
         const flipped = isFlipped(spreadIndex);
+        const frontInset = spread >= 1;
+        const backInset = spread >= 2;
         return (
           <div
             key={spreadIndex}
             className={`book-page-pair ${flipped ? 'is-flipped' : ''}`}
             style={{ zIndex: getPairZIndex(spreadIndex, totalSpreads, flipped) }}
           >
-            <div className="book-page-pair-face book-page-pair-front binder-book-page">
+            <div
+              className="book-page-pair-face book-page-pair-front binder-book-page"
+              style={{
+                top: frontInset ? '14px' : '0',
+                right: frontInset ? '14px' : '0',
+                bottom: frontInset ? '14px' : '0',
+                left: 'auto',
+                width: frontInset ? 'calc(100% - 28px)' : '100%',
+                height: frontInset ? 'calc(100% - 28px)' : '100%',
+                borderRadius: frontInset ? '0 16px 16px 0' : '0',
+              }}
+            >
               {frontPageNum <= binder.pages && (
                 <BinderPage
                   binder={binder}
@@ -249,7 +284,18 @@ export function BinderBookFlip({
                 />
               )}
             </div>
-            <div className="book-page-pair-face book-page-pair-back binder-book-page">
+            <div
+              className="book-page-pair-face book-page-pair-back binder-book-page"
+              style={{
+                top: backInset ? '14px' : '0',
+                left: backInset ? '14px' : '0',
+                bottom: backInset ? '14px' : '0',
+                right: 'auto',
+                width: backInset ? 'calc(100% - 28px)' : '100%',
+                height: backInset ? 'calc(100% - 28px)' : '100%',
+                borderRadius: backInset ? '16px 0 0 16px' : '0',
+              }}
+            >
               {backPageNum <= binder.pages && (
                 <BinderPage
                   binder={binder}

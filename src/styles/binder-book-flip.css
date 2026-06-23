@@ -71,8 +71,21 @@
   left: 0;
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
   backface-visibility: hidden;
   overflow: hidden;
+  /* === FIX (border flash during backward navigation): inset/width/
+     height here used to snap instantly the moment `spread` changed,
+     while the pair's own rotation takes 0.7s to visually catch up.
+     Going backward, the previous spread's inset would disappear
+     immediately while that page was still mid-rotation back into
+     view, then reappear once state settled — exactly the flash
+     confirmed via frame-by-frame screenshots. Transitioning these
+     properties over the same 0.7s as the rotation keeps the border
+     animating in sync with the page turn instead of snapping. */
+  transition: top 0.7s ease-in-out, right 0.7s ease-in-out,
+              bottom 0.7s ease-in-out, left 0.7s ease-in-out,
+              width 0.7s ease-in-out, height 0.7s ease-in-out;
   /* === FIX (pink flash): every face needs an explicit OPAQUE
      background, not just the cover's. Previously only the cover pair
      declared a background-color (var(--cover-color)); every content
@@ -101,6 +114,53 @@
   transform: rotateY(180deg);
 }
 
+/* === Background frame entities — separate from the pages, sitting
+   BEHIND them as their own layer. Drawn as two independent halves so
+   each side can be shown/hidden per spread: from spread 2 onward both
+   halves show; at spread 1, only the RIGHT half shows (behind Page 1)
+   since the left side must read as empty right when the binder opens;
+   at spread 0 neither shows. Pages above this layer carry zero border
+   of their own — the framed look comes entirely from this layer
+   peeking through the gap BinderBookFlip's inline inset styles leave
+   around each page (see the component for the conditional inset
+   logic). z-index sits below every real pair (z-index >= 0) and the
+   back-cover placeholder (-1). === */
+.book-flip-frame-half {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  z-index: -3;
+  pointer-events: none;
+  background: var(--cover-color, transparent);
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%);
+  opacity: 0;
+  /* === FIX (instant pop instead of smooth fade): these were
+     previously only ever mounted/unmounted via React conditional
+     rendering (spread >= N), which removes them from the DOM
+     instantly — no CSS transition can animate an element appearing
+     or disappearing entirely. Now always rendered, gated by this
+     opacity instead (toggled via the .book-flip-frame-half-visible
+     modifier class BinderBookFlip applies), so the same 0.7s
+     transition that smooths the page rotation also smooths the
+     frame fading in/out alongside it. === */
+  transition: opacity 0.7s ease-in-out;
+}
+
+.book-flip-frame-half-visible {
+  opacity: 1;
+}
+
+.book-flip-frame-half-left {
+  left: 0;
+  border-radius: 16px 0 0 16px;
+}
+
+.book-flip-frame-half-right {
+  right: 0;
+  border-radius: 0 16px 16px 0;
+}
+
 /* A subtle shading overlay on the currently-turning page, echoing the
    reference's .flip::before — gives a slight sense of depth/shadow
    during the turn itself rather than a perfectly flat rotation. */
@@ -124,6 +184,7 @@
   align-items: center;
   justify-content: center;
   background-color: var(--cover-color, #e8627a);
+  border-radius: 0 16px 16px 0;
 }
 
 /* === FIX (pink panel over Page 2): the cover's BACK face is the
@@ -145,4 +206,6 @@
   align-items: center;
   justify-content: center;
   background-color: var(--binder-page-bg, #fff);
+  border-left: 14px solid var(--cover-color, transparent);
+  border-radius: 16px 0 0 16px;
 }
