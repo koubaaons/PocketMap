@@ -52,15 +52,149 @@
  * getPairZIndex below uses pairSpreadIndex directly while flipped, and
  * (totalSpreads - pairSpreadIndex) while unflipped, so each pile
  * independently peaks at its own boundary with the current spread.
+ *
+ * === FIX: z-index during the transition window (mid-flip occlusion) ===
+ * getPairZIndex's ordering above is only correct AT REST — it assumes
+ * a pair's visual rotation already matches its logical isFlipped
+ * value. But isFlipped is a discrete boolean that flips the INSTANT
+ * `spread` changes, while the actual CSS transform rotation
+ * (.book-page-pair's `transition: transform 0.7s`) takes 0.7s to
+ * visually catch up. z-index has no transition of its own — it's
+ * applied instantly, with no animatable in-between state.
+ *
+ * Concretely, OPENING: the cover's z-index drops to its "flipped"
+ * value (lowest in the stack) the instant spread changes, while the
+ * NEXT pair's z-index jumps to its "unflipped" value (much higher) —
+ * both instantly, before the cover has rotated even one degree. For
+ * the entire 0.7s the cover is still visually flat-on, facing the
+ * viewer, it renders BEHIND the next pair — confirmed via
+ * frame-by-frame screenshots showing the cover as a sliver tucked
+ * behind the page grid throughout its own animation.
+ *
+ * An EARLIER version of this fix tried holding each pair's z-index
+ * ORDERING at its pre-change value for 0.7s, on the theory that "the
+ * old ordering was correct a moment ago, so keep using it until the
+ * visual catches up." That happens to work for OPENING (the cover's
+ * old ordering was "topmost on the right," which is also what it
+ * needs while leaving) but is BACKWARDS for CLOSING: the cover's old
+ * ordering at rest was "flipped/lowest" (resting on the left), and
+ * holding THAT while it actively rotates back into view on the right
+ * keeps it buried beneath the very pair it needs to rotate over —
+ * confirmed via a second round of frame-by-frame screenshots showing
+ * the identical occlusion bug, now on close instead of open.
+ *
+ * The actually-correct, direction-agnostic rule: a pair currently
+ * MID-ROTATION must render above every settled pair, full stop —
+ * regardless of which direction it's turning, since "not yet at rest
+ * in either pile" is what it means to be transitioning at all. See
+ * useTransitioningPairs + getEffectiveZIndex below: any pair whose
+ * real isFlipped value changed within the last 0.7s gets a flat
+ * z-index boost large enough to beat every settled pair's ordering,
+ * regardless of totalSpreads/pairSpreadIndex magnitude; once the
+ * timeout elapses (the rotation has actually finished), it drops back
+ * to the normal two-pile ordering, which is correct again now that
+ * it's genuinely at rest.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BinderPage } from '../collections/BinderPage.jsx';
+
+const FLIP_TRANSITION_MS = 700;
 
 function getPairZIndex(pairSpreadIndex, totalSpreads, isFlipped) {
   return isFlipped
     ? pairSpreadIndex
     : totalSpreads - pairSpreadIndex;
+}
+
+/**
+ * Returns a Set<pairSpreadIndex> of pairs CURRENTLY mid-transition —
+ * i.e. whose real isFlipped(i) value changed within the last
+ * FLIP_TRANSITION_MS. A pair stays in this set for the full duration
+ * of its own visual rotation, regardless of which direction it's
+ * turning (opening or closing) — see getEffectiveZIndex below for why
+ * direction doesn't matter for the z-index rule itself.
+ *
+ * isFlipped(i) is a pure function of `spread` (and the fixed pair
+ * index), so the effect depends on `spread` directly and recomputes
+ * real values fresh inside its own body — NOT on a spread array of
+ * pre-computed booleans, which would change LENGTH whenever
+ * pairSpreadIndices.length changes (e.g. binder.pages grows via the
+ * "+ Page" button while a binder is open), violating React's
+ * fixed-length deps-array rule for hooks.
+ */
+function useTransitioningPairs(pairSpreadIndices, isFlipped, spread) {
+  const [transitioning, setTransitioning] = useState(() => new Set());
+
+  // Tracks the real/logical value we last saw per pair, so we can
+  // detect a change.
+  const prevRealRef = useRef(new Map());
+  const timeoutsRef = useRef(new Map());
+  const pairSpreadIndicesKey = pairSpreadIndices.join(',');
+
+  useEffect(() => {
+    pairSpreadIndices.forEach((i) => {
+      const real = isFlipped(i);
+      const prevReal = prevRealRef.current.has(i) ? prevRealRef.current.get(i) : real;
+
+      if (real !== prevReal) {
+        // Just started rotating (in either direction) — mark as
+        // transitioning immediately, clearing any previous timeout
+        // for this pair first so rapid open/close/open doesn't let an
+        // earlier timeout clear the flag too soon.
+        const existingTimeout = timeoutsRef.current.get(i);
+        if (existingTimeout) clearTimeout(existingTimeout);
+
+        setTransitioning(prev => {
+          if (prev.has(i)) return prev;
+          const next = new Set(prev);
+          next.add(i);
+          return next;
+        });
+
+        const timeout = setTimeout(() => {
+          setTransitioning(prev => {
+            if (!prev.has(i)) return prev;
+            const next = new Set(prev);
+            next.delete(i);
+            return next;
+          });
+          timeoutsRef.current.delete(i);
+        }, FLIP_TRANSITION_MS);
+        timeoutsRef.current.set(i, timeout);
+      }
+
+      prevRealRef.current.set(i, real);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spread, pairSpreadIndicesKey]);
+
+  // Clean up any pending timeouts on unmount.
+  useEffect(() => {
+    return () => {
+      timeoutsRef.current.forEach(t => clearTimeout(t));
+      timeoutsRef.current.clear();
+    };
+  }, []);
+
+  return transitioning;
+}
+
+/**
+ * A pair currently mid-rotation must render ABOVE every settled pair,
+ * regardless of which direction it's turning — opening (unflipped →
+ * flipped) or closing (flipped → unflipped) both need the same thing:
+ * visibility throughout the turn, since the rotating face is, by
+ * definition, not yet resting in either pile. Settled pairs keep
+ * getPairZIndex's original two-pile ordering among themselves, just
+ * shifted down by TRANSITION_Z_BOOST so a transitioning pair's boosted
+ * value always wins regardless of totalSpreads/pairSpreadIndex size.
+ */
+const TRANSITION_Z_BOOST = 10000;
+
+function getEffectiveZIndex(pairSpreadIndex, totalSpreads, isFlipped, isTransitioning) {
+  const base = getPairZIndex(pairSpreadIndex, totalSpreads, isFlipped);
+  return isTransitioning ? base + TRANSITION_Z_BOOST : base;
 }
 
 /**
@@ -114,7 +248,7 @@ export function BinderBookFlip({
       setShowRightFrameDelayed(true);
       return;
     }
-    const timeout = setTimeout(() => setShowRightFrameDelayed(false), 700);
+    const timeout = setTimeout(() => setShowRightFrameDelayed(false), FLIP_TRANSITION_MS);
     return () => clearTimeout(timeout);
   }, [spread]);
 
@@ -162,6 +296,18 @@ export function BinderBookFlip({
   const isFlipped = (pairSpreadIndex) => pairSpreadIndex === lastPairSpreadIndex
     ? pairSpreadIndex <= spread
     : pairSpreadIndex < spread;
+
+  // === FIX: z-index ordering, delayed to match the visual transition.
+  // See big comment block at top of file. allPairSpreadIndices covers
+  // the cover (0) plus every content pair, so every pair's z-index
+  // ordering is delayed consistently, not just the cover's.
+  const allPairSpreadIndices = useMemo(
+    () => [0, ...pagePairs.map(p => p.spreadIndex)],
+    [pagePairs.map(p => p.spreadIndex).join(',')]
+  );
+  const transitioningPairs = useTransitioningPairs(allPairSpreadIndices, isFlipped, spread);
+  const getZIndexFor = (pairSpreadIndex) =>
+    getEffectiveZIndex(pairSpreadIndex, totalSpreads, isFlipped(pairSpreadIndex), transitioningPairs.has(pairSpreadIndex));
 
   return (
     <div
@@ -225,7 +371,7 @@ export function BinderBookFlip({
           inside-of-cover (visible on the left once flipped open). === */}
       <div
         className={`book-page-pair book-page-pair-cover ${isFlipped(0) ? 'is-flipped' : ''}`}
-        style={{ zIndex: getPairZIndex(0, totalSpreads, isFlipped(0)) }}
+        style={{ zIndex: getZIndexFor(0) }}
       >
         <div
           className="book-page-pair-face book-page-pair-front"
@@ -285,7 +431,7 @@ export function BinderBookFlip({
           <div
             key={spreadIndex}
             className={`book-page-pair ${flipped ? 'is-flipped' : ''}`}
-            style={{ zIndex: getPairZIndex(spreadIndex, totalSpreads, flipped) }}
+            style={{ zIndex: getZIndexFor(spreadIndex) }}
           >
             <div
               className="book-page-pair-face book-page-pair-front binder-book-page"
