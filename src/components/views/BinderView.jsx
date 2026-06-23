@@ -77,7 +77,7 @@
  *   not an estimate. See bookAspectRatio below.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
@@ -202,22 +202,24 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     setDraftStickers(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
   }, []);
 
-  // === FIX: isCover (spread === 0) flips the INSTANT you click, but
-  // BinderBookFlip's cover pair takes 0.7s to actually rotate (see
-  // .book-page-pair's transition in binder-book-flip.css). .binder-
-  // book's own background/boxShadow override below was keyed directly
-  // to isCover, so it snapped from transparent to the solid pink
-  // gradient immediately on click — while the cover was still visibly
-  // mid-rotation on top of it, showing pink filling the WHOLE book box
-  // (not just the cover's own face) until the rotation caught up.
-  // This mirrors the old isAnimatingOpen flag the original book had,
-  // timed to the same 0.7s duration, so the background swap waits for
-  // the visual flip to actually finish — in either direction (open or
-  // close) — instead of changing instantly with spread.
+  // === FIX: this was a useEffect, which runs AFTER the browser has
+  // already painted the render that triggered it — leaving a real,
+  // not just theoretical, one-paint gap where isCover has already
+  // flipped to false but isAnimatingCoverFlip hasn't caught up to
+  // true yet. .binder-book's background (below) snapped to the solid
+  // gradient during exactly that gap, for one frame, before the cover
+  // had even started rotating — confirmed via screenshot showing solid
+  // color filling the whole book the instant after clicking, cover
+  // still flat/unrotated on top. useLayoutEffect runs synchronously
+  // after DOM mutations but BEFORE paint, so the flag is already true
+  // in the SAME paint where spread changes — no gap. The cleanup timer
+  // that flips it back to false 700ms later stays on the normal async
+  // path since "transition just finished" has no before-paint urgency
+  // the way "transition just started" does.
   const COVER_FLIP_DURATION_MS = 700;
   const [isAnimatingCoverFlip, setIsAnimatingCoverFlip] = useState(false);
   const prevIsCoverRef = useRef(view.page === 0);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const nowIsCover = view.page === 0;
     if (prevIsCoverRef.current !== nowIsCover) {
       setIsAnimatingCoverFlip(true);
@@ -768,7 +770,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
 
         <div
           ref={bookFlipWrapperRef}
-          className={`binder-book ${isCover ? 'binder-book-closed' : ''}`}
+          className={`binder-book ${(isCover || isAnimatingCoverFlip) ? 'binder-book-closed' : ''}`}
           style={{
             aspectRatio: effectiveBookAspectRatio,
             // === FIX: .binder-book's 10px padding (binder.css) used to
