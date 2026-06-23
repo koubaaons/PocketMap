@@ -54,7 +54,7 @@
  * independently peaks at its own boundary with the current spread.
  */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BinderPage } from '../collections/BinderPage.jsx';
 
 function getPairZIndex(pairSpreadIndex, totalSpreads, isFlipped) {
@@ -95,6 +95,28 @@ export function BinderBookFlip({
   isClickable = true,
 }) {
   const totalSpreads = Math.ceil(binder.pages / 2) + 1;
+
+  // === FIX (border disappears too early during close): the right
+  // frame-half's visibility was tied directly to `spread >= 1`, which
+  // flips to false the INSTANT you click close — before the cover has
+  // even started its 0.7s rotation back shut. That made the border
+  // vanish immediately while the cover was still visibly mid-close,
+  // looking like it disappeared too soon instead of staying present
+  // until the cover actually finished covering that area. This delays
+  // hiding the right frame-half by the same 0.7s the cover's rotation
+  // takes, so it only disappears once the close animation has
+  // actually finished — appearing (spread 0->1) is unaffected, since
+  // there's no reason to delay something becoming visible. ===
+  const [showRightFrameDelayed, setShowRightFrameDelayed] = useState(spread >= 1);
+
+  useEffect(() => {
+    if (spread >= 1) {
+      setShowRightFrameDelayed(true);
+      return;
+    }
+    const timeout = setTimeout(() => setShowRightFrameDelayed(false), 700);
+    return () => clearTimeout(timeout);
+  }, [spread]);
 
   // Build slot maps once per spread-pair, same approach BinderView
   // already uses today — just looped across every spread instead of
@@ -157,7 +179,7 @@ export function BinderBookFlip({
           — spread 1's left side is the cover's freshly-opened back
           face, which must read as empty, not already framed.
           Neither is visible at spread 0 (closed). === */}
-      <div className={`book-flip-frame-half book-flip-frame-half-right ${spread >= 1 ? 'book-flip-frame-half-visible' : ''}`} />
+      <div className={`book-flip-frame-half book-flip-frame-half-right ${showRightFrameDelayed ? 'book-flip-frame-half-visible' : ''}`} />
       <div className={`book-flip-frame-half book-flip-frame-half-left ${spread >= 2 ? 'book-flip-frame-half-visible' : ''}`} />
 
       {/* === Back cover — fills the right side once every pair has
@@ -251,8 +273,14 @@ export function BinderBookFlip({
           exactly tracks when each side's frame half is shown). === */}
       {pagePairs.map(({ spreadIndex, frontPageNum, backPageNum }) => {
         const flipped = isFlipped(spreadIndex);
-        const frontInset = spread >= 1;
-        const backInset = spread >= 2;
+
+        // === THE FIX (other AI's diagnosis): page faces ALWAYS carry
+        // their inset properties by default, never waiting for spread
+        // to change, so their card grids are pre-rendered at final
+        // size from the moment they mount instead of transitioning
+        // into it while the cover is also animating.
+        const frontInset = true;
+        const backInset = true;
         return (
           <div
             key={spreadIndex}
