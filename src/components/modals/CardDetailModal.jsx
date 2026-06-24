@@ -33,9 +33,11 @@ export function CardDetailModal({
   // === HOLO: no ownership gate here — unlike BinderSlot, this modal
   // never greys out card.image_url based on ownership in the first
   // place (ownership only changes the status badge below), so the
-  // effect just follows card.holoType directly. ===
+  // effect just follows card.holoType directly. Only 'off' disables
+  // it now — 'none' is Regular Holo, the active default (see
+  // collection.types.js for the semantic change). ===
   const holoType = card.holoType ?? 'none';
-  const activeHolo = holoType !== 'none' ? holoType : null;
+  const activeHolo = holoType !== 'off' ? holoType : null;
   const { holoRef, handlePointerMoveWithTilt, handlePointerLeaveWithTilt } = useCardHoloPointer();
 
   const sortedFields = [...templateFields]

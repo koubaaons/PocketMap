@@ -13,12 +13,20 @@ import { HOLO_TYPES } from '../../types/index.js';
 import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
 
 const HOLO_LABELS = {
-  none: 'None',
+  // === LABEL NOTE: the stored value is still 'none' (unchanged, for
+  // backward compatibility with existing data), but it's no longer a
+  // no-op — it's Regular Holo, the default look every card gets.
+  // Labeling the button "None" would be confusing UI for something
+  // that visibly applies an effect, so it's shown as "Regular" instead
+  // — only the user-facing label changed, not the underlying value. ===
+  off: 'Off',
+  none: 'Regular',
   holo: 'Holo',
   galaxy: 'Galaxy',
   rainbow: 'Rainbow',
   gold: 'Gold',
   v: 'V',
+  vstar: 'VStar',
 };
 
 export function CardDefinitionForm({ collection, templateFields, initialCard, mode = 'create', onSubmit, onClose }) {
@@ -64,9 +72,10 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
   // Reuses .card-detail-image-wrapper's [data-holo] CSS rules (same
   // selector card-holo.css already targets for the real detail modal)
   // rather than inventing a third, parallel selector set just for
-  // this form's preview. ===
+  // this form's preview. Only 'off' disables the live preview now —
+  // 'none' is Regular Holo, the active default. ===
   const holoType = values.holoType ?? 'none';
-  const activeHolo = holoType !== 'none' ? holoType : null;
+  const activeHolo = holoType !== 'off' ? holoType : null;
   const { holoRef, handlePointerMoveWithTilt, handlePointerLeaveWithTilt } = useCardHoloPointer();
 
   const title = mode === 'create' ? `Add Card to ${collection.name}` : 'Edit Card';

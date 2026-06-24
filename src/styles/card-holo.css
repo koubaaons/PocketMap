@@ -99,7 +99,8 @@
 /* ── Picker container — CardDefinitionForm ───────────────────────────────── */
 
 .holo-picker {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--space-2);
 }
 
@@ -281,6 +282,41 @@
   position: absolute;
   inset: 0;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   NONE — basic/default card treatment. Originally ported as the full
+   Regular Holo recipe (4 layers: rainbow stripe, scanline bars, a
+   luminosity sheen, plus its own glare) — turned out to be too much
+   for something applied to EVERY card by default, even after one
+   round of softening. Replaced with just the single GENERIC glare
+   layer from the source's own base.css (.card__glare's bare default,
+   before any rarity-specific override) — the simplest real building
+   block in the whole system: one pointer-following radial-gradient
+   sheen, no foil, no glitter, no color gradients, no shine content at
+   all. Shine is left completely inert here (no override on
+   .card-holo-shine for this type), matching its own base rule's
+   defaults.
+
+   'off' is still the genuinely-flat value — no CSS needed for it,
+   since activeHolo is null whenever holoType === 'off'.
+   ════════════════════════════════════════════════════════════════════ */
+
+.binder-book-page .binder-slot-filled[data-holo="none"] .card-holo-glare,
+.card-detail-image-wrapper[data-holo="none"] .card-holo-glare,
+.image-preview-wrapper[data-holo="none"] .card-holo-glare {
+  background-image: radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsla(0, 0%, 100%, 0.8) 10%, hsla(0, 0%, 100%, 0.65) 20%, hsla(0, 0%, 0%, 0.5) 90%);
+  /* Source: opacity: var(--card-opacity) — 0.65 substituted, same
+     convention used throughout this file. */
+  opacity: 0.65;
+  mix-blend-mode: overlay;
+}
+
+/* Source's generic .card__glare has no :after content of its own —
+   only rarity-specific overrides add one. None of those apply here,
+   so the base .card-holo-glare::after's empty default is correct,
+   same reasoning already used for V/VStar. */
+
 
 /* ════════════════════════════════════════════════════════════════════
    HOLO — now Trainer Gallery Holofoil (replaces the original
@@ -726,3 +762,118 @@
    appears there at all), so the base .card-holo-glare::after's
    generic empty/default state already matches — no explicit
    disabling rule needed here, unlike Trainer Gallery Holo/Gold. */
+
+/* ════════════════════════════════════════════════════════════════════
+   VSTAR — faithful port of v-star.css. Uses ancient.png via a locally-
+   scoped --vstar-foil (a third, distinct foil use — Gold uses
+   geometric.png, Rainbow Alt deliberately uses none — same per-effect
+   scoping pattern as Gold).
+
+   This app has no masked/unmasked distinction (no real per-card SVG
+   mask system), so the source's "NO MASK" override values are simply
+   the effective ones used directly in the base rule below, rather
+   than layered as a conditional override — same approach already
+   used for every other effect's NO-MASK block.
+
+   --space/--angle here are 5%/133deg, an EXACT match to the shared
+   :root defaults already added for Rainbow Alt — first effect that
+   needs zero local override for these two.
+   ════════════════════════════════════════════════════════════════════ */
+
+.binder-book-page .binder-slot-filled[data-holo="vstar"] .card-holo-shine,
+.card-detail-image-wrapper[data-holo="vstar"] .card-holo-shine,
+.image-preview-wrapper[data-holo="vstar"] .card-holo-shine {
+  --vstar-foil: url('/img/ancient.png');
+  --vstar-imgsize: 18% 15%;
+
+  background-image:
+    var(--vstar-foil),
+    repeating-linear-gradient(0deg,
+      var(--sunpillar-1) calc(var(--space)*1), var(--sunpillar-2) calc(var(--space)*2),
+      var(--sunpillar-3) calc(var(--space)*3), var(--sunpillar-4) calc(var(--space)*4),
+      var(--sunpillar-5) calc(var(--space)*5), var(--sunpillar-6) calc(var(--space)*6),
+      var(--sunpillar-1) calc(var(--space)*7)),
+    repeating-linear-gradient(var(--angle),
+      #0e152e 0%, hsl(180, 10%, 60%) 3.8%, hsl(180, 29%, 66%) 4.5%,
+      hsl(180, 10%, 60%) 5.2%, #0e152e 10%, #0e152e 12%),
+    radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsla(0, 0%, 0%, 0.1) 12%, hsla(0, 0%, 0%, 0.15) 20%, hsla(0, 0%, 0%, 0.25) 120%);
+  /* NO-MASK blend-mode override applied directly (see header note). */
+  background-blend-mode: exclusion, hue, hard-light;
+  background-size: var(--vstar-imgsize), 200% 700%, 300% 100%, 200% 100%;
+  background-position: center center, 0% var(--background-y), var(--background-x) var(--background-y), var(--background-x) var(--background-y);
+  /* NO-MASK filter override applied directly (see header note). */
+  filter: brightness(calc((var(--pointer-from-center) * .25) + .35)) contrast(1.8) saturate(1.75);
+}
+
+.binder-book-page .binder-slot-filled[data-holo="vstar"] .card-holo-shine::after,
+.card-detail-image-wrapper[data-holo="vstar"] .card-holo-shine::after,
+.image-preview-wrapper[data-holo="vstar"] .card-holo-shine::after {
+  /* z-index:1, pairing with ::before's z-index:2 above — explicit and
+     paired rather than leaving this one unset and relying on
+     ::before's value alone to win by default stacking rules. */
+  z-index: 1;
+  /* Starting point matches the base shine layer above (same
+     background-image/blend-mode list), only position/size/filter/
+     mix-blend-mode differ below — same pattern as V's own ::after. */
+  background-image:
+    var(--vstar-foil),
+    repeating-linear-gradient(0deg,
+      var(--sunpillar-1) calc(var(--space)*1), var(--sunpillar-2) calc(var(--space)*2),
+      var(--sunpillar-3) calc(var(--space)*3), var(--sunpillar-4) calc(var(--space)*4),
+      var(--sunpillar-5) calc(var(--space)*5), var(--sunpillar-6) calc(var(--space)*6),
+      var(--sunpillar-1) calc(var(--space)*7)),
+    repeating-linear-gradient(var(--angle),
+      #0e152e 0%, hsl(180, 10%, 60%) 3.8%, hsl(180, 29%, 66%) 4.5%,
+      hsl(180, 10%, 60%) 5.2%, #0e152e 10%, #0e152e 12%),
+    radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsla(0, 0%, 0%, 0.1) 12%, hsla(0, 0%, 0%, 0.15) 20%, hsla(0, 0%, 0%, 0.25) 120%);
+  background-blend-mode: exclusion, hue, hard-light;
+
+  background-size: var(--vstar-imgsize), 200% 400%, 195% 100%, 200% 100%;
+  background-position: center center, 0% var(--background-y),
+    calc(var(--background-x) * -1) calc(var(--background-y) * -1), var(--background-x) var(--background-y);
+  /* NO-MASK's :after-specific filter override applied directly. */
+  filter: brightness(calc((var(--pointer-from-center) * .75) + .5)) contrast(1.5) saturate(1.5);
+  mix-blend-mode: exclusion;
+}
+
+.binder-book-page .binder-slot-filled[data-holo="vstar"] .card-holo-shine::before,
+.card-detail-image-wrapper[data-holo="vstar"] .card-holo-shine::before,
+.image-preview-wrapper[data-holo="vstar"] .card-holo-shine::before {
+  /* === FIX: without an explicit z-index, default DOM-order stacking
+     would put ::after on top of ::before — backwards from this
+     effect's intent. The source's :before is a glossy white-sheen
+     highlight meant to sit ABOVE the colorful foil/gradient :after
+     layer (most other ported effects have the opposite priority,
+     where :after is the topmost sub-layer) — z-index:2 here, paired
+     with z-index:1 on ::after below, makes that explicit instead of
+     relying on DOM order, which would get it backwards. === */
+  content: '';
+  z-index: 2;
+  background-image: radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsla(190, 7%, 80%, 0.75) 0%, hsla(260, 7%, 50%, 0.25) 45%, hsl(310, 7%, 50%) 120%);
+  mix-blend-mode: hard-light;
+  opacity: 0.8;
+}
+
+.binder-book-page .binder-slot-filled[data-holo="vstar"] .card-holo-glare,
+.card-detail-image-wrapper[data-holo="vstar"] .card-holo-glare,
+.image-preview-wrapper[data-holo="vstar"] .card-holo-glare {
+  /* NO-MASK's glare-specific filter override (brightness .55, vs the
+     masked variant's .7) applied directly — same reasoning as the
+     shine layer's NO-MASK values above. */
+  filter: brightness(.55) contrast(2);
+  background-image: radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(195, 90%, 90%) 5%, hsl(300, 3%, 60%) 60%, hsl(350, 0%, 15%) 150%);
+  mix-blend-mode: hard-light;
+  /* Source: opacity: calc(var(--card-opacity) * (var(--pointer-from-
+     center) * .75)) — 0.65 substituted for --card-opacity, same
+     convention used throughout this file. */
+  opacity: calc(0.65 * (var(--pointer-from-center) * .75));
+}
+
+/* Source doesn't disable glare::after for VStar either — same
+   reasoning as V: no .card__glare:after rule exists for this rarity
+   in the source, so the base .card-holo-glare::after's generic empty
+   default already matches. */

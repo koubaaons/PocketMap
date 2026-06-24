@@ -103,14 +103,28 @@ export function validateOneTemplatePerCollection(collectionId, existingFields) {
 // CardDefinition belongs to a collection, not directly to a user.
 // No userId needed here — ownership is tracked via USER_INVENTORY.
 
-// holoType: which holographic visual treatment (if any) this card
-// renders with inside the binder. 'none' is the default/no-effect
-// value, not just "falsy" — kept explicit so a card can be
-// deliberately set back to no-holo rather than relying on
-// undefined/null meaning the same thing. Exported so CardDefinitionForm
-// (the picker UI) and the holo CSS/render layer share one source of
-// truth for the allowed values instead of duplicating this list.
-export const HOLO_TYPES = ['none', 'holo', 'galaxy', 'rainbow', 'gold', 'v'];
+// holoType: which holographic visual treatment this card renders with
+// inside the binder.
+//
+// === SEMANTIC CHANGE ===
+// 'none' USED TO mean "no effect at all" (the picker's reset option,
+// and the factory default for every card). It now means Regular Holo
+// — every TCG card has at least a subtle holo sheen in real life, so
+// 'none' became an ACTIVE recipe rather than a no-op, and is still the
+// factory default below — meaning every card, including ones already
+// in storage from before this change, will start showing this subtle
+// shine once it ships, by explicit decision.
+//
+// 'off' is the NEW genuinely-flat value, for anyone who wants a card
+// with literally no shine at all. It's the only value BinderSlot.jsx /
+// CardDetailModal.jsx / CardDefinitionForm.jsx treat as "don't render
+// any holo overlay" — every other value, including 'none', activates
+// the effect machinery.
+//
+// Exported so CardDefinitionForm (the picker UI) and the holo CSS/
+// render layer share one source of truth for the allowed values
+// instead of duplicating this list.
+export const HOLO_TYPES = ['off', 'none', 'holo', 'galaxy', 'rainbow', 'gold', 'v', 'vstar'];
 
 export function validateCardDefinition(data) {
   const errors = [];
@@ -121,10 +135,13 @@ export function validateCardDefinition(data) {
   if (data.image_url !== null && typeof data.image_url !== 'string') errors.push('image_url must be a string or null');
   if (typeof data.attributes !== 'object' || data.attributes === null) errors.push('attributes must be an object');
   // holoType is OPTIONAL — existing cards created before this field
-  // existed won't have it at all, and that's valid (BinderSlot treats
-  // missing/undefined the same as 'none' when rendering). Only a
-  // PRESENT value gets checked against the allowed list, so old stored
-  // data is never retroactively invalidated by adding this field.
+  // existed won't have it at all, and that's valid. Missing/undefined
+  // is treated the SAME as 'none' when rendering (BinderSlot etc. use
+  // `cardDef.holoType ?? 'none'`) — which, per the semantic change
+  // above, means those cards now show Regular Holo by default, not no
+  // effect. Only a PRESENT value gets checked against the allowed
+  // list, so old stored data is never retroactively invalidated by
+  // adding this field.
   if (data.holoType !== undefined && !HOLO_TYPES.includes(data.holoType)) {
     errors.push(`holoType must be one of: ${HOLO_TYPES.join(', ')}`);
   }

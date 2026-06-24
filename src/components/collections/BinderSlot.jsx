@@ -48,9 +48,11 @@ export function BinderSlot({
   // (slot-card-image-grey, "Not owned" label) rather than introducing
   // a new, separate rule just for holo. cardDef.holoType may be
   // undefined on cards created before this field existed; treat that
-  // the same as 'none'. ===
+  // the same as 'none' (Regular Holo, the default look — see
+  // collection.types.js for why 'none' is no longer a no-op). Only
+  // 'off' genuinely disables the holo overlay now. ===
   const holoType = cardDef.holoType ?? 'none';
-  const activeHolo = !showGrey && holoType !== 'none' ? holoType : null;
+  const activeHolo = !showGrey && holoType !== 'off' ? holoType : null;
   const { holoRef, handlePointerMove, handlePointerLeave } = useCardHoloPointer();
 
   return (
