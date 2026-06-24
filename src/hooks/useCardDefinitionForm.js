@@ -15,6 +15,11 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
       name: initialCard?.name ?? '',
       // === ISSUE #80: include image_url in initial values ===
       image_url: initialCard?.image_url ?? null,
+      // === HOLO: seed from the card's current holoType so editing
+      // starts the picker on its real value, not always 'none' — an
+      // existing card with no holoType at all (created before this
+      // field existed) still correctly defaults to 'none' here. ===
+      holoType: initialCard?.holoType ?? 'none',
     };
     sortedFields.forEach(f => {
       const existing = initialCard?.attributes?.[f.field_name];
@@ -68,6 +73,9 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
         // === ISSUE #80: pass image_url to factory ===
         image_url: values.image_url ?? null,
         attributes,
+        // === HOLO: pass the picked holoType through to the factory,
+        // which itself clamps any invalid value back to 'none'. ===
+        holoType: values.holoType ?? 'none',
       });
       if (!cardDef) { console.error('Card creation failed:', createErrors); return; }
       onSubmit(cardDef);
@@ -78,6 +86,11 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
         // === ISSUE #80: include image_url in update ===
         image_url: values.image_url ?? null,
         attributes,
+        // === HOLO FIX: this was missing entirely — without it, picking
+        // a different holoType while editing an existing card was
+        // silently discarded, since ...initialCard's old value would
+        // otherwise be the only one present on the update object. ===
+        holoType: values.holoType ?? 'none',
         updatedAt: Date.now(),
       });
     }

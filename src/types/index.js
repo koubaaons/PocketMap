@@ -10,6 +10,9 @@ export { validateBinder, createBinder, createSticker, BINDER_COLORS, DEFAULT_BIN
 export { validateCard, validateBinItem, createCard } from './card.types.js';
 // === ISSUE #58 END ===
 
+// === HOLO: export HOLO_TYPES alongside CardDefinition's other
+// validators/factories — it lives in the same file since it's part of
+// CardDefinition's own schema (the holoType field). ===
 export {
   validateCollection,
   validateTemplateField,
@@ -18,6 +21,7 @@ export {
   createCollection,
   createTemplateField,
   createCardDefinition,
+  HOLO_TYPES,
 } from './collection.types.js';
 
 export {

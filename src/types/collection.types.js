@@ -103,6 +103,15 @@ export function validateOneTemplatePerCollection(collectionId, existingFields) {
 // CardDefinition belongs to a collection, not directly to a user.
 // No userId needed here — ownership is tracked via USER_INVENTORY.
 
+// holoType: which holographic visual treatment (if any) this card
+// renders with inside the binder. 'none' is the default/no-effect
+// value, not just "falsy" — kept explicit so a card can be
+// deliberately set back to no-holo rather than relying on
+// undefined/null meaning the same thing. Exported so CardDefinitionForm
+// (the picker UI) and the holo CSS/render layer share one source of
+// truth for the allowed values instead of duplicating this list.
+export const HOLO_TYPES = ['none', 'holo', 'galaxy', 'rainbow', 'gold'];
+
 export function validateCardDefinition(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
@@ -111,12 +120,20 @@ export function validateCardDefinition(data) {
   if (!data.name || typeof data.name !== 'string' || !data.name.trim()) errors.push('name must be a non-empty string');
   if (data.image_url !== null && typeof data.image_url !== 'string') errors.push('image_url must be a string or null');
   if (typeof data.attributes !== 'object' || data.attributes === null) errors.push('attributes must be an object');
+  // holoType is OPTIONAL — existing cards created before this field
+  // existed won't have it at all, and that's valid (BinderSlot treats
+  // missing/undefined the same as 'none' when rendering). Only a
+  // PRESENT value gets checked against the allowed list, so old stored
+  // data is never retroactively invalidated by adding this field.
+  if (data.holoType !== undefined && !HOLO_TYPES.includes(data.holoType)) {
+    errors.push(`holoType must be one of: ${HOLO_TYPES.join(', ')}`);
+  }
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   if (typeof data.updatedAt !== 'number') errors.push('updatedAt must be a timestamp');
   return { valid: errors.length === 0, errors };
 }
 
-export function createCardDefinition({ collectionId, name, image_url = null, attributes = {} }) {
+export function createCardDefinition({ collectionId, name, image_url = null, attributes = {}, holoType = 'none' }) {
   const now = Date.now();
   const cardDef = {
     id: generateId(),
@@ -124,6 +141,7 @@ export function createCardDefinition({ collectionId, name, image_url = null, att
     name: (name || '').trim(),
     image_url: image_url ?? null,
     attributes: attributes ?? {},
+    holoType: HOLO_TYPES.includes(holoType) ? holoType : 'none',
     createdAt: now,
     updatedAt: now,
   };

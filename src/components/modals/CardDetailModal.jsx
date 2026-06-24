@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Button, Modal, ModalActions, ConfirmModal } from '../ui/index.jsx';
 import { AcquisitionForm } from '../collections/AcquisitionForm.jsx';
 import { AcquisitionSummary } from '../collections/AcquisitionSummary.jsx';
+import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
 
 export function CardDetailModal({
   card,
@@ -28,6 +29,14 @@ export function CardDetailModal({
   const [confirmDelete, setConfirmDelete]     = useState(false);
 
   const isOwned = inventoryItem !== null;
+
+  // === HOLO: no ownership gate here — unlike BinderSlot, this modal
+  // never greys out card.image_url based on ownership in the first
+  // place (ownership only changes the status badge below), so the
+  // effect just follows card.holoType directly. ===
+  const holoType = card.holoType ?? 'none';
+  const activeHolo = holoType !== 'none' ? holoType : null;
+  const { holoRef, handlePointerMove, handlePointerLeave } = useCardHoloPointer();
 
   const sortedFields = [...templateFields]
     .filter(f => f.collectionId === card.collectionId)
@@ -73,12 +82,27 @@ export function CardDetailModal({
 
       {/* === ISSUE #80: Card image displayed prominently === */}
       {card.image_url && (
-        <div className="card-detail-image-wrapper">
+        <div
+          ref={activeHolo ? holoRef : undefined}
+          className="card-detail-image-wrapper"
+          data-holo={activeHolo ?? undefined}
+          onPointerMove={activeHolo ? handlePointerMove : undefined}
+          onPointerLeave={activeHolo ? handlePointerLeave : undefined}
+        >
           <img
             src={card.image_url}
             alt={card.name}
             className="card-detail-image"
           />
+          {/* === HOLO: same two-element structure as BinderSlot — see
+              card-holo.css for why this is two real elements, not one
+              implicit ::after. === */}
+          {activeHolo && (
+            <>
+              <span className="card-holo-shine" aria-hidden="true" />
+              <span className="card-holo-glare" aria-hidden="true" />
+            </>
+          )}
         </div>
       )}
 
