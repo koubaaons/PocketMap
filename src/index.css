@@ -31,4 +31,10 @@
 @import './styles/search-table.css';
 /* === ISSUE #89: Modal and Form Polish === */
 @import './styles/modal-polish.css';
+/* === ISSUE #92: Binder close/open animation + sticker cover === */
+@import './styles/binder-cover.css';
+/* === ISSUE #92: Cover customizer — sticker upload/drag/rotate === */
+@import './styles/cover-customizer.css';
 /* === ISSUE #68 END === */
+@import './styles/binder-book-flip.css';
+@import './styles/card-holo.css';

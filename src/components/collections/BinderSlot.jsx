@@ -5,6 +5,12 @@
 
 // === ISSUE #55 START: Binder Page View — BinderSlot ===
 
+// === HOLO: pointer-position tracking, written straight to the DOM
+// (bypasses React state — see useCardHoloPointer.js for why this
+// matters for performance). Only ever attached when the slot's own
+// card actually has a holoType set; ordinary cards pay nothing. ===
+import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
+
 export function BinderSlot({
   slotIndex,
   slot,
@@ -35,10 +41,28 @@ export function BinderSlot({
   // In preview mode all cards show in full color regardless of ownership
   const showGrey = !isOwned && !isPreviewMode;
 
+  // === HOLO: only meaningfully active when this card has a holoType
+  // set AND it's actually showing in full color — a greyed-out
+  // not-owned placeholder shouldn't shine, matching the existing
+  // convention that ownership already changes how a slot looks
+  // (slot-card-image-grey, "Not owned" label) rather than introducing
+  // a new, separate rule just for holo. cardDef.holoType may be
+  // undefined on cards created before this field existed; treat that
+  // the same as 'none' (Regular Holo, the default look — see
+  // collection.types.js for why 'none' is no longer a no-op). Only
+  // 'off' genuinely disables the holo overlay now. ===
+  const holoType = cardDef.holoType ?? 'none';
+  const activeHolo = !showGrey && holoType !== 'off' ? holoType : null;
+  const { holoRef, handlePointerMove, handlePointerLeave } = useCardHoloPointer();
+
   return (
     <button
+      ref={activeHolo ? holoRef : undefined}
       className={`binder-slot ${showGrey ? 'binder-slot-placeholder' : 'binder-slot-filled'} ${isSelected ? 'binder-slot-selected' : ''}`}
+      data-holo={activeHolo ?? undefined}
       onClick={() => onClickSlot(slot)}
+      onPointerMove={activeHolo ? handlePointerMove : undefined}
+      onPointerLeave={activeHolo ? handlePointerLeave : undefined}
       aria-label={cardDef.name}
       aria-pressed={isSelected}
     >
@@ -55,6 +79,16 @@ export function BinderSlot({
           <span className="slot-card-name">{cardDef.name}</span>
           {showGrey && <span className="slot-placeholder-label">Not owned</span>}
         </div>
+      )}
+      {/* === HOLO: two real overlay elements, matching the source's
+          own .card__shine / .card__glare structure exactly — each
+          with its own ::before/::after sub-layers and its own
+          mix-blend-mode, not flattened into one pseudo-element. === */}
+      {activeHolo && (
+        <>
+          <span className="card-holo-shine" aria-hidden="true" />
+          <span className="card-holo-glare" aria-hidden="true" />
+        </>
       )}
     </button>
   );

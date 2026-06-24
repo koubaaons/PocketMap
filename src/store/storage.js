@@ -58,6 +58,23 @@ function sanitizeState(raw) {
     if (!b.page_color)  b.page_color  = 'dark';
     if (!b.cover_color) b.cover_color = '#e8627a';
     // === ISSUE #82 END ===
+    // === ISSUE #92: same pattern — old binders predate stickers entirely.
+    // Without this, validateBinder's "stickers must be an array" check
+    // would reject every binder created before this feature shipped, and
+    // sanitizeState would silently drop them on the next app load. ===
+    if (!Array.isArray(b.stickers)) b.stickers = [];
+    // === ISSUE #92 STAGE 3: scale added to the sticker shape after
+    // some stickers may already have been saved without it (resize
+    // wasn't built yet) — same defaulting pattern, applied per-sticker
+    // this time instead of per-binder. ===
+    b.stickers = b.stickers.map(s => (typeof s.scale === 'number' ? s : { ...s, scale: 1 }));
+    // === ISSUE #94 FIX: size added after some stickers were saved with
+    // an implicit fixed 56px instead of a cover-relative percentage —
+    // same migration pattern. 17.5 matches the old 56px on the 320px
+    // customizer canvas, so existing stickers keep their visual size
+    // there while finally being consistent everywhere else too. ===
+    b.stickers = b.stickers.map(s => (typeof s.size === 'number' ? s : { ...s, size: 17.5 }));
+    // === ISSUE #92 END ===
     const { valid, errors } = validateBinder(b);
     if (!valid) console.warn('[BinderVault] Dropping corrupt binder:', errors, b);
     return valid;

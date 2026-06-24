@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Button, Modal, ModalActions, ConfirmModal } from '../ui/index.jsx';
 import { AcquisitionForm } from '../collections/AcquisitionForm.jsx';
 import { AcquisitionSummary } from '../collections/AcquisitionSummary.jsx';
+import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
 
 export function CardDetailModal({
   card,
@@ -28,6 +29,16 @@ export function CardDetailModal({
   const [confirmDelete, setConfirmDelete]     = useState(false);
 
   const isOwned = inventoryItem !== null;
+
+  // === HOLO: no ownership gate here — unlike BinderSlot, this modal
+  // never greys out card.image_url based on ownership in the first
+  // place (ownership only changes the status badge below), so the
+  // effect just follows card.holoType directly. Only 'off' disables
+  // it now — 'none' is Regular Holo, the active default (see
+  // collection.types.js for the semantic change). ===
+  const holoType = card.holoType ?? 'none';
+  const activeHolo = holoType !== 'off' ? holoType : null;
+  const { holoRef, handlePointerMoveWithTilt, handlePointerLeaveWithTilt } = useCardHoloPointer();
 
   const sortedFields = [...templateFields]
     .filter(f => f.collectionId === card.collectionId)
@@ -72,13 +83,37 @@ export function CardDetailModal({
     <Modal title={card.name} onClose={onClose}>
 
       {/* === ISSUE #80: Card image displayed prominently === */}
+      {/* === ROTATION: outer wrapper stays static (provides
+          perspective + is what pointer math measures against via
+          getBoundingClientRect); inner .card-rotator is the element
+          that actually tilts. Binder slots never get this — only the
+          form preview and this detail modal do, per explicit
+          decision (no flip-to-back anywhere, just a pointer-following
+          3D lean, and only outside binders). === */}
       {card.image_url && (
-        <div className="card-detail-image-wrapper">
-          <img
-            src={card.image_url}
-            alt={card.name}
-            className="card-detail-image"
-          />
+        <div
+          ref={activeHolo ? holoRef : undefined}
+          className="card-detail-image-wrapper card-rotate-wrapper"
+          data-holo={activeHolo ?? undefined}
+          onPointerMove={activeHolo ? handlePointerMoveWithTilt : undefined}
+          onPointerLeave={activeHolo ? handlePointerLeaveWithTilt : undefined}
+        >
+          <div className="card-rotator">
+            <img
+              src={card.image_url}
+              alt={card.name}
+              className="card-detail-image"
+            />
+            {/* === HOLO: same two-element structure as BinderSlot — see
+                card-holo.css for why this is two real elements, not one
+                implicit ::after. === */}
+            {activeHolo && (
+              <>
+                <span className="card-holo-shine" aria-hidden="true" />
+                <span className="card-holo-glare" aria-hidden="true" />
+              </>
+            )}
+          </div>
         </div>
       )}
 

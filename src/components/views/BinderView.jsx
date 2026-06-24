@@ -27,15 +27,64 @@
  *   making the element fill the whole monitor; our existing CSS handles
  *   everything else, exactly as it already does today. Anything added to
  *   this view later works in fullscreen automatically, with no extra code.
+ *
+ * === MIGRATION: BinderBookFlip is now THE book ===
+ *   The old stacked-left/right-page book (with its own isOpen/
+ *   isAnimatingOpen state, transitionend listener, and inline-duplicated
+ *   cover markup) has been removed. BinderBookFlip — previously mounted
+ *   underneath as a side-by-side test harness — is now the only book
+ *   rendered here. It's a self-contained component: it builds its own
+ *   slot maps from the full binderSlots array and mounts every page-pair
+ *   itself, so BinderView no longer needs per-spread left/right slot maps
+ *   at all (leftSlotMap/rightSlotMap are gone).
+ *
+ *   Everything else — topbar, page-nav, nav arrows, fullscreen toggle,
+ *   in-place cover editing, preview mode, modals — is unchanged in
+ *   behavior. The only state that had to change is "is the binder
+ *   open/closed": BinderBookFlip has no concept of this separate from
+ *   `view.page` (its cover pair flips purely off `spread`), so isOpen/
+ *   isAnimatingOpen are gone and isClosed is now derived directly from
+ *   spread === 0. handleOpenBinder/handleCloseBinder now just move
+ *   `view.page`; BinderBookFlip's own transition handles the visual
+ *   animation, with no transitionend bookkeeping needed on this side.
+ *
+ *   The fullscreen width-cap measurement (item from ISSUE #93) still
+ *   needs a real element to measure. BinderBookFlip itself takes no
+ *   ref/maxWidth prop and is left untouched, so the wrapper div
+ *   (bookFlipWrapperRef) carries the actual `binder-book`/
+ *   `binder-book-closed` classes themselves — giving it the original
+ *   leather-edge styling, box-shadow, and width caps from binder.css
+ *   for free — and is what gets measured/capped instead of the old
+ *   book's own root div.
+ *
+ *   === Height: why an explicit aspect-ratio is needed now ===
+ *   .binder-book never had its own height rule — it got its height
+ *   implicitly, pushed up from content: BinderPage's .binder-page-grid
+ *   sizes each row from the column width via each slot's
+ *   `aspect-ratio: 2.5/3.5`, and that intrinsic grid height flows up
+ *   through flex (.binder-book-page flex:1, .binder-book align-items:
+ *   stretch) to become .binder-book's own height. BinderBookFlip's
+ *   page faces are `position: absolute` (required for the flip
+ *   transform), which contributes ZERO intrinsic height to any
+ *   ancestor — so with BinderBookFlip as .binder-book's only child,
+ *   nothing pushes .binder-book's height anymore; it would collapse to
+ *   ~0 since .book-flip-container's height:100% resolves against
+ *   nothing.
+ *
+ *   Fix: give .binder-book an explicit aspect-ratio, computed in JS
+ *   from the SAME math the page grid already uses internally (slot
+ *   aspect-ratio 2.5/3.5, binder.cols columns, binder.rows rows) —
+ *   not an estimate. See bookAspectRatio below.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
-import { BinderPage } from '../collections/BinderPage.jsx';
+import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { SlotActionModal } from '../modals/SlotActionModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
-import { buildPageSlotMap, getFilledSlotCount } from '../../selectors/binderSelectors.js';
+import { CustomizerSticker } from '../modals/CustomizerSticker.jsx';
+import { getFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
@@ -46,6 +95,8 @@ import { useDispatch } from '../../hooks/useStore.js';
 import { ACTIONS } from '../../store/index.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 import { createBinderSlot } from '../../types/index.js';
+import { createSticker } from '../../types/index.js';
+import { compressImage, compressStickerImage } from '../../utils/index.js';
 
 // === ISSUE #93: breathing room reserved above/below the book in
 // fullscreen (accounts for the topbar + page-nav row still being visible,
@@ -56,6 +107,144 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   const dispatch   = useDispatch();
   const view       = useBinderView(binder, binderSlots);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // === MIGRATION: "closed" is now purely spread === 0. BinderBookFlip's
+  // cover pair flips off `spread` directly (isFlipped(0) = 0 < spread),
+  // so there's no separate isOpen/isAnimatingOpen boolean to track on
+  // this side anymore — view.page IS the open/closed state. ===
+  const isClosed = view.page === 0;
+
+  // === IN-PLACE COVER EDITING: replaces the old CustomizeCoverModal
+  // popup. The cover already on screen becomes editable directly — the
+  // upload/state logic below is moved VERBATIM from the modal, only the
+  // container it renders into changed (the real cover's own slot,
+  // referenced via coverRef, instead of a separate modal canvas). ===
+  const [isEditingCover, setIsEditingCover] = useState(false);
+  const [draftStickers, setDraftStickers] = useState(binder.stickers ?? []);
+  const [selectedStickerId, setSelectedStickerId] = useState(null);
+  const [isUploadingSticker, setIsUploadingSticker] = useState(false);
+  const [stickerUploadError, setStickerUploadError] = useState('');
+  // BinderBookFlip's cover pair's own front face is what coverRef now
+  // measures against (passed down as coverFrontContent below) — there's
+  // only ever one cover face rendered now, so only one ref is needed.
+  const coverRef = useRef(null);
+  const stickerFileInputRef = useRef(null);
+  const isUploadingStickerRef = useRef(false);
+
+  const STICKER_MAX_WIDTH = 400;
+  const MAX_STICKERS = 10;
+
+  const handleEnterCoverEdit = () => {
+    setDraftStickers(binder.stickers ?? []);
+    setSelectedStickerId(null);
+    setIsEditingCover(true);
+  };
+
+  const handleCancelCoverEdit = () => {
+    setDraftStickers(binder.stickers ?? []);
+    setSelectedStickerId(null);
+    setIsEditingCover(false);
+  };
+
+  const handleSaveCoverEdit = () => {
+    dispatch({ type: ACTIONS.BINDER_UPDATE, payload: { ...binder, stickers: draftStickers, updatedAt: Date.now() } });
+    toast?.('Cover updated');
+    setSelectedStickerId(null);
+    setIsEditingCover(false);
+  };
+
+  const handleAddStickerClick = () => {
+    if (draftStickers.length >= MAX_STICKERS) {
+      setStickerUploadError(`Maximum ${MAX_STICKERS} stickers per cover.`);
+      return;
+    }
+    stickerFileInputRef.current?.click();
+  };
+
+  const handleStickerFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (isUploadingStickerRef.current) return;
+    isUploadingStickerRef.current = true;
+
+    setIsUploadingSticker(true);
+    setStickerUploadError('');
+    try {
+      const image_url = await compressStickerImage(file, STICKER_MAX_WIDTH);
+      // Slight random offset around center so multiple stickers don't
+      // land exactly on top of each other — still fully draggable
+      // anywhere on the cover afterward.
+      const offsetX = 50 + (Math.random() * 20 - 10);
+      const offsetY = 50 + (Math.random() * 20 - 10);
+      const { sticker, errors } = createSticker({ image_url, x: offsetX, y: offsetY, rotation: 0 });
+      if (!sticker) {
+        setStickerUploadError('Could not add that image — ' + errors.join(', '));
+        return;
+      }
+      setDraftStickers(prev => [...prev, sticker]);
+      setSelectedStickerId(sticker.id);
+    } catch (err) {
+      setStickerUploadError('Could not read that image. Try a different file.');
+    } finally {
+      setIsUploadingSticker(false);
+      isUploadingStickerRef.current = false;
+    }
+  };
+
+  const handleRemoveDraftSticker = (id) => {
+    setDraftStickers(prev => prev.filter(s => s.id !== id));
+    if (selectedStickerId === id) setSelectedStickerId(null);
+  };
+
+  const handleChangeDraftSticker = useCallback((id, patch) => {
+    setDraftStickers(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
+  }, []);
+
+  // === FIX: this was a useEffect, which runs AFTER the browser has
+  // already painted the render that triggered it — leaving a real,
+  // not just theoretical, one-paint gap where isCover has already
+  // flipped to false but isAnimatingCoverFlip hasn't caught up to
+  // true yet. .binder-book's background (below) snapped to the solid
+  // gradient during exactly that gap, for one frame, before the cover
+  // had even started rotating — confirmed via screenshot showing solid
+  // color filling the whole book the instant after clicking, cover
+  // still flat/unrotated on top. useLayoutEffect runs synchronously
+  // after DOM mutations but BEFORE paint, so the flag is already true
+  // in the SAME paint where spread changes — no gap. The cleanup timer
+  // that flips it back to false 700ms later stays on the normal async
+  // path since "transition just finished" has no before-paint urgency
+  // the way "transition just started" does.
+  const COVER_FLIP_DURATION_MS = 700;
+  const [isAnimatingCoverFlip, setIsAnimatingCoverFlip] = useState(false);
+  const prevIsCoverRef = useRef(view.page === 0);
+  useLayoutEffect(() => {
+    const nowIsCover = view.page === 0;
+    if (prevIsCoverRef.current !== nowIsCover) {
+      setIsAnimatingCoverFlip(true);
+      const timeout = setTimeout(() => setIsAnimatingCoverFlip(false), COVER_FLIP_DURATION_MS);
+      prevIsCoverRef.current = nowIsCover;
+      return () => clearTimeout(timeout);
+    }
+  }, [view.page]);
+
+  // === MIGRATION: open/close now just moves view.page. BinderBookFlip's
+  // cover pair animates off spread on its own (CSS transition on
+  // .book-page-pair), so there's no isAnimatingOpen flag and no
+  // transitionend listener needed here anymore — the previous version's
+  // whole reason for being (keeping a second book's cosmetic state in
+  // sync with this one) no longer applies now that there's only one
+  // book. ===
+  const handleOpenBinder = () => {
+    if (view.page === 0) {
+      view.goToPage(1);
+    }
+  };
+
+  const handleCloseBinder = () => {
+    view.goToPage(0);
+  };
 
   // === ISSUE #93: the whole root element goes fullscreen as-is ===
   const rootRef = useRef(null);
@@ -80,7 +269,12 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   // fullscreen width cap first, measure its REAL rendered height with
   // getBoundingClientRect(), and only shrink — by the exact ratio needed,
   // no guessing — if it's actually too tall for the viewport.
-  const bookRef = useRef(null);
+  //
+  // === MIGRATION: BinderBookFlip takes no ref/maxWidth prop of its own
+  // and is left untouched, so a plain wrapper div around it is what gets
+  // measured and capped here instead of the old book's own root div. The
+  // measure-then-shrink-only-if-needed logic itself is unchanged. ===
+  const bookFlipWrapperRef = useRef(null);
   const [fullscreenMaxBookWidth, setFullscreenMaxBookWidth] = useState(null);
 
   useEffect(() => {
@@ -100,7 +294,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
       // measuring mid-transition risks a slightly-off rect.
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const el = bookRef.current;
+          const el = bookFlipWrapperRef.current;
           if (!el) return;
 
           const rect = el.getBoundingClientRect();
@@ -127,6 +321,69 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
 
   const color = binder.cover_color ?? DEFAULT_BINDER_COLOR;
 
+  // === FIX: the formula below is a STARTING ESTIMATE only — it counts
+  // just the slot grid itself (cols x rows x 2.5:3.5 slot ratio), with
+  // no allowance for .binder-page-label's row, the gaps inside
+  // .binder-page-wrapper/.binder-page-grid, .binder-book-page's own
+  // padding, or the page-pair-face's 14px inset — none of whose pixel
+  // values were available to compute analytically. That under-count
+  // showed up as real content (e.g. a grid's last row) clipped at the
+  // bottom on binders with more rows, since book-flip-container clips
+  // overflow silently. Fixed below by MEASURING a live page's actual
+  // overflow (scrollHeight vs clientHeight) at its current rendered
+  // width, the same measure-don't-guess approach already used for the
+  // fullscreen width cap, and folding that real correction into the
+  // ratio — instead of trying to guess token pixel values.
+  const bookAspectRatio = useMemo(() => {
+    const SLOT_RATIO = 2.5 / 3.5; // width / height, matches .binder-slot
+    const pageWidthUnits  = binder.cols;
+    const pageHeightUnits = binder.rows / SLOT_RATIO;
+    const bookWidthUnits  = pageWidthUnits * 2;   // two pages side by side
+    const bookHeightUnits = pageHeightUnits;
+    return bookWidthUnits / bookHeightUnits;
+  }, [binder.cols, binder.rows]);
+
+  const [measuredAspectRatio, setMeasuredAspectRatio] = useState(null);
+
+  useEffect(() => {
+    setMeasuredAspectRatio(null); // reset so we re-measure fresh, not off a stale prior correction
+
+    const recalc = () => {
+      const wrapperEl = bookFlipWrapperRef.current;
+      if (!wrapperEl) return;
+
+      // Grab any one live page grid currently mounted — BinderBookFlip
+      // mounts every page-pair simultaneously, so one is always
+      // available regardless of current spread.
+      const gridEl = wrapperEl.querySelector('.binder-page-grid');
+      if (!gridEl) return;
+
+      const wrapperEl2 = gridEl.closest('.binder-page-wrapper');
+      const measureEl = wrapperEl2 ?? gridEl;
+
+      const overflow = measureEl.scrollHeight - measureEl.clientHeight;
+      if (overflow <= 0) return; // formula already fits, nothing to correct
+
+      const bookRect = wrapperEl.getBoundingClientRect();
+      if (bookRect.height === 0) return;
+
+      // Grow the book's effective height by the real measured shortfall,
+      // recomputing aspect-ratio (width / corrected-height) from it.
+      const correctedHeight = bookRect.height + overflow;
+      setMeasuredAspectRatio(bookRect.width / correctedHeight);
+    };
+
+    // Two frames: let the formula-based aspect-ratio actually paint and
+    // lay out the grid first, so scrollHeight/clientHeight reflect real
+    // rendered geometry rather than a pre-layout state.
+    requestAnimationFrame(() => requestAnimationFrame(recalc));
+
+    window.addEventListener('resize', recalc);
+    return () => window.removeEventListener('resize', recalc);
+  }, [binder.rows, binder.cols, bookAspectRatio]);
+
+  const effectiveBookAspectRatio = measuredAspectRatio ?? bookAspectRatio;
+
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
   const cardDefMap = useMemo(() => {
@@ -135,33 +392,15 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     return map;
   }, [cardDefinitions]);
 
-  // Use preview slots when in preview mode, real slots otherwise
+  // Use preview slots when in preview mode, real slots otherwise.
+  // === MIGRATION: leftSlotMap/rightSlotMap are gone — BinderBookFlip
+  // builds its own per-page slot maps internally from the full
+  // displaySlots array, so BinderView no longer needs to slice them
+  // per-spread itself. ===
   const displaySlots = view.activeSlots;
 
   const spread       = view.page;
-  const isCover      = spread === 0;
-  const leftPageNum  = isCover ? null : spread * 2;
-  const rightPageNum = isCover ? 1    : spread * 2 + 1;
   const totalSpreads = Math.ceil(binder.pages / 2) + 1;
-
-  // Build slot maps from display slots (preview or real)
-  const leftSlotMap = useMemo(() => {
-    if (!leftPageNum) return {};
-    const map = {};
-    displaySlots
-      .filter(s => s.binderId === binder.id && s.pageNumber === leftPageNum)
-      .forEach(s => { map[s.slotIndex] = s; });
-    return map;
-  }, [displaySlots, binder.id, leftPageNum]);
-
-  const rightSlotMap = useMemo(() => {
-    if (!rightPageNum) return {};
-    const map = {};
-    displaySlots
-      .filter(s => s.binderId === binder.id && s.pageNumber === rightPageNum)
-      .forEach(s => { map[s.slotIndex] = s; });
-    return map;
-  }, [displaySlots, binder.id, rightPageNum]);
 
   const filled   = getFilledSlotCount(binderSlots, binder.id);
   const capacity = binder.rows * binder.cols * binder.pages;
@@ -282,6 +521,8 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
   // Displayed page number is the lower page currently shown (1 on cover
   // spread, otherwise leftPageNum). Typing a number and committing jumps
   // to whichever spread contains that page.
+  const isCover = spread === 0;
+  const leftPageNum = isCover ? null : spread * 2;
   const currentDisplayPage = isCover ? 1 : leftPageNum;
   const [pageInputValue, setPageInputValue] = useState(String(currentDisplayPage));
 
@@ -320,10 +561,123 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         : view.openSlotAction(slot, cardDef),
   });
 
+  // === Cover content passed into BinderBookFlip's cover pair. This is
+  // now the ONLY copy of this markup — previously duplicated once for
+  // the old book and once for the BinderBookFlip test harness. "Not yet
+  // opened" is now spread === 0 (isCover) rather than the old
+  // !isAnimatingOpen && !isOpen check, since there's no separate
+  // animating-state to distinguish from "closed" anymore. ===
+  // === FIX: .binder-cover-customize-btn's only visibility rule is
+  // `.binder-cover-flip:hover .binder-cover-customize-btn` (see
+  // cover-customizer.css) — that class lived on the OLD book's cover
+  // wrapper, which no longer exists now that BinderBookFlip owns the
+  // cover face. Restoring `binder-cover-flip` here, alongside
+  // `binder-cover-frame`, gives that pre-existing hover rule something
+  // to match again — no new CSS needed, just keeping the same class
+  // name the rule already depends on. ===
+  const coverFrontContent = (
+    <div
+      ref={coverRef}
+      className={`binder-cover-flip binder-cover-frame ${isCover && !isEditingCover ? 'binder-cover-resting-tilt' : ''}`}
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        // binder-cover-flip's stylesheet rule sets inset:-12px (it used
+        // to be a 12px-oversized absolute hit-target around the old
+        // book's cover). That class is reused here ONLY for its hover
+        // selector — explicitly zeroing inset prevents that leftover
+        // rule from shifting this box outward on every edge.
+        inset: 0,
+        backgroundColor: color,
+        backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
+      }}
+      onClick={isEditingCover ? (e) => e.stopPropagation() : undefined}
+      onMouseDown={isEditingCover ? () => setSelectedStickerId(null) : undefined}
+    >
+      <div className="binder-cover-content">
+        <div className="binder-cover-name">{binder.name}</div>
+        <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
+      </div>
+
+      {(isEditingCover ? draftStickers : (binder.stickers ?? [])).map(sticker => (
+        <CustomizerSticker
+          key={sticker.id}
+          sticker={sticker}
+          containerRef={coverRef}
+          editable={isEditingCover}
+          isSelected={isEditingCover && selectedStickerId === sticker.id}
+          onSelect={isEditingCover ? () => setSelectedStickerId(sticker.id) : undefined}
+          onChange={isEditingCover ? (patch) => handleChangeDraftSticker(sticker.id, patch) : undefined}
+          onRemove={isEditingCover ? () => handleRemoveDraftSticker(sticker.id) : undefined}
+        />
+      ))}
+
+      {isCover && !isEditingCover && (
+        <button
+          className="binder-cover-customize-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleEnterCoverEdit();
+          }}
+          aria-label="Customize cover"
+        >
+          ✎ Customize
+        </button>
+      )}
+
+      {isEditingCover && (
+        <div className="binder-cover-edit-controls" onMouseDown={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="binder-cover-edit-btn"
+            onClick={handleAddStickerClick}
+            disabled={isUploadingSticker || draftStickers.length >= MAX_STICKERS}
+          >
+            {isUploadingSticker ? 'Adding…' : `+ Sticker (${draftStickers.length}/${MAX_STICKERS})`}
+          </button>
+          <button type="button" className="binder-cover-edit-btn" onClick={handleCancelCoverEdit}>
+            Cancel
+          </button>
+          <button type="button" className="binder-cover-edit-btn binder-cover-edit-btn-primary" onClick={handleSaveCoverEdit}>
+            Save Cover
+          </button>
+        </div>
+      )}
+
+      {stickerUploadError && isEditingCover && (
+        <p className="binder-cover-edit-error">{stickerUploadError}</p>
+      )}
+
+      <input
+        ref={stickerFileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleStickerFileSelected}
+      />
+    </div>
+  );
+
+  // Inside-of-cover (back face) — plain surface in the binder's color
+  // family. Solid binder color with a soft inset gradient for depth,
+  // echoing the cover front's own treatment.
+  const coverBackContent = (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        background: color,
+        backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 100%)`,
+      }}
+    />
+  );
+
   return (
     <div ref={rootRef} className={`binder-view-root ${isFullscreen ? 'binder-view-root-fullscreen' : ''}`}>
 
-      {/* Topbar — stays visible in fullscreen, exactly as requested */}
+      {/* Topbar — hidden while closed, stays visible in fullscreen otherwise */}
+      {!isClosed && (
       <div className="binder-topbar">
         <div className="binder-topbar-left">
           <span className="binder-title" style={{ color }}>{binder.name}</span>
@@ -361,13 +715,21 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
             {isFullscreen ? '✕' : '⛶'}
           </Button>
 
+          {/* === ISSUE #92: close binder — returns to the closed cover === */}
+          <Button variant="ghost" size="sm" onClick={handleCloseBinder}>
+            Close Binder
+          </Button>
+
           <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>Delete</Button>
         </div>
       </div>
+      )}
 
-      {/* Page navigation — editable page number, replaces the old
-          thumbnails bar entirely. Click the number, clear it, type a new
-          page (1-binder.pages), press Enter or click away to jump. */}
+      {/* Page navigation — hidden while closed, same as topbar. Editable
+          page number, replaces the old thumbnails bar entirely. Click
+          the number, clear it, type a new page (1-binder.pages), press
+          Enter or click away to jump. */}
+      {!isClosed && (
       <div className="binder-page-nav">
         <input
           type="number"
@@ -390,10 +752,12 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         />
         <span className="binder-page-indicator-suffix">/ {binder.pages} pages</span>
       </div>
+      )}
 
-      {/* Book — unchanged from normal mode. The existing centering CSS on
-          binder-book-wrapper handles fullscreen automatically since it's
-          just rendering into a bigger box now; nothing else changes. */}
+      {/* Book — BinderBookFlip is now the only book. The wrapper div is
+          what fullscreen's width-cap measurement targets (see
+          bookFlipWrapperRef above), since BinderBookFlip itself takes no
+          ref/maxWidth prop. */}
       <div className="binder-book-wrapper">
         <button
           className="binder-nav-arrow binder-nav-arrow-side binder-nav-arrow-left"
@@ -405,73 +769,58 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
         </button>
 
         <div
-          ref={bookRef}
-          className={`binder-book binder-pages-${binder.page_color ?? "dark"}`}
+          ref={bookFlipWrapperRef}
+          className={`binder-book ${(isCover || isAnimatingCoverFlip) ? 'binder-book-closed' : ''}`}
           style={{
-            background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
+            aspectRatio: effectiveBookAspectRatio,
+            // === FIX: .binder-book's 10px padding (binder.css) used to
+            // be invisible because the OLD book's page divs filled that
+            // padded interior edge-to-edge with their own matching
+            // background + shadow — the padding gap and the page's own
+            // edge were the same visual surface. BinderBookFlip supplies
+            // its own complete framing (frame-halves, page-face border-
+            // radii) independently, so that 10px gap is no longer
+            // covered by anything matching — it showed up as a visible
+            // second border ring between .binder-book's own rounded
+            // pink edge and BinderBookFlip's inner content edge, 10px
+            // further in. Zeroing it here lets BinderBookFlip's content
+            // run flush to .binder-book's own edge, same as the single
+            // border the original design intended.
+            padding: 0,
+            background: (isCover || isAnimatingCoverFlip)
+              ? 'transparent'
+              : `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
+            ...((isCover || isAnimatingCoverFlip) ? { boxShadow: 'none' } : {}),
             ...(fullscreenMaxBookWidth ? { maxWidth: `${fullscreenMaxBookWidth}px` } : {}),
           }}
         >
-
-          {isCover ? (
-            <div key="cover" className="binder-book-page binder-book-page-left binder-cover-page" style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
-              <div className="binder-cover-content">
-                <div className="binder-cover-name">{binder.name}</div>
-                <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
-              </div>
-            </div>
-          ) : leftPageNum <= binder.pages ? (
-            <div key={`left-${leftPageNum}`} className="binder-book-page binder-book-page-left">
-              <BinderPage
-                binder={binder}
-                pageNumber={leftPageNum}
-                pageSlotMap={leftSlotMap}
-                cardDefMap={cardDefMap}
-                ownershipMap={ownershipMap}
-                isPreviewMode={view.isPreviewMode}
-                selectedSlot={view.selectedSlot}
-                {...makePageHandlers(leftPageNum)}
-              />
-            </div>
-          ) : (
-            <div key={`left-empty-${leftPageNum}`} className="binder-book-page binder-book-page-left binder-page-empty-right" />
-          )}
-
-          <div className="binder-spine-center" style={{ background: `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)` }}>
-            <div className="binder-ring" />
-            <div className="binder-ring" />
-            <div className="binder-ring" />
-          </div>
-
-          {rightPageNum <= binder.pages ? (
-            <div key={`right-${rightPageNum}`} className="binder-book-page binder-book-page-right">
-              <BinderPage
-                binder={binder}
-                pageNumber={rightPageNum}
-                pageSlotMap={rightSlotMap}
-                cardDefMap={cardDefMap}
-                ownershipMap={ownershipMap}
-                isPreviewMode={view.isPreviewMode}
-                selectedSlot={view.selectedSlot}
-                {...makePageHandlers(rightPageNum)}
-              />
-            </div>
-          ) : (
-            <div key={`right-empty-${rightPageNum}`} className="binder-book-page binder-book-page-right binder-page-empty-right" />
-          )}
-
+          <BinderBookFlip
+            binder={binder}
+            binderSlots={displaySlots}
+            cardDefMap={cardDefMap}
+            ownershipMap={ownershipMap}
+            spread={spread}
+            isPreviewMode={view.isPreviewMode}
+            selectedSlot={view.selectedSlot}
+            makePageHandlers={makePageHandlers}
+            coverColor={color}
+            pageColor={binder.page_color ?? 'dark'}
+            coverFrontContent={coverFrontContent}
+            coverBackContent={coverBackContent}
+            onCoverClick={handleOpenBinder}
+            isClickable={isCover && !isEditingCover}
+          />
         </div>
 
         <button
           className="binder-nav-arrow binder-nav-arrow-side binder-nav-arrow-right"
           onClick={() => view.goToPage(spread + 1)}
-          disabled={spread >= totalSpreads - 1}
+          disabled={spread >= totalSpreads - 1 || isClosed}
           aria-label="Next page"
         >
           ›
         </button>
       </div>
-
 
       {/* Preview hint */}
       {view.isPreviewMode && (

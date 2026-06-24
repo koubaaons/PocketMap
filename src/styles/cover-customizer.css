@@ -1,0 +1,424 @@
+/**
+ * @fileoverview Cover customizer — canvas, draggable stickers, controls.
+ * === ISSUE #92: Binder close/open animation with sticker customisation ===
+ */
+
+/* .modal-lg — missing alongside .modal-sm added earlier for #89. The
+   customizer canvas needs more room than the default 480px modal. */
+.modal-lg {
+  max-width: 720px;
+}
+
+.cover-customizer-canvas {
+  position: relative;
+  width: 320px;
+  /* aspect-ratio set inline per-binder now (binder.cols/rows), not
+     fixed here — see CustomizeCoverModal.jsx */
+  margin: 0 auto;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow:
+    inset 0 3px 16px rgba(255,255,255,0.15),
+    inset 0 -6px 16px rgba(0,0,0,0.35),
+    0 12px 30px rgba(0,0,0,0.25);
+  user-select: none;
+}
+
+.cover-customizer-sticker {
+  position: absolute;
+  /* width/height set inline per-sticker now (sticker.size, a % of cover
+     width) — not fixed here, see CustomizeCoverModal.jsx */
+  cursor: grab;
+  touch-action: none;
+  /* === FIX: the actual bug, found by elimination. .binder-cover-content
+     (the WINX name/meta text, rendered as a sibling before stickers in
+     this same canvas) has z-index:2 — even though stickers paint
+     visually on top (later in DOM, default z-index:auto doesn't
+     override an ancestor's explicit stacking), .binder-cover-content's
+     stacking context was intercepting clicks in the canvas's center
+     region BEFORE they reached the sticker beneath it. A fixed-position
+     debug box placed outside that region worked fine, which is what
+     isolated this. z-index:5 here ensures stickers are genuinely on
+     top for both paint AND click purposes. */
+  z-index: 5;
+}
+
+.cover-customizer-sticker.is-dragging {
+  cursor: grabbing;
+}
+
+.cover-customizer-sticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  pointer-events: none;
+}
+
+.cover-customizer-sticker.is-selected::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 1.5px dashed rgba(255,255,255,0.7);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.cover-customizer-sticker-remove {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  color: white;
+  border: none;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.cover-customizer-sticker-rotate-handle {
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  border: 2px solid white;
+  cursor: grab;
+  z-index: 2;
+}
+
+.cover-customizer-sticker-rotate-handle:active {
+  cursor: grabbing;
+}
+
+.cover-customizer-sticker-resize-handle {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--accent);
+  border: 2px solid white;
+  cursor: nwse-resize;
+  z-index: 2;
+}
+
+.cover-customizer-sticker-resize-handle:active {
+  cursor: nwse-resize;
+}
+
+/* ── Hover-revealed "Customize Cover" entry points ────────────────────────── */
+/* === ISSUE #92: two separate trigger locations, same button styling —
+   the binders grid (BinderCard) and BinderView's closed-cover state.
+   Both are hidden by default, fading in on hover via the parent's
+   :hover selector, per explicit design decision (only on the CLOSED
+   cover, never once a binder is open). === */
+
+.binder-card-wrapper {
+  position: relative;
+}
+
+.binder-card-customize-btn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,0.55);
+  color: white;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 5;
+}
+
+.binder-card-wrapper:hover .binder-card-customize-btn {
+  opacity: 1;
+}
+
+.binder-cover-customize-btn {
+  position: absolute;
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,0.55);
+  color: white;
+  border: none;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 5;
+  white-space: nowrap;
+}
+
+.binder-cover-flip:hover .binder-cover-customize-btn {
+  opacity: 1;
+}
+
+/* === IN-PLACE COVER EDITING: shown directly on the real cover while
+   BinderView's isEditingCover is true — replaces the old
+   CustomizeCoverModal popup. Always visible while editing (not
+   hover-revealed, unlike .binder-cover-customize-btn above), since the
+   person is actively mid-edit. === */
+.binder-cover-edit-controls {
+  position: absolute;
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--space-2);
+  z-index: 6;
+  white-space: nowrap;
+}
+
+.binder-cover-edit-btn {
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,0.55);
+  color: white;
+  border: none;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.binder-cover-edit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.binder-cover-edit-btn-primary {
+  background: var(--accent, #e8627a);
+}
+
+.binder-cover-edit-error {
+  position: absolute;
+  bottom: calc(var(--space-3) + 34px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--text-xs);
+  color: white;
+  background: rgba(0,0,0,0.6);
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-sm, 4px);
+  z-index: 6;
+  white-space: nowrap;
+}
+
+/* ── Mini binder cover — replaces the old flat BinderCard rectangle ──────── */
+/* === 3D book effect, adapted from a CodePen "flat-cover-to-3D-book"
+   technique. Mapping onto this project's real structure:
+   - their .book-3d        -> .binder-mini-cover (perspective host)
+   - their .book-3d__inner -> .binder-mini-cover itself also carries the
+     rotation + preserve-3d (collapsed into one element since there's no
+     need for a separate wrapper here)
+   - their .book-3d__cover (a flat <img>) -> .binder-mini-cover-frame
+     (real DOM content: name, meta, stickers — not a flat image)
+   - their --cover-color custom property -> currentColor, which
+     resolves to binder.cover_color via the inline style={{ color }}
+     already set on the <button class="binder-mini-cover"> in
+     HomeView.jsx — no new CSS variable needed, no JSX change required
+     beyond what's already there.
+   Purely decorative: clicking still opens the binder exactly as
+   before, nothing about that behavior changes. === */
+
+.binder-mini-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2.5 / 3.5;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  perspective: 1000px;
+  --book-thickness: 10px;
+  transform-style: preserve-3d;
+  animation: binder-mini-cover-open 1s ease forwards;
+}
+
+@keyframes binder-mini-cover-open {
+  from { transform: rotateY(0); }
+  to   { transform: rotateY(-25deg); }
+}
+
+.binder-mini-cover:hover {
+  transform: rotateY(0deg);
+  transition: transform 0.4s ease;
+}
+
+/* === Genuinely flat on hover, not just rotated to face the viewer
+   while still technically having depth. Per explicit request: hover
+   should show ONLY the front cover, 2D, no perspective/thickness
+   effect at all — not a 3D object viewed head-on. ===*/
+.binder-mini-cover:hover::before,
+.binder-mini-cover:hover::after {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.binder-mini-cover::before,
+.binder-mini-cover::after {
+  transition: opacity 0.3s ease;
+}
+
+/* === FIX: filter:drop-shadow() on the PARENT (.binder-mini-cover,
+   which has transform-style:preserve-3d and rotated 3D children) was
+   causing the whole card to render as a solid black silhouette on
+   hover in at least one browser — CSS filter forces its own
+   compositing layer, which conflicts with how 3D-transformed children
+   underneath it get painted, apparently hiding the real content and
+   showing only a flat black shape with the glow color bleeding around
+   its edge. Moved the glow to a plain box-shadow on the FRONT FACE
+   alone instead (.binder-mini-cover-frame, a flat 2D element, not the
+   3D-rotating parent) — this avoids the filter/3D conflict entirely.
+   translateZ(0) here removes this layer's own depth offset too, so
+   on hover there's genuinely zero 3D thickness left anywhere, not
+   just a rotation facing the viewer while still technically having
+   depth. ===*/
+.binder-mini-cover:hover .binder-mini-cover-frame {
+  transform: translateZ(0);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  /* === FIX: dropped the original dark drop-shadow on hover entirely
+     (it was layered together with the colored glow below, and the two
+     combined were reading as dominantly dark rather than as a clean
+     colored highlight). Hover now shows ONLY the colored glow. ===*/
+  box-shadow: 0 0 20px 4px currentColor;
+}
+
+/* Front face — the real cover content (name, meta, stickers render
+   inside this exact element, unchanged from before). */
+.binder-mini-cover-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 5px 5px 20px rgba(0,0,0,0.15);
+  transform: translateZ(var(--book-thickness));
+  transition: box-shadow 0.4s ease;
+}
+
+/* Page edges — thin striped sliver suggesting the stack of pages
+   inside, visible on the right side as the cover tilts away. */
+.binder-mini-cover::before {
+  position: absolute;
+  content: '';
+  left: 100%;
+  top: 1%;
+  width: calc(var(--book-thickness) * 2);
+  height: 98%;
+  transform: translate(-55%, 0) rotateY(90deg);
+  background: linear-gradient(
+    90deg,
+    #fff 0%, hsl(0, 0%, 94%) 5%, #fff 10%, hsl(0, 0%, 94%) 15%,
+    #fff 20%, hsl(0, 0%, 94%) 25%, #fff 30%, hsl(0, 0%, 94%) 35%,
+    #fff 40%, hsl(0, 0%, 94%) 45%, #fff 50%, hsl(0, 0%, 94%) 55%,
+    #fff 60%, hsl(0, 0%, 94%) 65%, #fff 70%, hsl(0, 0%, 94%) 75%,
+    #fff 80%, hsl(0, 0%, 94%) 85%, #fff 90%, hsl(0, 0%, 94%) 95%, #fff 100%
+  );
+  /* === FIX (visible in light mode): a single boundary line on the
+     near edge so the page-edge strip reads as distinct from whatever
+     sits behind it, even if the binder's own colors happen to be
+     pale/white too. ===*/
+  border-left: 1px solid rgba(0,0,0,0.25);
+}
+
+/* Rear cover — sits behind the front face in 3D space, using the
+   binder's OWN cover color (currentColor, via style={{color}} already
+   set on the button in HomeView.jsx) rather than a hardcoded color, so
+   each binder's rear face genuinely matches its own front cover. */
+.binder-mini-cover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 1%;
+  width: 100%;
+  height: 100%;
+  transform: translateZ(calc(var(--book-thickness) * -1));
+  background-color: currentColor;
+  border-radius: 0 8px 8px 0;
+}
+
+.binder-mini-cover-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  padding: var(--space-3);
+  z-index: 2;
+}
+
+.binder-mini-cover-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: rgba(255,255,255,0.95);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.binder-mini-cover-meta {
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.binder-mini-cover-sticker {
+  position: absolute;
+  /* width/height set inline now (sticker.size %, aspect-ratio:1) — not
+     fixed here, see HomeView.jsx */
+  z-index: 1;
+  pointer-events: none;
+}
+
+.binder-mini-cover-sticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+
+.binder-mini-cover-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0,0,0,0.25);
+  z-index: 2;
+}
+
+.binder-mini-cover-progress-fill {
+  height: 100%;
+  background: rgba(255,255,255,0.85);
+  transition: width var(--transition-slow);
+}

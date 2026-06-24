@@ -9,6 +9,19 @@ import { useState, useRef } from 'react';
 import { Button, Modal, ModalActions } from '../ui/index.jsx';
 import { useCardDefinitionForm } from '../../hooks/useCardDefinitionForm.js';
 import { compressImage } from '../../utils/index.js';
+import { HOLO_TYPES, HOLO_LABELS } from '../../types/index.js';
+import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
+
+// HOLO_LABELS now comes from ../../types/index.js (ultimately
+// holoTypes.js) — was previously a hardcoded object maintained
+// separately from HOLO_TYPES, which meant the two could silently
+// drift out of sync (e.g. a type added to HOLO_TYPES but never given
+// a label here would render `undefined` as button text with no
+// error). The label's stored VALUE for 'none' is unchanged
+// ('none' is still what's written to storage) — only its display
+// text is "Regular" rather than "None", since a button labeled "None"
+// that visibly applies an effect would be confusing UI. See
+// holoTypes.js for the full rationale.
 
 export function CardDefinitionForm({ collection, templateFields, initialCard, mode = 'create', onSubmit, onClose }) {
   const sortedFields = [...templateFields]
@@ -48,6 +61,17 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // === HOLO: live preview, driven directly by values.holoType as the
+  // user clicks different picker buttons — no save needed to see it.
+  // Reuses .card-detail-image-wrapper's [data-holo] CSS rules (same
+  // selector card-holo.css already targets for the real detail modal)
+  // rather than inventing a third, parallel selector set just for
+  // this form's preview. Only 'off' disables the live preview now —
+  // 'none' is Regular Holo, the active default. ===
+  const holoType = values.holoType ?? 'none';
+  const activeHolo = holoType !== 'off' ? holoType : null;
+  const { holoRef, handlePointerMoveWithTilt, handlePointerLeaveWithTilt } = useCardHoloPointer();
+
   const title = mode === 'create' ? `Add Card to ${collection.name}` : 'Edit Card';
 
   return (
@@ -58,8 +82,22 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
         <label>Card Image</label>
         <div className="image-upload-area">
           {values.image_url ? (
-            <div className="image-preview-wrapper">
-              <img src={values.image_url} alt="Card preview" className="image-preview" />
+            <div
+              ref={activeHolo ? holoRef : undefined}
+              className="image-preview-wrapper card-rotate-wrapper"
+              data-holo={activeHolo ?? undefined}
+              onPointerMove={activeHolo ? handlePointerMoveWithTilt : undefined}
+              onPointerLeave={activeHolo ? handlePointerLeaveWithTilt : undefined}
+            >
+              <div className="card-rotator">
+                <img src={values.image_url} alt="Card preview" className="image-preview" />
+                {activeHolo && (
+                  <>
+                    <span className="card-holo-shine" aria-hidden="true" />
+                    <span className="card-holo-glare" aria-hidden="true" />
+                  </>
+                )}
+              </div>
               <button className="image-remove-btn" onClick={handleRemoveImage} aria-label="Remove image">✕</button>
             </div>
           ) : (
@@ -83,6 +121,12 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
             aria-label="Upload card image"
           />
         </div>
+      </div>
+
+      {/* Holographic effect */}
+      <div className="form-group">
+        <label>Holographic Effect</label>
+        <HolographicPicker value={values.holoType} onChange={(v) => set('holoType', v)} />
       </div>
 
       {/* Card name */}
@@ -117,6 +161,26 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
         </Button>
       </ModalActions>
     </Modal>
+  );
+}
+
+function HolographicPicker({ value, onChange }) {
+  const current = value ?? 'none';
+  return (
+    <div className="holo-picker" role="radiogroup" aria-label="Holographic effect">
+      {HOLO_TYPES.map(type => (
+        <button
+          key={type}
+          type="button"
+          role="radio"
+          aria-checked={current === type}
+          className={`holo-swatch ${current === type ? 'holo-swatch-selected' : ''}`}
+          onClick={() => onChange(type)}
+        >
+          {HOLO_LABELS[type]}
+        </button>
+      ))}
+    </div>
   );
 }
 

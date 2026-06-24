@@ -4,7 +4,7 @@
  */
 
 // === ISSUE #88 START: image compression, used across all upload flows ===
-export { compressImage } from './imageCompression.js';
+export { compressImage, compressStickerImage } from './imageCompression.js';
 // === ISSUE #88 END ===
 
 // ─── Search ───────────────────────────────────────────────────────────────────
