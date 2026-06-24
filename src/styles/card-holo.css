@@ -35,9 +35,13 @@
  *   attempting to fabricate a fake inset that wouldn't correspond to
  *   anything real on these cards.
  * - Cosmos's three texture layers (cosmos-bottom.png,
- *   cosmos-middle-trans.png, cosmos-top-trans.png) and Rainbow's foil
- *   (illusion-mask.png) and glitter (glitter.png) are the REAL image
- *   assets from the source repo, supplied by the user directly.
+ *   cosmos-middle-trans.png, cosmos-top-trans.png), Gold/Secret Rare's
+ *   foil (geometric.png), and the shared glitter texture (glitter.png,
+ *   used by Gold and Rainbow) and grain texture (grain.webp, used by
+ *   V) are the REAL image assets from the source repo, supplied by
+ *   the user directly. Rainbow (now Rainbow Alt) deliberately uses no
+ *   foil image at all — --foil: none is the source's own explicit
+ *   choice for that rarity, not a missing asset.
  *
  * === Structure per holo card ===
  *   .binder-slot-filled[data-holo] / .card-detail-image-wrapper[data-holo]
@@ -60,8 +64,16 @@
 
   --holo-glitter: url('/img/glitter.png');
   --holo-glittersize: 25%;
-  --holo-foil: url('/img/illusion-mask.png');
-  --holo-foil-size: cover;
+  --holo-grain: url('/img/grain.webp');
+
+  /* Shared defaults from the source's global.css .card block. Every
+     effect ported so far redefined its own LOCALLY-scoped --space/
+     --angle equivalent (--tg-space, --v-space, etc.) instead of
+     relying on these bare/unscoped names — Rainbow Alt is the first
+     recipe that references var(--space)/var(--angle) directly without
+     its own local override, so these need to actually exist now. */
+  --space: 5%;
+  --angle: 133deg;
 
   /* Sunpillar palette — from the source's own base.css :root block,
      used by Gold/Secret Rare's conic-gradient layer. */
@@ -124,6 +136,43 @@
   border-color: var(--accent);
   color: var(--accent);
   background: var(--bg-hover);
+}
+
+
+/* ── Rotation — form preview & detail modal ONLY, never binder slots ──────
+   Binder slots stay flat (color/shine effects only) per explicit
+   product decision; .card-rotate-wrapper is added only to
+   CardDefinitionForm.jsx's preview and CardDetailModal.jsx's image
+   wrapper, never to BinderSlot.jsx, so this entire block has no effect
+   there regardless of what's defined here.
+
+   Static OUTER wrapper provides perspective (required for rotateX/
+   rotateY to read as 3D rather than a 2D skew) and is what pointer
+   math measures against (getBoundingClientRect on a rotating element
+   would give a distorted box). The INNER .card-rotator is what
+   actually tilts — kept separate from the overflow:hidden/isolation
+   wrapper so rotated corners don't get clipped oddly against an
+   axis-aligned box.
+
+   FIDELITY NOTE: --rotate-x/--rotate-y's exact values are written by
+   useCardHoloPointer.js's handlePointerMoveWithTilt using a standard
+   linear pointer-to-angle mapping — NOT a verified port of the
+   source's own card.svelte formula, which wasn't available to read
+   (only a static non-interactive hover fallback was visible in
+   base.css, not the real interactive math). */
+
+.card-rotate-wrapper {
+  perspective: 1000px;
+}
+
+.card-rotator {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rotate-x, 0deg)) rotateY(var(--rotate-y, 0deg));
+  transition: transform 0.15s ease-out;
+  will-change: transform;
 }
 
 
@@ -408,8 +457,21 @@
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   RAINBOW / SECRET RARE — faithful port of rainbow-holo.css. Uses the
-   real glitter.png and illusion-mask.png assets from the source repo.
+   RAINBOW (ALTERNATE ART) HOLO — replaces the original rainbow-holo.css
+   port per explicit request. Faithful port of rainbow-alt.css.
+
+   --foil is locally scoped to `none` here, matching the SOURCE's own
+   explicit --foil: none in its "NO MASK" block for this specific
+   rarity — this is a deliberate, confirmed "no image" rather than an
+   unresolved gap (unlike Amazing Rare's --foil, which the source
+   never assigns anything to at all for that rarity). glitter.png is
+   reused via the existing shared --holo-glitter default, no local
+   override needed.
+
+   --space/--angle here use the newly-added shared :root defaults
+   (5%/133deg, from the source's global.css .card block) rather than a
+   local override — this is the first ported recipe that references
+   them unscoped.
    ════════════════════════════════════════════════════════════════════ */
 
 .binder-book-page .binder-slot-filled[data-holo="rainbow"] .card-holo-shine,
@@ -424,20 +486,24 @@
   --r-clr-7: hsl(280, 55%, 31%);
 
   background-image:
-    linear-gradient(-45deg, var(--r-clr-1), var(--r-clr-5)),
+    repeating-linear-gradient(var(--angle),
+      hsla(283, 49%, 60%, 0.75) calc(var(--space)*1), hsla(2, 70%, 58%, 0.75) calc(var(--space)*2),
+      hsla(53, 67%, 53%, 0.75) calc(var(--space)*3), hsla(93, 56%, 52%, 0.75) calc(var(--space)*4),
+      hsla(176, 38%, 50%, 0.75) calc(var(--space)*5), hsla(228, 100%, 77%, 0.75) calc(var(--space)*6),
+      hsla(283, 49%, 61%, 0.75) calc(var(--space)*7)),
     var(--holo-glitter),
     linear-gradient(-30deg,
       var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
       var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
       var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
       var(--r-clr-1));
-  background-blend-mode: luminosity, soft-light;
-  background-size: 200% 200%, var(--holo-glittersize) var(--holo-glittersize), 400% 400%;
+  background-size: 200% 400%, var(--holo-glittersize) var(--holo-glittersize), 400% 400%;
   background-position:
-    calc(25% + (50% * var(--pointer-from-left))) calc(25% + (50% * var(--pointer-from-top))),
+    0% calc(var(--background-y) * 1),
     center center,
-    calc(25% + (var(--pointer-x) / 2)) calc(25% + (var(--pointer-y) / 2));
-  filter: brightness(calc((var(--pointer-from-center)*0.25) + 0.6)) contrast(2.2) saturate(0.75);
+    calc(var(--background-x) * 1.5) calc(var(--background-y) * 1.5);
+  background-blend-mode: luminosity, overlay;
+  filter: brightness(calc((var(--pointer-from-center)*0.3) + 0.3)) contrast(3) saturate(1.8);
 }
 
 .binder-book-page .binder-slot-filled[data-holo="rainbow"] .card-holo-shine::after,
@@ -450,43 +516,53 @@
       var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
       var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
       var(--r-clr-1));
-  background-blend-mode: soft-light;
+  background-blend-mode: overlay;
   background-size: var(--holo-glittersize) var(--holo-glittersize), 400% 400%;
-  background-position: center center, var(--pointer-x) var(--pointer-y);
-  filter: brightness(calc((var(--pointer-from-center)*0.3) + 0.55)) contrast(2) saturate(1);
+  background-position:
+    center center,
+    calc(var(--background-x) * -1.5) calc(var(--background-y) * -1.5);
+  filter: brightness(calc((var(--pointer-from-center)*0.5) + 0.6)) contrast(3) saturate(1);
   mix-blend-mode: color-dodge;
+  opacity: calc(1.2 + (var(--pointer-from-center)/2) * -1);
 }
 
 .binder-book-page .binder-slot-filled[data-holo="rainbow"] .card-holo-shine::before,
 .card-detail-image-wrapper[data-holo="rainbow"] .card-holo-shine::before,
 .image-preview-wrapper[data-holo="rainbow"] .card-holo-shine::before {
-  background-image: var(--holo-foil);
-  background-size: var(--holo-foil-size);
+  /* Deliberately --foil: none for this rarity (see header note above)
+     — not a missing asset, a confirmed "render nothing here" per the
+     source's own NO MASK override. */
+  --rainbow-foil: none;
+  --rainbow-imgsize: 25% auto;
+
+  background-image: var(--rainbow-foil);
+  background-size: var(--rainbow-imgsize);
   background-position: center center;
-  filter: brightness(2.5) contrast(1);
-  opacity: calc((var(--pointer-from-center) + 0.4) * 0.6);
+  filter: brightness(1.5) contrast(1.5);
+  opacity: calc((var(--pointer-from-center) + 0.6) * 0.4);
   background-blend-mode: difference;
-  mix-blend-mode: darken;
+  mix-blend-mode: color-dodge;
 }
 
 .binder-book-page .binder-slot-filled[data-holo="rainbow"] .card-holo-glare,
 .card-detail-image-wrapper[data-holo="rainbow"] .card-holo-glare,
 .image-preview-wrapper[data-holo="rainbow"] .card-holo-glare {
   background-image: radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
-    hsl(0,0%,80%), hsla(187,10%,85%,0.25) 30%, hsl(197,6%,25%) 120%);
-  filter: brightness(.9) contrast(1.75);
-  opacity: calc(var(--pointer-from-center) * 0.9);
-  mix-blend-mode: hard-light;
+    hsla(50, 20%, 90%, 0.75) 0%, hsla(150, 20%, 30%, 0.65) 45%, hsla(0, 0%, 0%, 1) 100%);
+  filter: brightness(.9) contrast(2);
+  /* Source: opacity: calc(var(--card-opacity) * 0.75) — same flat
+     0.65 substitution used everywhere else in this file for
+     --card-opacity (see base .card-holo-glare rule), kept consistent. */
+  opacity: calc(0.65 * 0.75);
 }
 
 /* ════════════════════════════════════════════════════════════════════
    GOLD / SECRET RARE — faithful port of secret-rare.css. Uses
-   glitter.png (shared with Rainbow, via the default --holo-glitter)
-   and geometric.png (this effect's own foil texture — note --foil is
-   scoped LOCALLY here, not via the shared :root --holo-foil default,
-   since Rainbow and Gold each want a DIFFERENT foil image; the real
-   source does the same thing, redefining --foil per-rarity rather
-   than globally).
+   glitter.png (shared with Rainbow Alt, via the default --holo-glitter)
+   and geometric.png (this effect's own foil texture, scoped locally
+   as --gold-foil rather than a shared default — Rainbow Alt's own
+   --foil is deliberately `none`, so there's no longer a shared foil
+   default to share in the first place).
    ════════════════════════════════════════════════════════════════════ */
 
 .binder-book-page .binder-slot-filled[data-holo="gold"] .card-holo-shine,
@@ -512,8 +588,9 @@
 .card-detail-image-wrapper[data-holo="gold"] .card-holo-shine::before,
 .image-preview-wrapper[data-holo="gold"] .card-holo-shine::before {
   /* Locally-scoped --foil/--foil-size — geometric.png at 33%, this
-     effect's own values, distinct from Rainbow's illusion-mask.png
-     at cover. */
+     effect's own values. (Rainbow no longer uses a foil image at all
+     since its replacement with Rainbow Alt — that rarity's own --foil
+     is deliberately `none`, per the source's own design.) */
   --gold-foil: url('/img/geometric.png');
   --gold-foil-size: 33%;
 
@@ -559,3 +636,93 @@
   content: none;
   display: none;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   V — faithful port of v-regular.css. Uses grain.webp via the shared
+   --holo-grain default (confirmed in global.css's .card block, unlike
+   --foil which has no global default and must be set per-rarity).
+
+   The source declares its base shine background-image/blend-mode/size
+   ONCE across a comma-grouped selector spanning BOTH .card__shine and
+   .card__shine:after, then layers a MORE SPECIFIC override onto :after
+   alone (different position/size/filter/mix-blend-mode). Since this
+   app keeps shine's base and ::after as separate rule blocks (matching
+   the actual DOM structure, not the source's selector grouping
+   shorthand), the shared declaration is written once on the base rule
+   and again as ::after's starting point, with ::after's own overrides
+   layered on top — same computed result, different rule organization.
+   ════════════════════════════════════════════════════════════════════ */
+
+.binder-book-page .binder-slot-filled[data-holo="v"] .card-holo-shine,
+.card-detail-image-wrapper[data-holo="v"] .card-holo-shine,
+.image-preview-wrapper[data-holo="v"] .card-holo-shine {
+  --v-space: 5%;
+  --v-angle: 133deg;
+  --v-imgsize: 500px;
+
+  background-image:
+    var(--holo-grain),
+    repeating-linear-gradient(0deg,
+      var(--sunpillar-1) calc(var(--v-space)*1), var(--sunpillar-2) calc(var(--v-space)*2),
+      var(--sunpillar-3) calc(var(--v-space)*3), var(--sunpillar-4) calc(var(--v-space)*4),
+      var(--sunpillar-5) calc(var(--v-space)*5), var(--sunpillar-6) calc(var(--v-space)*6),
+      var(--sunpillar-1) calc(var(--v-space)*7)),
+    repeating-linear-gradient(var(--v-angle),
+      #0e152e 0%, hsl(180, 10%, 60%) 3.8%, hsl(180, 29%, 66%) 4.5%,
+      hsl(180, 10%, 60%) 5.2%, #0e152e 10%, #0e152e 12%),
+    radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsla(0, 0%, 0%, 0.1) 12%, hsla(0, 0%, 0%, 0.15) 20%, hsla(0, 0%, 0%, 0.25) 120%);
+  background-blend-mode: screen, hue, hard-light;
+  background-size: var(--v-imgsize) 100%, 200% 700%, 300% 100%, 200% 100%;
+  background-position: center, 0% var(--background-y), var(--background-x) var(--background-y), var(--background-x) var(--background-y);
+  filter: brightness(.8) contrast(2.95) saturate(.65);
+}
+
+.binder-book-page .binder-slot-filled[data-holo="v"] .card-holo-shine::after,
+.card-detail-image-wrapper[data-holo="v"] .card-holo-shine::after,
+.image-preview-wrapper[data-holo="v"] .card-holo-shine::after {
+  /* Starting point matches the base shine layer above (same
+     background-image list — the source's shared declaration); only
+     position/size/filter/mix-blend-mode differ, applied below. */
+  background-image:
+    var(--holo-grain),
+    repeating-linear-gradient(0deg,
+      var(--sunpillar-1) calc(var(--v-space)*1), var(--sunpillar-2) calc(var(--v-space)*2),
+      var(--sunpillar-3) calc(var(--v-space)*3), var(--sunpillar-4) calc(var(--v-space)*4),
+      var(--sunpillar-5) calc(var(--v-space)*5), var(--sunpillar-6) calc(var(--v-space)*6),
+      var(--sunpillar-1) calc(var(--v-space)*7)),
+    repeating-linear-gradient(var(--v-angle),
+      #0e152e 0%, hsl(180, 10%, 60%) 3.8%, hsl(180, 29%, 66%) 4.5%,
+      hsl(180, 10%, 60%) 5.2%, #0e152e 10%, #0e152e 12%),
+    radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsla(0, 0%, 0%, 0.1) 12%, hsla(0, 0%, 0%, 0.15) 20%, hsla(0, 0%, 0%, 0.25) 120%);
+  background-blend-mode: screen, hue, hard-light;
+
+  background-position: center, 0% var(--background-y),
+    calc(var(--background-x) * -1) calc(var(--background-y) * -1), var(--background-x) var(--background-y);
+  background-size: var(--v-imgsize) 100%, 200% 400%, 195% 100%, 200% 100%;
+  filter: brightness(1) contrast(2.5) saturate(1.75);
+  mix-blend-mode: soft-light;
+}
+
+.binder-book-page .binder-slot-filled[data-holo="v"] .card-holo-glare,
+.card-detail-image-wrapper[data-holo="v"] .card-holo-glare,
+.image-preview-wrapper[data-holo="v"] .card-holo-glare {
+  background-image: radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(0, 0%, 100%) 0%, hsla(210, 3%, 54%, 0.33) 45%, hsla(0, 0%, 20%, 0.9) 130%);
+  /* Source: opacity: calc(var(--card-opacity) * .5). --card-opacity is
+     the source's pointer-driven hover-scale opacity (tied to its full
+     3D interactive system, which this app doesn't replicate) — 0.65 is
+     the same flat substitution already used as this file's general
+     --card-opacity fallback (see the base .card-holo-glare rule), kept
+     consistent rather than picking a new number just for this layer. */
+  opacity: calc(0.65 * .5);
+  mix-blend-mode: hard-light;
+  filter: brightness(.9) contrast(1.75);
+}
+
+/* Source doesn't disable glare::after for V — but v-regular.css never
+   defines any content for it either (no .card__glare:after rule
+   appears there at all), so the base .card-holo-glare::after's
+   generic empty/default state already matches — no explicit
+   disabling rule needed here, unlike Trainer Gallery Holo/Gold. */

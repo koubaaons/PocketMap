@@ -18,6 +18,7 @@ const HOLO_LABELS = {
   galaxy: 'Galaxy',
   rainbow: 'Rainbow',
   gold: 'Gold',
+  v: 'V',
 };
 
 export function CardDefinitionForm({ collection, templateFields, initialCard, mode = 'create', onSubmit, onClose }) {
@@ -66,7 +67,7 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
   // this form's preview. ===
   const holoType = values.holoType ?? 'none';
   const activeHolo = holoType !== 'none' ? holoType : null;
-  const { holoRef, handlePointerMove, handlePointerLeave } = useCardHoloPointer();
+  const { holoRef, handlePointerMoveWithTilt, handlePointerLeaveWithTilt } = useCardHoloPointer();
 
   const title = mode === 'create' ? `Add Card to ${collection.name}` : 'Edit Card';
 
@@ -80,18 +81,20 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
           {values.image_url ? (
             <div
               ref={activeHolo ? holoRef : undefined}
-              className="image-preview-wrapper"
+              className="image-preview-wrapper card-rotate-wrapper"
               data-holo={activeHolo ?? undefined}
-              onPointerMove={activeHolo ? handlePointerMove : undefined}
-              onPointerLeave={activeHolo ? handlePointerLeave : undefined}
+              onPointerMove={activeHolo ? handlePointerMoveWithTilt : undefined}
+              onPointerLeave={activeHolo ? handlePointerLeaveWithTilt : undefined}
             >
-              <img src={values.image_url} alt="Card preview" className="image-preview" />
-              {activeHolo && (
-                <>
-                  <span className="card-holo-shine" aria-hidden="true" />
-                  <span className="card-holo-glare" aria-hidden="true" />
-                </>
-              )}
+              <div className="card-rotator">
+                <img src={values.image_url} alt="Card preview" className="image-preview" />
+                {activeHolo && (
+                  <>
+                    <span className="card-holo-shine" aria-hidden="true" />
+                    <span className="card-holo-glare" aria-hidden="true" />
+                  </>
+                )}
+              </div>
               <button className="image-remove-btn" onClick={handleRemoveImage} aria-label="Remove image">✕</button>
             </div>
           ) : (

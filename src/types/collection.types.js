@@ -110,7 +110,7 @@ export function validateOneTemplatePerCollection(collectionId, existingFields) {
 // undefined/null meaning the same thing. Exported so CardDefinitionForm
 // (the picker UI) and the holo CSS/render layer share one source of
 // truth for the allowed values instead of duplicating this list.
-export const HOLO_TYPES = ['none', 'holo', 'galaxy', 'rainbow', 'gold'];
+export const HOLO_TYPES = ['none', 'holo', 'galaxy', 'rainbow', 'gold', 'v'];
 
 export function validateCardDefinition(data) {
   const errors = [];
