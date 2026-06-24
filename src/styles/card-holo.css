@@ -56,6 +56,15 @@
 :root {
   --holo-card-aspect: 0.714286; /* 2.5/3.5, matches .binder-slot exactly */
 
+  /* Substitute for the source's --card-opacity (a pointer-driven
+     hover-scale opacity, tied to its full 3D interactive/tilt system
+     that this app doesn't replicate in binder slots). Previously
+     hand-typed as the literal number 0.65 in every rule that needed
+     it — centralized here so there's one place to tune it, and so
+     every usage stays consistent by construction rather than by
+     remembering to copy the same number correctly each time. */
+  --holo-card-opacity: 0.65;
+
   --holo-red: #f80e35;
   --holo-yellow: #eedf10;
   --holo-green: #21e985;
@@ -255,7 +264,7 @@
      patch). === */
   filter: brightness(.85) contrast(2.75) saturate(.65);
   mix-blend-mode: color-dodge;
-  opacity: 0.65;
+  opacity: var(--holo-card-opacity);
 }
 
 .card-holo-shine::before,
@@ -273,7 +282,7 @@
      this is kept as a safety net the same way .card-holo-shine's
      default above is, rather than leaving a silent gap for anything
      added later. */
-  opacity: 0.65;
+  opacity: var(--holo-card-opacity);
   mix-blend-mode: overlay;
 }
 
@@ -306,9 +315,10 @@
 .image-preview-wrapper[data-holo="none"] .card-holo-glare {
   background-image: radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
     hsla(0, 0%, 100%, 0.8) 10%, hsla(0, 0%, 100%, 0.65) 20%, hsla(0, 0%, 0%, 0.5) 90%);
-  /* Source: opacity: var(--card-opacity) — 0.65 substituted, same
-     convention used throughout this file. */
-  opacity: 0.65;
+  /* Source: opacity: var(--card-opacity) — now the centralized
+     --holo-card-opacity variable, same convention used throughout
+     this file. */
+  opacity: var(--holo-card-opacity);
   mix-blend-mode: overlay;
 }
 
@@ -403,17 +413,17 @@
 .binder-book-page .binder-slot-filled[data-holo="galaxy"] .card-holo-shine,
 .card-detail-image-wrapper[data-holo="galaxy"] .card-holo-shine,
 .image-preview-wrapper[data-holo="galaxy"] .card-holo-shine {
-  --space: 4%;
+  --galaxy-space: 4%;
 
   background-image:
     url('/img/cosmos-bottom.png'),
     repeating-linear-gradient(82deg,
-      hsl(53,65%,60%) calc(var(--space)*1), hsl(93,56%,50%) calc(var(--space)*2),
-      hsl(176,54%,49%) calc(var(--space)*3), hsl(228,59%,55%) calc(var(--space)*4),
-      hsl(283,60%,55%) calc(var(--space)*5), hsl(326,59%,51%) calc(var(--space)*6),
-      hsl(326,59%,51%) calc(var(--space)*7), hsl(283,60%,55%) calc(var(--space)*8),
-      hsl(228,59%,55%) calc(var(--space)*9), hsl(176,54%,49%) calc(var(--space)*10),
-      hsl(93,56%,50%) calc(var(--space)*11), hsl(53,65%,60%) calc(var(--space)*12)),
+      hsl(53,65%,60%) calc(var(--galaxy-space)*1), hsl(93,56%,50%) calc(var(--galaxy-space)*2),
+      hsl(176,54%,49%) calc(var(--galaxy-space)*3), hsl(228,59%,55%) calc(var(--galaxy-space)*4),
+      hsl(283,60%,55%) calc(var(--galaxy-space)*5), hsl(326,59%,51%) calc(var(--galaxy-space)*6),
+      hsl(326,59%,51%) calc(var(--galaxy-space)*7), hsl(283,60%,55%) calc(var(--galaxy-space)*8),
+      hsl(228,59%,55%) calc(var(--galaxy-space)*9), hsl(176,54%,49%) calc(var(--galaxy-space)*10),
+      hsl(93,56%,50%) calc(var(--galaxy-space)*11), hsl(53,65%,60%) calc(var(--galaxy-space)*12)),
     radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
       hsla(180,100%,89%,0.5) 5%, hsla(180,14%,57%,0.3) 40%, hsl(0,0%,0%) 130%);
   background-blend-mode: color-burn, multiply;
@@ -433,12 +443,12 @@
   background-image:
     url('/img/cosmos-middle-trans.png'),
     repeating-linear-gradient(82deg,
-      hsl(53,65%,60%) calc(var(--space)*1), hsl(93,56%,50%) calc(var(--space)*2),
-      hsl(176,54%,49%) calc(var(--space)*3), hsl(228,59%,55%) calc(var(--space)*4),
-      hsl(283,60%,55%) calc(var(--space)*5), hsl(326,59%,51%) calc(var(--space)*6),
-      hsl(326,59%,51%) calc(var(--space)*7), hsl(283,60%,55%) calc(var(--space)*8),
-      hsl(228,59%,55%) calc(var(--space)*9), hsl(176,54%,49%) calc(var(--space)*10),
-      hsl(93,56%,50%) calc(var(--space)*11), hsl(53,65%,60%) calc(var(--space)*12));
+      hsl(53,65%,60%) calc(var(--galaxy-space)*1), hsl(93,56%,50%) calc(var(--galaxy-space)*2),
+      hsl(176,54%,49%) calc(var(--galaxy-space)*3), hsl(228,59%,55%) calc(var(--galaxy-space)*4),
+      hsl(283,60%,55%) calc(var(--galaxy-space)*5), hsl(326,59%,51%) calc(var(--galaxy-space)*6),
+      hsl(326,59%,51%) calc(var(--galaxy-space)*7), hsl(283,60%,55%) calc(var(--galaxy-space)*8),
+      hsl(228,59%,55%) calc(var(--galaxy-space)*9), hsl(176,54%,49%) calc(var(--galaxy-space)*10),
+      hsl(93,56%,50%) calc(var(--galaxy-space)*11), hsl(53,65%,60%) calc(var(--galaxy-space)*12));
   background-blend-mode: lighten, multiply;
   background-position:
     center center,
@@ -456,12 +466,12 @@
   background-image:
     url('/img/cosmos-top-trans.png'),
     repeating-linear-gradient(82deg,
-      hsl(53,65%,60%) calc(var(--space)*1), hsl(93,56%,50%) calc(var(--space)*2),
-      hsl(176,54%,49%) calc(var(--space)*3), hsl(228,59%,55%) calc(var(--space)*4),
-      hsl(283,60%,55%) calc(var(--space)*5), hsl(326,59%,51%) calc(var(--space)*6),
-      hsl(326,59%,51%) calc(var(--space)*7), hsl(283,60%,55%) calc(var(--space)*8),
-      hsl(228,59%,55%) calc(var(--space)*9), hsl(176,54%,49%) calc(var(--space)*10),
-      hsl(93,56%,50%) calc(var(--space)*11), hsl(53,65%,60%) calc(var(--space)*12));
+      hsl(53,65%,60%) calc(var(--galaxy-space)*1), hsl(93,56%,50%) calc(var(--galaxy-space)*2),
+      hsl(176,54%,49%) calc(var(--galaxy-space)*3), hsl(228,59%,55%) calc(var(--galaxy-space)*4),
+      hsl(283,60%,55%) calc(var(--galaxy-space)*5), hsl(326,59%,51%) calc(var(--galaxy-space)*6),
+      hsl(326,59%,51%) calc(var(--galaxy-space)*7), hsl(283,60%,55%) calc(var(--galaxy-space)*8),
+      hsl(228,59%,55%) calc(var(--galaxy-space)*9), hsl(176,54%,49%) calc(var(--galaxy-space)*10),
+      hsl(93,56%,50%) calc(var(--galaxy-space)*11), hsl(53,65%,60%) calc(var(--galaxy-space)*12));
   background-blend-mode: multiply, multiply;
   background-position:
     center center,
@@ -586,10 +596,10 @@
   background-image: radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
     hsla(50, 20%, 90%, 0.75) 0%, hsla(150, 20%, 30%, 0.65) 45%, hsla(0, 0%, 0%, 1) 100%);
   filter: brightness(.9) contrast(2);
-  /* Source: opacity: calc(var(--card-opacity) * 0.75) — same flat
-     0.65 substitution used everywhere else in this file for
-     --card-opacity (see base .card-holo-glare rule), kept consistent. */
-  opacity: calc(0.65 * 0.75);
+  /* Source: opacity: calc(var(--card-opacity) * 0.75) — now using the
+     centralized --holo-card-opacity variable, same convention used
+     throughout this file. */
+  opacity: calc(var(--holo-card-opacity) * 0.75);
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -748,11 +758,10 @@
     hsl(0, 0%, 100%) 0%, hsla(210, 3%, 54%, 0.33) 45%, hsla(0, 0%, 20%, 0.9) 130%);
   /* Source: opacity: calc(var(--card-opacity) * .5). --card-opacity is
      the source's pointer-driven hover-scale opacity (tied to its full
-     3D interactive system, which this app doesn't replicate) — 0.65 is
-     the same flat substitution already used as this file's general
-     --card-opacity fallback (see the base .card-holo-glare rule), kept
-     consistent rather than picking a new number just for this layer. */
-  opacity: calc(0.65 * .5);
+     3D interactive system, which this app doesn't replicate) — now
+     using the centralized --holo-card-opacity variable instead of a
+     hand-typed number, kept consistent across this whole file. */
+  opacity: calc(var(--holo-card-opacity) * .5);
   mix-blend-mode: hard-light;
   filter: brightness(.9) contrast(1.75);
 }
@@ -868,9 +877,9 @@
     hsl(195, 90%, 90%) 5%, hsl(300, 3%, 60%) 60%, hsl(350, 0%, 15%) 150%);
   mix-blend-mode: hard-light;
   /* Source: opacity: calc(var(--card-opacity) * (var(--pointer-from-
-     center) * .75)) — 0.65 substituted for --card-opacity, same
-     convention used throughout this file. */
-  opacity: calc(0.65 * (var(--pointer-from-center) * .75));
+     center) * .75)) — now using the centralized --holo-card-opacity
+     variable, same convention used throughout this file. */
+  opacity: calc(var(--holo-card-opacity) * (var(--pointer-from-center) * .75));
 }
 
 /* Source doesn't disable glare::after for VStar either — same

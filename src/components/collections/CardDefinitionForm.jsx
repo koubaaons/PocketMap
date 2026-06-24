@@ -9,25 +9,19 @@ import { useState, useRef } from 'react';
 import { Button, Modal, ModalActions } from '../ui/index.jsx';
 import { useCardDefinitionForm } from '../../hooks/useCardDefinitionForm.js';
 import { compressImage } from '../../utils/index.js';
-import { HOLO_TYPES } from '../../types/index.js';
+import { HOLO_TYPES, HOLO_LABELS } from '../../types/index.js';
 import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
 
-const HOLO_LABELS = {
-  // === LABEL NOTE: the stored value is still 'none' (unchanged, for
-  // backward compatibility with existing data), but it's no longer a
-  // no-op — it's Regular Holo, the default look every card gets.
-  // Labeling the button "None" would be confusing UI for something
-  // that visibly applies an effect, so it's shown as "Regular" instead
-  // — only the user-facing label changed, not the underlying value. ===
-  off: 'Off',
-  none: 'Regular',
-  holo: 'Holo',
-  galaxy: 'Galaxy',
-  rainbow: 'Rainbow',
-  gold: 'Gold',
-  v: 'V',
-  vstar: 'VStar',
-};
+// HOLO_LABELS now comes from ../../types/index.js (ultimately
+// holoTypes.js) — was previously a hardcoded object maintained
+// separately from HOLO_TYPES, which meant the two could silently
+// drift out of sync (e.g. a type added to HOLO_TYPES but never given
+// a label here would render `undefined` as button text with no
+// error). The label's stored VALUE for 'none' is unchanged
+// ('none' is still what's written to storage) — only its display
+// text is "Regular" rather than "None", since a button labeled "None"
+// that visibly applies an effect would be confusing UI. See
+// holoTypes.js for the full rationale.
 
 export function CardDefinitionForm({ collection, templateFields, initialCard, mode = 'create', onSubmit, onClose }) {
   const sortedFields = [...templateFields]

@@ -10,9 +10,12 @@ export { validateBinder, createBinder, createSticker, BINDER_COLORS, DEFAULT_BIN
 export { validateCard, validateBinItem, createCard } from './card.types.js';
 // === ISSUE #58 END ===
 
-// === HOLO: export HOLO_TYPES alongside CardDefinition's other
-// validators/factories — it lives in the same file since it's part of
-// CardDefinition's own schema (the holoType field). ===
+// === HOLO: HOLO_TYPES still re-exported from collection.types.js
+// (which itself now imports it from holoTypes.js, the actual single
+// source of truth) since it's part of CardDefinition's schema. The
+// rest of the registry — labels and the full metadata list — comes
+// directly from holoTypes.js, so the form's picker reads labels from
+// the same place the validator reads allowed ids from. ===
 export {
   validateCollection,
   validateTemplateField,
@@ -23,6 +26,8 @@ export {
   createCardDefinition,
   HOLO_TYPES,
 } from './collection.types.js';
+
+export { HOLO_LABELS, HOLO_TYPE_REGISTRY } from './holoTypes.js';
 
 export {
   validateInventoryItem,

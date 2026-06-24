@@ -4,6 +4,9 @@
  */
 
 import { generateId } from './utils.js';
+import { HOLO_TYPES } from './holoTypes.js';
+
+export { HOLO_TYPES };
 
 // ─── Collection ───────────────────────────────────────────────────────────────
 
@@ -104,27 +107,10 @@ export function validateOneTemplatePerCollection(collectionId, existingFields) {
 // No userId needed here — ownership is tracked via USER_INVENTORY.
 
 // holoType: which holographic visual treatment this card renders with
-// inside the binder.
-//
-// === SEMANTIC CHANGE ===
-// 'none' USED TO mean "no effect at all" (the picker's reset option,
-// and the factory default for every card). It now means Regular Holo
-// — every TCG card has at least a subtle holo sheen in real life, so
-// 'none' became an ACTIVE recipe rather than a no-op, and is still the
-// factory default below — meaning every card, including ones already
-// in storage from before this change, will start showing this subtle
-// shine once it ships, by explicit decision.
-//
-// 'off' is the NEW genuinely-flat value, for anyone who wants a card
-// with literally no shine at all. It's the only value BinderSlot.jsx /
-// CardDetailModal.jsx / CardDefinitionForm.jsx treat as "don't render
-// any holo overlay" — every other value, including 'none', activates
-// the effect machinery.
-//
-// Exported so CardDefinitionForm (the picker UI) and the holo CSS/
-// render layer share one source of truth for the allowed values
-// instead of duplicating this list.
-export const HOLO_TYPES = ['off', 'none', 'holo', 'galaxy', 'rainbow', 'gold', 'v', 'vstar'];
+// inside the binder. See ./holoTypes.js for the full type registry
+// (id + label + asset deps) and the rationale for why 'none' is an
+// active recipe (Regular Holo) rather than a no-op — 'off' is the
+// genuinely-flat value.
 
 export function validateCardDefinition(data) {
   const errors = [];
