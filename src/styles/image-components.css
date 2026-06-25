@@ -88,13 +88,37 @@
 .card-detail-image-wrapper {
   display: flex;
   justify-content: center;
-  margin-bottom: var(--space-3);
+  /* === FIX: margin-bottom removed — .modal already applies
+     gap: var(--space-4) (16px) between EVERY flex child, so this
+     12px margin-bottom was stacking on top of that gap rather than
+     being the only source of spacing, contributing to a larger-than-
+     intended empty gap between the card image and the status row
+     below it. The modal's own gap is sufficient on its own. === */
 }
 
 .card-detail-image {
-  width: 140px;
-  aspect-ratio: 2.5 / 3.5;
-  object-fit: cover;
+  width: 100%;
+  max-width: 320px;
+  /* === FIX: aspect-ratio:2.5/3.5 + object-fit:cover forces every
+     card into the SAME fixed-ratio crop window, center-anchored —
+     for art whose real proportions don't match 2.5:3.5, that crops
+     into content that matters (confirmed: a card whose actual art
+     sits lower in its frame than this box expected was having its
+     bottom cropped off, all the way down to a thin visible sliver in
+     one case). Per explicit decision, this view should show the
+     FULL image, uncropped, even if that means the modal has to grow
+     taller and the rest of its content (status badge, name, action
+     buttons) gets pushed down with a scrollbar — the modal's
+     overflow-y:auto already handles that.
+
+     object-fit: contain (not cover) + no aspect-ratio constraint:
+     the image now renders at its own NATURAL proportions, scaled to
+     fit max-width:320px, with height following from THAT image's
+     real shape rather than being forced into a fixed box. height:
+     auto makes that explicit rather than relying on the (now absent)
+     aspect-ratio to define it. === */
+  height: auto;
+  object-fit: contain;
   border-radius: var(--radius-lg);
   border: 0.5px solid var(--border-primary);
 }

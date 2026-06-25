@@ -171,57 +171,99 @@
    (only a static non-interactive hover fallback was visible in
    base.css, not the real interactive math). */
 
+/* === FIX: overflow containment was only applied via
+   .card-detail-image-wrapper[data-holo] -- conditional on a holo
+   effect being active. But .card-rotate-wrapper/.card-rotator apply
+   UNCONDITIONALLY (the pointer-tilt should work even on a card with
+   holoType:'off', where [data-holo] is never set at all). Without
+   containment on that no-holo path, the 3D transform context
+   established by .card-rotator's rotateX/rotateY can visually bleed
+   past the wrapper's own box -- confirmed via screenshot showing the
+   card extending past the modal's right edge. .card-rotate-wrapper
+   itself (present on EVERY card with an image, holo or not) is the
+   right place for this, not the holo-conditional selector below. === */
 .card-rotate-wrapper {
   perspective: 1000px;
+  /* === FIX: overflow:hidden (here, on both axes) was clipping the
+     BOTTOM of the card image once it started rendering at its own
+     natural, taller height (object-fit:contain, no fixed aspect-
+     ratio) — confirmed via screenshot: card art truncated mid-shape
+     at this wrapper's edge, before the MODAL's own overflow-y:auto
+     scroll mechanism ever got a chance to reveal the rest.
+
+     Tried overflow-x:hidden / overflow-y:visible as a per-axis split
+     first, but per the CSS Overflow spec, a UA must compute a
+     'visible' axis as 'auto' whenever the OTHER axis isn't visible —
+     so that combination would have actually computed to overflow-y:
+     auto, making THIS wrapper its own scroll container instead of
+     deferring to the modal (a nested scrollbar around just the
+     image, not what's wanted).
+
+     Dropping overflow entirely instead: the original horizontal-
+     bleed problem this was added for should already be covered by
+     .card-rotator's own sizing fix (width is now reliably bounded by
+     max-width:320px on the image itself, not something that can
+     overflow on its own anymore) — isolation:isolate is kept since
+     that's for holo blend-mode containment, unrelated to overflow. === */
+  isolation: isolate;
 }
 
+/* === FIX: the real cause of the card-detail-modal crop bug. This was
+   width:100%; height:100% — meaning .card-rotator needed its PARENT
+   (.card-detail-image-wrapper) to already have an explicit height to
+   inherit from. But that parent has no height of its own; it was
+   always meant to get its height FROM its child's content (the
+   <img>'s own aspect-ratio). Inserting .card-rotator between the
+   wrapper and the <img> for the tilt feature broke that — the
+   wrapper now waits on .card-rotator for height, .card-rotator waits
+   on the wrapper, neither has anything concrete to resolve against,
+   and the <img>'s aspect-ratio/object-fit:cover then computed against
+   whatever collapsed/unstable box resulted, cropping the image.
+
+   Fix: drop width/height:100% (which assumed an already-sized parent)
+   in favor of display:grid + grid-area:1/1 alongside the elements it
+   contains (.card-detail-image and the holo overlays, see image-
+   components.css / BinderSlot's pattern) — this makes .card-rotator's
+   own size follow its CONTENT's natural size (the image's intrinsic
+   aspect-ratio) instead of demanding a pre-existing parent height,
+   the same way CSS grid is already used elsewhere in this file
+   (.card-holo-shine/.card-holo-glare use grid-area:1/1 for exactly
+   this reason). === */
 .card-rotator {
   position: relative;
-  width: 100%;
-  height: 100%;
+  display: grid;
   transform-style: preserve-3d;
   transform: rotateX(var(--rotate-x, 0deg)) rotateY(var(--rotate-y, 0deg));
   transition: transform 0.15s ease-out;
   will-change: transform;
 }
 
+.card-rotator > * {
+  grid-area: 1 / 1;
+}
+
 
 /* ── Real effect hosts ─────────────────────────────────────────────────────
    Both possible hosts need position:relative + overflow handling for
    the two overlay children to anchor/clip correctly. .binder-slot-
-   filled already has both from binder.css; .card-detail-image-wrapper's
-   own CSS wasn't available to confirm, so it's declared explicitly
-   here too (harmless if already set the same way). */
-
-/* === TEMPORARY SIZE OVERRIDE — requested bigger card preview in the
-   detail modal. The actual rule sizing .card-detail-image-wrapper /
-   .card-detail-image lives in a CSS file not yet located (not
-   modal-polish.css — that file only covers step-text typography).
-   This override sits here so the request isn't blocked on finding
-   that file; once located, consider moving/adjusting the size there
-   directly instead of stacking an override on top of it. === */
-.card-detail-image-wrapper {
-  max-width: 320px;
-  margin: 0 auto;
-}
-
-.card-detail-image {
-  width: 100%;
-  height: auto;
-}
+   filled already has both from binder.css. .card-detail-image-wrapper's
+   own sizing/layout rules live in image-components.css (confirmed) —
+   position:relative/overflow:hidden are declared here too regardless,
+   since this file shouldn't depend on another file's rules to make
+   its own overlay children render correctly. */
 
 .card-detail-image-wrapper[data-holo],
 .image-preview-wrapper[data-holo] {
   position: relative;
-  overflow: hidden;
-  /* === FIX: without isolation:isolate, the shine/glare children's
-     mix-blend-mode can composite against content OUTSIDE this box
-     (e.g. the modal's own white backdrop) rather than being scoped to
-     blending only with the card image directly behind them within
-     this box — this is what caused Rainbow's glow to visibly extend
-     past the card into the surrounding page. isolation:isolate forces
-     a new stacking context so blend modes here can never reach
-     outside this element. === */
+  /* === FIX: overflow:hidden removed — it was clipping the image's
+     bottom once it started rendering at its own natural, taller
+     height (object-fit:contain, no fixed aspect-ratio). isolation:
+     isolate alone is the actual mechanism that contains mix-blend-
+     mode bleed (it creates a new stacking context, which is what
+     stops blend modes from reaching outside this element) —
+     overflow:hidden was redundant insurance for that specific
+     purpose, not load-bearing, so dropping it doesn't reopen the
+     earlier "Rainbow's glow extends past the card" bug. === */
   isolation: isolate;
 }
 
