@@ -5,6 +5,7 @@
 // === ISSUE #57 START: Redesigned Trash Bin ===
 
 import { useState, useMemo } from 'react';
+import { useStore, useDispatch } from '../../hooks/useStore.js';
 import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
 
 // === REFACTOR7d START: use useBinActions hook ===
@@ -13,7 +14,8 @@ import { useBinActions } from '../../hooks/useBinActions.js';
 
 const SECTIONS = ['Binders', 'Collections', 'Cards'];
 
-export function BinView({ bin, toast }) {
+export function BinView({ toast }) {
+  const bin = useStore(s => s.bin);
   const [activeSection, setActiveSection] = useState('Binders');
   const [confirmEmpty, setConfirmEmpty]   = useState(false);
 

@@ -12,7 +12,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { Button, EmptyState, StatCard } from '../ui/index.jsx';
 import { CreateBinderModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
-import { useDispatch } from '../../hooks/useStore.js';
+import { useStore, useDispatch } from '../../hooks/useStore.js';
 import { binderCapacity, relativeDate } from '../../utils/index.js';
 import { getFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { buildHomeStats, getRecentlyAddedCards, getRecentActivity } from '../../selectors/homeStats.js';
@@ -26,7 +26,13 @@ const MAX_BINDERS_SHOWN = 4;
  *   every binder, unpaginated, with none of the dashboard widgets — this
  *   is what the dashboard's "View All" link navigates to (route: 'binders').
  */
-export function HomeView({ binders, binderSlots = [], inventory = [], cardDefinitions = [], collections = [], bin, toast, onNavigate, mode = 'dashboard' }) {
+export function HomeView({ toast, onNavigate, mode = 'dashboard' }) {
+  const binders         = useStore(s => s.binders);
+  const binderSlots     = useStore(s => s.binderSlots ?? []);
+  const inventory       = useStore(s => s.inventory);
+  const cardDefinitions = useStore(s => s.cardDefinitions);
+  const collections     = useStore(s => s.collections);
+  const bin             = useStore(s => s.bin);
   const dispatch = useDispatch();
   const [showCreate, setShowCreate] = useState(false);
 

@@ -10,6 +10,7 @@
 //   those just leave Location/Owned blank (—) rather than using a
 //   different layout per result type.
 
+import { useStore } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
@@ -23,15 +24,15 @@ import {
 const TABS = ['All', 'Cards', 'Collections', 'Binders'];
 
 export function SearchView({
-  cardDefinitions = [],
-  collections = [],
-  inventory = [],
-  binders = [],
-  binderSlots = [],
   toast,
   onNavigateToBinder,
   onNavigateToCollection,
 }) {
+  const cardDefinitions = useStore(s => s.cardDefinitions);
+  const collections     = useStore(s => s.collections);
+  const inventory       = useStore(s => s.inventory);
+  const binders         = useStore(s => s.binders);
+  const binderSlots     = useStore(s => s.binderSlots ?? []);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
 

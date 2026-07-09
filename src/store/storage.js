@@ -4,7 +4,7 @@
  */
 
 import {
-  validateBinder, validateCard, validateBinItem,
+  validateBinder,
   validateCollection, validateTemplateField, validateCardDefinition,
   validateInventoryItem, validateBinderSlot,
 } from '../types/index.js';

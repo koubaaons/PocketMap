@@ -1,5 +1,8 @@
-
-
+/**
+ * @fileoverview AccountView — account management screen.
+ * Currently handles data reset (clear all stored state and
+ * reload), with a confirmation step before the destructive action.
+ */
 import { useState } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { clearState } from '../../store/storage.js';

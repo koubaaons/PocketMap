@@ -88,11 +88,30 @@
 .card-detail-image-wrapper {
   display: flex;
   justify-content: center;
-  margin-bottom: var(--space-3);
+  /* === FIX: margin-bottom removed — .modal already applies
+     gap: var(--space-4) (16px) between EVERY flex child, so this
+     12px margin-bottom was stacking on top of that gap rather than
+     being the only source of spacing, contributing to a larger-than-
+     intended empty gap between the card image and the status row
+     below it. The modal's own gap is sufficient on its own. === */
 }
 
 .card-detail-image {
-  width: 140px;
+  width: 100%;
+  /* === Same sizing model as edit mode's .image-preview
+     (aspect-ratio:2.5/3.5 + object-fit:cover) — per explicit
+     correction, uniform sizing across every card matters more than
+     showing 100% of any one card's source art, exactly like edit
+     mode already does. The earlier crop complaints weren't actually
+     caused by this combination itself; they were caused by
+     overflow:hidden on ancestor wrappers (.card-rotate-wrapper, the
+     [data-holo] host rule) clipping content before this box even got
+     a chance to size correctly — both already fixed elsewhere in
+     this file. max-width:420px makes this genuinely BIGGER than
+     edit mode's preview (which has no width cap beyond its own
+     200px-capped wrapper), matching the actual request: same
+     behavior, bigger size, in the detail view specifically. === */
+  max-width: 420px;
   aspect-ratio: 2.5 / 3.5;
   object-fit: cover;
   border-radius: var(--radius-lg);

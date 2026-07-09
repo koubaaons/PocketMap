@@ -39,14 +39,10 @@ export default function App() {
   const dispatch = useDispatch();
   const { toasts, toast, dismiss } = useToast();
   const { theme, toggleTheme, isDark } = useTheme();
+  const nav             = useStore(s => s.nav);
   const binders         = useStore(s => s.binders);
   const bin             = useStore(s => s.bin);
-  const nav             = useStore(s => s.nav);
   const collections     = useStore(s => s.collections);
-  const cardDefinitions = useStore(s => s.cardDefinitions);
-  const templateFields  = useStore(s => s.templateFields);
-  const inventory       = useStore(s => s.inventory);
-  const binderSlots     = useStore(s => s.binderSlots ?? []);
 
   const navigate = useCallback((view, id = null) => {
     dispatch({
@@ -76,12 +72,6 @@ export default function App() {
       case 'home':
         return (
           <HomeView
-            binders={binders}
-            binderSlots={binderSlots}
-            inventory={inventory}
-            cardDefinitions={cardDefinitions}
-            collections={collections}
-            bin={bin}
             toast={toast}
             onNavigate={navigate}
             mode="dashboard"
@@ -95,12 +85,6 @@ export default function App() {
       case 'binders':
         return (
           <HomeView
-            binders={binders}
-            binderSlots={binderSlots}
-            inventory={inventory}
-            cardDefinitions={cardDefinitions}
-            collections={collections}
-            bin={bin}
             toast={toast}
             onNavigate={navigate}
             mode="all-binders"
@@ -110,25 +94,12 @@ export default function App() {
       case 'binder':
         if (!currentBinder) { navigate('home'); return null; }
         return (
-          <BinderView
-            binder={currentBinder}
-            binderSlots={binderSlots.filter(s => s.binderId === currentBinder.id)}
-            cardDefinitions={cardDefinitions}
-            collections={collections}
-            templateFields={templateFields}
-            inventory={inventory}
-            toast={toast}
-          />
+          <BinderView toast={toast} onNavigate={navigate} />
         );
 
       case 'search':
         return (
           <SearchView
-            cardDefinitions={cardDefinitions}
-            collections={collections}
-            binderSlots={binderSlots}
-            binders={binders}
-            inventory={inventory}
             toast={toast}
             onNavigateToBinder={(id) => navigate('binder', id)}
             onNavigateToCollection={(id) => navigate('collection', id)}
@@ -137,38 +108,21 @@ export default function App() {
 
       case 'favorites':
         return (
-          <FavoritesView
-            inventory={inventory}
-            cardDefinitions={cardDefinitions}
-            collections={collections}
-            toast={toast}
-            onNavigate={navigate}
-          />
+          <FavoritesView toast={toast} onNavigate={navigate} />
         );
 
       case 'bin':
-        return <BinView bin={bin} toast={toast} />;
+        return <BinView toast={toast} />;
 
       case 'collections':
         return (
-          <CollectionsView
-            collections={collections}
-            cardDefinitions={cardDefinitions}
-            inventory={inventory}
-            toast={toast}
-            onNavigate={navigate}
-          />
+          <CollectionsView toast={toast} onNavigate={navigate} />
         );
 
       case 'collection':
         if (!currentCollection) { navigate('collections'); return null; }
         return (
           <CollectionDetailView
-            collection={currentCollection}
-            cardDefinitions={cardDefinitions}
-            templateFields={templateFields}
-            inventory={inventory}
-            binderSlots={binderSlots}
             toast={toast}
             onBack={() => navigate('collections')}
           />
@@ -181,12 +135,6 @@ export default function App() {
       default:
         return (
           <HomeView
-            binders={binders}
-            binderSlots={binderSlots}
-            inventory={inventory}
-            cardDefinitions={cardDefinitions}
-            collections={collections}
-            bin={bin}
             toast={toast}
             onNavigate={navigate}
             mode="dashboard"

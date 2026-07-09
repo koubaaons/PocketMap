@@ -14,6 +14,7 @@
 // === ISSUE #1 START: Split Views — CollectionsView shell ===
 // === ISSUE #5 START: Collections List View ===
 
+import { useStore } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
 import { CreateCollectionModal, EditCollectionModal } from '../modals/index.js';
@@ -21,7 +22,10 @@ import { CollectionList } from '../collections/CollectionList.jsx';
 import { buildCollectionStatsMap } from '../../selectors/collectionStats.js';
 import { useCollectionActions } from '../../hooks/useCollectionActions.js';
 
-export function CollectionsView({ collections, cardDefinitions, inventory, toast, onNavigate }) {
+export function CollectionsView({ toast, onNavigate }) {
+  const collections     = useStore(s => s.collections);
+  const cardDefinitions = useStore(s => s.cardDefinitions);
+  const inventory       = useStore(s => s.inventory);
   const [query, setQuery]                       = useState('');
   const [showCreate, setShowCreate]             = useState(false);
   const [editingCollection, setEditingCollection] = useState(null);
