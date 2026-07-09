@@ -46,3 +46,6 @@ export function applyCardDefinitionFilters(cards, query, sortBy) {
 }
 
 // === ISSUE #15 END: Card Definitions List — search and sort selectors ===
+export function getCardDefinitionsForCollection(cardDefinitions, collectionId) {
+  return cardDefinitions.filter(cd => cd.collectionId === collectionId);
+}

@@ -17,7 +17,7 @@ import { CardDefinitionList } from '../collections/CardDefinitionList.jsx';
 import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
 import { CollectionSummary } from '../collections/CollectionSummary.jsx';
 import { TabToolbar } from '../collections/TabToolbar.jsx';
-import { applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
+import { applyCardDefinitionFilters, getCardDefinitionsForCollection } from '../../selectors/cardDefinitionSelectors.js';
 import { buildOwnershipMap, buildCollectionSummary } from '../../selectors/inventorySelectors.js';
 import { getOrganisedCardDefIds } from '../../selectors/binderSelectors.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
@@ -42,7 +42,7 @@ export function CollectionDetailView({ collection, cardDefinitions, templateFiel
   const ownership = useOwnershipEditor();
 
   const collectionCards = useMemo(
-    () => cardDefinitions.filter(cd => cd.collectionId === collection.id),
+    () => getCardDefinitionsForCollection(cardDefinitions, collection.id),
     [cardDefinitions, collection.id]
   );
 

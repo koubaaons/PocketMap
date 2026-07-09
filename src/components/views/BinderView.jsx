@@ -84,7 +84,7 @@ import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { SlotActionModal } from '../modals/SlotActionModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { CustomizerSticker } from '../modals/CustomizerSticker.jsx';
-import { getFilledSlotCount } from '../../selectors/binderSelectors.js';
+import { getFilledSlotCount, getSlotById } from '../../selectors/binderSelectors.js';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
@@ -493,7 +493,7 @@ export function BinderView({ binder, binderSlots, cardDefinitions, collections, 
     if (!view.previewSlots) return;
 
     view.previewSlots.forEach(previewSlot => {
-      const original = binderSlots.find(s => s.id === previewSlot.id);
+      const original = getSlotById(binderSlots, previewSlot.id);
       if (!original) {
         dispatch({ type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: previewSlot } });
       } else if (

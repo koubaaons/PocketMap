@@ -59,3 +59,6 @@ export function filterCardsForBinder(cardDefinitions, placedCardIds, query, coll
     })
     .slice(0, limit);
 }
+export function getSlotById(binderSlots, slotId) {
+  return binderSlots.find(s => s.id === slotId) ?? null;
+}
