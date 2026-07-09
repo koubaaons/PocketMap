@@ -18,6 +18,13 @@
 @import './styles/typography.css';
 @import './styles/layout.css';
 @import './styles/components.css';
+@import './styles/binder-card.css';
+@import './styles/card-detail.css';
+@import './styles/collection-detail.css';
+@import './styles/bin-view.css';
+@import './styles/home-stats.css';
+@import './styles/template.css';
+@import './styles/binder-view-feature.css';
 @import './styles/utilities.css';
 @import './styles/image-components.css';
 @import './styles/binder.css';
