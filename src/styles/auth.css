@@ -1,0 +1,104 @@
+/* ── Auth screens (RegisterView, LoginView) ────────────────────────────────
+   Centred card layout, matching the existing token system.
+   Reuses .form-group / .form-input / .btn from components.css — only
+   auth-specific layout and typography is defined here. */
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  padding: var(--space-5);
+}
+
+.auth-card {
+  background: var(--bg-primary);
+  border: 0.5px solid var(--border-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-10) var(--space-8);
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.auth-logo {
+  font-size: 36px;
+  text-align: center;
+}
+
+.auth-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0;
+}
+
+.auth-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+}
+
+/* Full-width submit button */
+.auth-submit {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+/* Inline field-level error message */
+.auth-field-error {
+  font-size: var(--text-xs);
+  color: var(--color-error, #e05252);
+  margin: var(--space-1) 0 0;
+}
+
+/* Banner-level error (e.g. network failure) */
+.auth-error-banner {
+  font-size: var(--text-sm);
+  color: var(--color-error, #e05252);
+  background: rgba(224, 82, 82, 0.08);
+  border: 0.5px solid rgba(224, 82, 82, 0.25);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+/* "Already have an account? Log in" row */
+.auth-switch {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+}
+
+.auth-switch-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-switch-link:hover {
+  color: var(--accent-hover);
+}
+
+.auth-switch-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Success state icon */
+.auth-success-icon {
+  font-size: 48px;
+  text-align: center;
+}

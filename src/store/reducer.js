@@ -10,12 +10,16 @@ export const ACTIONS = Object.freeze({
   BINDER_UPDATE:   'BINDER_UPDATE',
   BINDER_DELETE:   'BINDER_DELETE',
   BINDER_ADD_PAGE: 'BINDER_ADD_PAGE',
+  CARD_ADD:    'CARD_ADD',
+  CARD_UPDATE: 'CARD_UPDATE',
+  CARD_DELETE: 'CARD_DELETE',
   BIN_RESTORE_BINDER:     'BIN_RESTORE_BINDER',
   BIN_RESTORE_COLLECTION: 'BIN_RESTORE_COLLECTION',
   BIN_RESTORE_CARD:       'BIN_RESTORE_CARD',
   BIN_DELETE_ITEM:        'BIN_DELETE_ITEM',
   BIN_EMPTY:              'BIN_EMPTY',
-  NAV_SET: 'NAV_SET',
+  NAV_SET:  'NAV_SET',
+  AUTH_SET: 'AUTH_SET',
   COLLECTION_ADD:    'COLLECTION_ADD',
   COLLECTION_UPDATE: 'COLLECTION_UPDATE',
   COLLECTION_DELETE: 'COLLECTION_DELETE',
@@ -72,6 +76,27 @@ export function reducer(state, action) {
         ),
       };
 
+    case ACTIONS.CARD_ADD:
+      return { ...state, cards: [...(state.cards ?? []), action.payload] };
+
+    case ACTIONS.CARD_UPDATE:
+      return {
+        ...state,
+        cards: (state.cards ?? []).map(c =>
+          c.id === action.payload.id ? { ...c, ...action.payload } : c
+        ),
+      };
+
+    case ACTIONS.CARD_DELETE: {
+      const card = (state.cards ?? []).find(c => c.id === action.payload.cardId);
+      if (!card) return state;
+      return {
+        ...state,
+        cards: (state.cards ?? []).filter(c => c.id !== action.payload.cardId),
+        bin: [...state.bin, { ...card, _type: 'legacy_card', deletedAt: Date.now() }],
+      };
+    }
+
     // ── Bin ───────────────────────────────────────────────────────────────────
 
     case ACTIONS.BIN_RESTORE_BINDER: {
@@ -126,6 +151,9 @@ export function reducer(state, action) {
 
     case ACTIONS.NAV_SET:
       return { ...state, nav: { ...state.nav, ...action.payload } };
+
+    case ACTIONS.AUTH_SET:
+      return { ...state, user: action.payload };
 
     case ACTIONS.COLLECTION_ADD:
       return { ...state, collections: [...state.collections, action.payload] };
