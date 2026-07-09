@@ -91,12 +91,21 @@ import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 import { useBinderView } from '../../hooks/useBinderView.js';
 import { useBinderFullscreen } from '../../hooks/useBinderFullscreen.js';
-import { useDispatch } from '../../hooks/useStore.js';
+import { useStore, useDispatch } from '../../hooks/useStore.js';
 import { ACTIONS } from '../../store/index.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 import { createBinderSlot } from '../../types/index.js';
 
-export function BinderView({ binder, binderSlots, cardDefinitions, collections, templateFields, inventory, toast, onNavigate }) {
+export function BinderView({ toast, onNavigate }) {
+  const nav             = useStore(s => s.nav);
+  const binders         = useStore(s => s.binders);
+  const allBinderSlots  = useStore(s => s.binderSlots ?? []);
+  const cardDefinitions = useStore(s => s.cardDefinitions);
+  const collections     = useStore(s => s.collections);
+  const templateFields  = useStore(s => s.templateFields);
+  const inventory       = useStore(s => s.inventory);
+  const binder          = binders.find(b => b.id === nav.currentBinderId) ?? null;
+  const binderSlots     = allBinderSlots.filter(s => s.binderId === binder?.id);
   const dispatch   = useDispatch();
   const view       = useBinderView(binder, binderSlots);
   const [confirmDelete, setConfirmDelete] = useState(false);

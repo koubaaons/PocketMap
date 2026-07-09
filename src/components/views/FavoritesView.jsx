@@ -6,6 +6,7 @@
 //   list; collectionFilter ('all' or a collectionId) narrows it down to
 //   one collection's favorites. Filter is applied before sort.
 
+import { useStore } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
 import { CardGridItem } from '../collections/CardGridItem.jsx';
@@ -17,7 +18,10 @@ import {
 } from '../../selectors/inventorySelectors.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 
-export function FavoritesView({ inventory, cardDefinitions, collections, toast, onNavigate }) {
+export function FavoritesView({ toast, onNavigate }) {
+  const inventory       = useStore(s => s.inventory);
+  const cardDefinitions = useStore(s => s.cardDefinitions);
+  const collections     = useStore(s => s.collections);
   const { handleToggleFavorite } = useInventoryActions(toast);
   const [sortBy, setSortBy] = useState('recent');
   const [collectionFilter, setCollectionFilter] = useState('all');

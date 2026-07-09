@@ -11,13 +11,14 @@
 
 // === ISSUE #13 START: Card Definition Management — CollectionDetailView shell ===
 
+import { useStore } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { CardDefinitionList } from '../collections/CardDefinitionList.jsx';
 import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
 import { CollectionSummary } from '../collections/CollectionSummary.jsx';
 import { TabToolbar } from '../collections/TabToolbar.jsx';
-import { applyCardDefinitionFilters, getCardDefinitionsForCollection } from '../../selectors/cardDefinitionSelectors.js';
+import { applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
 import { buildOwnershipMap, buildCollectionSummary } from '../../selectors/inventorySelectors.js';
 import { getOrganisedCardDefIds } from '../../selectors/binderSelectors.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
@@ -35,14 +36,21 @@ import { SettingsTab }     from '../collections/SettingsTab.jsx';
 
 const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Settings'];
 
-export function CollectionDetailView({ collection, cardDefinitions, templateFields, inventory, binderSlots = [], toast, onBack }) {
+export function CollectionDetailView({ toast, onBack }) {
+  const nav             = useStore(s => s.nav);
+  const collections     = useStore(s => s.collections);
+  const cardDefinitions = useStore(s => s.cardDefinitions);
+  const templateFields  = useStore(s => s.templateFields);
+  const inventory       = useStore(s => s.inventory);
+  const binderSlots     = useStore(s => s.binderSlots ?? []);
+  const collection      = collections.find(c => c.id === nav.currentCollectionId) ?? null;
   const [activeTab, setActiveTab] = useState('Cards');
 
   const editor    = useCardEditor();
   const ownership = useOwnershipEditor();
 
   const collectionCards = useMemo(
-    () => getCardDefinitionsForCollection(cardDefinitions, collection.id),
+    () => cardDefinitions.filter(cd => cd.collectionId === collection.id),
     [cardDefinitions, collection.id]
   );
 
