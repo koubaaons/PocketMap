@@ -11,6 +11,7 @@ import { useTheme } from './hooks/useTheme.js';
 import { ACTIONS } from './store/index.js';
 import { Sidebar } from './components/Sidebar.jsx';
 import { ToastContainer } from './components/ui/index.jsx';
+import { FeedbackButton } from './components/FeedbackButton.jsx';
 
 import { HomeView }             from './components/views/HomeView.jsx';
 import { BinderView }           from './components/views/BinderView.jsx';
@@ -39,10 +40,14 @@ export default function App() {
   const dispatch = useDispatch();
   const { toasts, toast, dismiss } = useToast();
   const { theme, toggleTheme, isDark } = useTheme();
-  const nav             = useStore(s => s.nav);
   const binders         = useStore(s => s.binders);
   const bin             = useStore(s => s.bin);
+  const nav             = useStore(s => s.nav);
   const collections     = useStore(s => s.collections);
+  const cardDefinitions = useStore(s => s.cardDefinitions);
+  const templateFields  = useStore(s => s.templateFields);
+  const inventory       = useStore(s => s.inventory);
+  const binderSlots     = useStore(s => s.binderSlots ?? []);
 
   const navigate = useCallback((view, id = null) => {
     dispatch({
@@ -72,6 +77,12 @@ export default function App() {
       case 'home':
         return (
           <HomeView
+            binders={binders}
+            binderSlots={binderSlots}
+            inventory={inventory}
+            cardDefinitions={cardDefinitions}
+            collections={collections}
+            bin={bin}
             toast={toast}
             onNavigate={navigate}
             mode="dashboard"
@@ -85,6 +96,12 @@ export default function App() {
       case 'binders':
         return (
           <HomeView
+            binders={binders}
+            binderSlots={binderSlots}
+            inventory={inventory}
+            cardDefinitions={cardDefinitions}
+            collections={collections}
+            bin={bin}
             toast={toast}
             onNavigate={navigate}
             mode="all-binders"
@@ -94,12 +111,25 @@ export default function App() {
       case 'binder':
         if (!currentBinder) { navigate('home'); return null; }
         return (
-          <BinderView toast={toast} onNavigate={navigate} />
+          <BinderView
+            binder={currentBinder}
+            binderSlots={binderSlots.filter(s => s.binderId === currentBinder.id)}
+            cardDefinitions={cardDefinitions}
+            collections={collections}
+            templateFields={templateFields}
+            inventory={inventory}
+            toast={toast}
+          />
         );
 
       case 'search':
         return (
           <SearchView
+            cardDefinitions={cardDefinitions}
+            collections={collections}
+            binderSlots={binderSlots}
+            binders={binders}
+            inventory={inventory}
             toast={toast}
             onNavigateToBinder={(id) => navigate('binder', id)}
             onNavigateToCollection={(id) => navigate('collection', id)}
@@ -108,21 +138,38 @@ export default function App() {
 
       case 'favorites':
         return (
-          <FavoritesView toast={toast} onNavigate={navigate} />
+          <FavoritesView
+            inventory={inventory}
+            cardDefinitions={cardDefinitions}
+            collections={collections}
+            toast={toast}
+            onNavigate={navigate}
+          />
         );
 
       case 'bin':
-        return <BinView toast={toast} />;
+        return <BinView bin={bin} toast={toast} />;
 
       case 'collections':
         return (
-          <CollectionsView toast={toast} onNavigate={navigate} />
+          <CollectionsView
+            collections={collections}
+            cardDefinitions={cardDefinitions}
+            inventory={inventory}
+            toast={toast}
+            onNavigate={navigate}
+          />
         );
 
       case 'collection':
         if (!currentCollection) { navigate('collections'); return null; }
         return (
           <CollectionDetailView
+            collection={currentCollection}
+            cardDefinitions={cardDefinitions}
+            templateFields={templateFields}
+            inventory={inventory}
+            binderSlots={binderSlots}
             toast={toast}
             onBack={() => navigate('collections')}
           />
@@ -135,6 +182,12 @@ export default function App() {
       default:
         return (
           <HomeView
+            binders={binders}
+            binderSlots={binderSlots}
+            inventory={inventory}
+            cardDefinitions={cardDefinitions}
+            collections={collections}
+            bin={bin}
             toast={toast}
             onNavigate={navigate}
             mode="dashboard"
@@ -168,6 +221,7 @@ export default function App() {
         </main>
       </div>
       <ToastContainer toasts={toasts} dismiss={dismiss} />
+      <FeedbackButton toast={toast} />
     </div>
   );
 }
