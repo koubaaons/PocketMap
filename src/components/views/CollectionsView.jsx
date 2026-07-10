@@ -133,7 +133,7 @@ export function CollectionsView({ toast, onNavigate }) {
       {confirmDelete && (
         <ConfirmModal
           title={`Delete "${confirmDelete.name}"?`}
-          message="This will permanently delete the collection, all its template fields, card definitions, and any inventory entries. This cannot be undone."
+          message="This collection will be moved to the trash. You can restore it from there."
           confirmLabel="Delete Collection"
           onConfirm={() => handleDelete(confirmDelete.id)}
           onClose={() => setConfirmDelete(null)}

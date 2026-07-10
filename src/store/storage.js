@@ -257,6 +257,12 @@ function rowToInventoryItem(row) {
     collectionId:       row.collection_id,
     is_favorite:        row.is_favorite,
     condition_rating:   row.condition_rating,
+    // Map Supabase column names back to JS field names used by the app
+    acquired_at:        row.date_acquired,
+    personal_notes:     row.notes,
+    is_tradeable:       row.available_for_trade,
+    is_sellable:        row.available_for_sale,
+    // Keep both names so existing code that reads either still works
     date_acquired:      row.date_acquired,
     notes:              row.notes,
     available_for_trade: row.available_for_trade,
@@ -291,12 +297,12 @@ export async function loadStateFromSupabase() {
       inventoryRes,
       binRes,
     ] = await Promise.all([
-      supabase.from('binders').select('*'),
+      supabase.from('binders').select('*').is('deleted_at', null),
       supabase.from('binder_slots').select('*'),
-      supabase.from('collections').select('*'),
+      supabase.from('collections').select('*').is('deleted_at', null),
       supabase.from('template_fields').select('*'),
-      supabase.from('card_definitions').select('*'),
-      supabase.from('user_inventory').select('*'),
+      supabase.from('card_definitions').select('*').is('deleted_at', null),
+      supabase.from('user_inventory').select('*').is('deleted_at', null),
       supabase.from('bin').select('*'),
     ]);
 
@@ -375,9 +381,10 @@ export function templateFieldToRow(field) {
     id:            field.id,
     user_id:       field.userId,
     collection_id: field.collectionId,
-    field_name:    field.fieldName,
-    field_type:    field.fieldType,
-    is_required:   field.isRequired ?? false,
+    // JS uses snake_case: field_name, field_type, is_required, order
+    field_name:    field.field_name ?? field.fieldName,
+    field_type:    field.field_type ?? field.fieldType,
+    is_required:   field.is_required ?? field.isRequired ?? false,
     field_order:   field.order ?? 0,
     options:       field.options ?? [],
     updated_at:    new Date().toISOString(),
@@ -405,10 +412,12 @@ export function inventoryItemToRow(item) {
     collection_id:       item.collectionId,
     is_favorite:         item.is_favorite ?? false,
     condition_rating:    item.condition_rating ?? null,
-    date_acquired:       item.date_acquired ?? null,
-    notes:               item.notes ?? null,
-    available_for_trade: item.available_for_trade ?? false,
-    available_for_sale:  item.available_for_sale ?? false,
+    // JS uses acquired_at / personal_notes / is_tradeable / is_sellable
+    // Supabase columns use date_acquired / notes / available_for_trade / available_for_sale
+    date_acquired:       item.acquired_at ?? item.date_acquired ?? null,
+    notes:               item.personal_notes ?? item.notes ?? null,
+    available_for_trade: item.is_tradeable ?? item.available_for_trade ?? false,
+    available_for_sale:  item.is_sellable  ?? item.available_for_sale  ?? false,
     updated_at:          new Date().toISOString(),
   };
 }

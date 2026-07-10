@@ -71,7 +71,7 @@ export function CardDetailModal({
     return (
       <ConfirmModal
         title={`Delete "${card.name}"?`}
-        message="This will permanently delete this card and any ownership record. This cannot be undone."
+        message="This card will be moved to the trash. You can restore it from there."
         confirmLabel="Delete Card"
         onConfirm={() => { onDelete(); onClose(); }}
         onClose={() => setConfirmDelete(false)}
