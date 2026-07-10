@@ -7,6 +7,7 @@
 import { useCallback } from 'react';
 import { useStore, useDispatch } from './hooks/useStore.js';
 import { useToast } from './hooks/useToast.js';
+import { useSupabaseSync } from './hooks/useSupabaseSync.js';
 import { useTheme } from './hooks/useTheme.js';
 import { ACTIONS } from './store/index.js';
 import { Sidebar } from './components/Sidebar.jsx';
@@ -40,6 +41,7 @@ export default function App() {
   const dispatch = useDispatch();
   const { toasts, toast, dismiss } = useToast();
   const { theme, toggleTheme, isDark } = useTheme();
+  const { syncing } = useSupabaseSync();
   const binders         = useStore(s => s.binders);
   const bin             = useStore(s => s.bin);
   const nav             = useStore(s => s.nav);
@@ -195,6 +197,17 @@ export default function App() {
         );
     }
   };
+
+  if (syncing) {
+    return (
+      <div className="sync-loading">
+        <div className="sync-loading-inner">
+          <div className="sync-spinner" aria-hidden="true" />
+          <p className="sync-loading-text">Loading your collection\u2026</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
