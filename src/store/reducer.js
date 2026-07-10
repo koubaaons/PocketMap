@@ -10,9 +10,6 @@ export const ACTIONS = Object.freeze({
   BINDER_UPDATE:   'BINDER_UPDATE',
   BINDER_DELETE:   'BINDER_DELETE',
   BINDER_ADD_PAGE: 'BINDER_ADD_PAGE',
-  CARD_ADD:    'CARD_ADD',
-  CARD_UPDATE: 'CARD_UPDATE',
-  CARD_DELETE: 'CARD_DELETE',
   BIN_RESTORE_BINDER:     'BIN_RESTORE_BINDER',
   BIN_RESTORE_COLLECTION: 'BIN_RESTORE_COLLECTION',
   BIN_RESTORE_CARD:       'BIN_RESTORE_CARD',
@@ -76,27 +73,6 @@ export function reducer(state, action) {
           b.id === action.payload.binderId ? { ...b, pages: b.pages + 1 } : b
         ),
       };
-
-    case ACTIONS.CARD_ADD:
-      return { ...state, cards: [...(state.cards ?? []), action.payload] };
-
-    case ACTIONS.CARD_UPDATE:
-      return {
-        ...state,
-        cards: (state.cards ?? []).map(c =>
-          c.id === action.payload.id ? { ...c, ...action.payload } : c
-        ),
-      };
-
-    case ACTIONS.CARD_DELETE: {
-      const card = (state.cards ?? []).find(c => c.id === action.payload.cardId);
-      if (!card) return state;
-      return {
-        ...state,
-        cards: (state.cards ?? []).filter(c => c.id !== action.payload.cardId),
-        bin: [...state.bin, { ...card, _type: 'legacy_card', deletedAt: Date.now() }],
-      };
-    }
 
     // ── Bin ───────────────────────────────────────────────────────────────────
 

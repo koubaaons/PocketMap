@@ -14,16 +14,15 @@
  */
 
 import { reducer, ACTIONS } from './reducer.js';
-import { loadState, saveState } from './storage.js';
 import {
-  binderToRow,
-  binderSlotToRow,
-  collectionToRow,
-  templateFieldToRow,
-  cardDefinitionToRow,
-  inventoryItemToRow,
+  loadState, saveState,
+  binderToRow, binderSlotToRow,
+  collectionToRow, templateFieldToRow,
+  cardDefinitionToRow, inventoryItemToRow,
 } from './storage.js';
 import { supabase } from '../services/supabase.js';
+
+const DEBUG = import.meta.env.DEV;
 
 // Get the real Supabase user id — never trust the userId stored on
 // entities since old data may have 'local-user-1' as a placeholder.
@@ -441,7 +440,7 @@ function createStore(reducerFn, initialState) {
 
     dispatch(action) {
       if (process.env.NODE_ENV !== 'production') {
-        console.debug('[Store] dispatch', action.type, action.payload ?? '');
+        DEBUG && console.debug('[Store] dispatch', action.type, action.payload ?? '');
       }
 
       const prevState = state; // capture BEFORE reducer runs

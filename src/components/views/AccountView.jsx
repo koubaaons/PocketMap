@@ -18,7 +18,6 @@ import { Button, ConfirmModal } from '../ui/index.jsx';
 import { clearState } from '../../store/storage.js';
 import { supabase } from '../../services/supabase.js';
 import { useAuth } from '../../hooks/useAuth.js';
-import { useSupabaseSync } from '../../hooks/useSupabaseSync.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -226,9 +225,8 @@ function ChangePasswordSection({ toast }) {
 
 // ── main component ─────────────────────────────────────────────────────────
 
-export function AccountView({ toast }) {
+export function AccountView({ toast, lastSynced }) {
   const { user } = useAuth();
-  const { lastSynced } = useSupabaseSync();
 
   const [confirmReset, setConfirmReset]   = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
