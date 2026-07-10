@@ -41,7 +41,7 @@ export default function App() {
   const dispatch = useDispatch();
   const { toasts, toast, dismiss } = useToast();
   const { theme, toggleTheme, isDark } = useTheme();
-  const { syncing } = useSupabaseSync();
+  const { syncing, lastSynced } = useSupabaseSync();
   const binders         = useStore(s => s.binders);
   const bin             = useStore(s => s.bin);
   const nav             = useStore(s => s.nav);
