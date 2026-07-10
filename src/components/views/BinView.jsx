@@ -18,6 +18,7 @@ export function BinView({ toast }) {
   const bin = useStore(s => s.bin);
   const [activeSection, setActiveSection] = useState('Binders');
   const [confirmEmpty, setConfirmEmpty]   = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null); // item to delete forever
 
   // === REFACTOR7d START: dispatch logic in hook ===
   const { handleRestore, handlePermDelete, handleEmptyAll } = useBinActions(toast);
@@ -72,11 +73,20 @@ export function BinView({ toast }) {
               </div>
               <div className="bin-actions">
                 <Button variant="ghost" size="sm" onClick={() => handleRestore(item)}>Restore</Button>
-                <Button variant="danger" size="sm" onClick={() => handlePermDelete(item)}>Delete Forever</Button>
+                <Button variant="danger" size="sm" onClick={() => setConfirmDelete(item)}>Delete Forever</Button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Permanently delete "${confirmDelete.name}"?`}
+          message="This cannot be undone. The item will be gone forever."
+          confirmLabel="Delete Forever"
+          onConfirm={() => { handlePermDelete(confirmDelete); setConfirmDelete(null); }}
+          onClose={() => setConfirmDelete(null)} />
       )}
 
       {confirmEmpty && (
