@@ -20,6 +20,7 @@ export const ACTIONS = Object.freeze({
   BIN_EMPTY:              'BIN_EMPTY',
   NAV_SET:  'NAV_SET',
   AUTH_SET: 'AUTH_SET',
+  HYDRATE:  'HYDRATE',
   COLLECTION_ADD:    'COLLECTION_ADD',
   COLLECTION_UPDATE: 'COLLECTION_UPDATE',
   COLLECTION_DELETE: 'COLLECTION_DELETE',
@@ -154,6 +155,18 @@ export function reducer(state, action) {
 
     case ACTIONS.AUTH_SET:
       return { ...state, user: action.payload };
+
+    case ACTIONS.HYDRATE:
+      return {
+        ...state,
+        binders:         action.payload.binders         ?? state.binders,
+        binderSlots:     action.payload.binderSlots     ?? state.binderSlots,
+        collections:     action.payload.collections     ?? state.collections,
+        templateFields:  action.payload.templateFields  ?? state.templateFields,
+        cardDefinitions: action.payload.cardDefinitions ?? state.cardDefinitions,
+        inventory:       action.payload.inventory       ?? state.inventory,
+        bin:             action.payload.bin             ?? state.bin,
+      };
 
     case ACTIONS.COLLECTION_ADD:
       return { ...state, collections: [...state.collections, action.payload] };
