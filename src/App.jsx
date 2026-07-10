@@ -179,7 +179,7 @@ export default function App() {
 
       case 'account':
       case 'settings':
-        return <AccountView toast={toast} theme={theme} onToggleTheme={toggleTheme} />;
+        return <AccountView toast={toast} theme={theme} onToggleTheme={toggleTheme} lastSynced={lastSynced} />;
 
       default:
         return (

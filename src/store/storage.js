@@ -16,6 +16,8 @@ import {
 } from '../types/index.js';
 import { supabase } from '../services/supabase.js';
 
+const DEBUG = import.meta.env.DEV;
+
 const STORAGE_KEY    = 'bindervault';
 const SCHEMA_VERSION = 2;
 
@@ -48,7 +50,7 @@ function applyMigrations(state) {
   let current = state;
   let v = current.version ?? 1;
   while (MIGRATIONS[v + 1]) {
-    console.info(`[BinderVault] Migrating storage from v${v} → v${v + 1}`);
+    DEBUG && console.info(`[BinderVault] Migrating storage from v${v} → v${v + 1}`);
     current = MIGRATIONS[v + 1](current);
     v = current.version;
   }
@@ -67,7 +69,7 @@ function sanitizeState(raw) {
     b.stickers = b.stickers.map(s => (typeof s.scale === 'number' ? s : { ...s, scale: 1 }));
     b.stickers = b.stickers.map(s => (typeof s.size === 'number' ? s : { ...s, size: 17.5 }));
     const { valid, errors } = validateBinder(b);
-    if (!valid) console.warn('[BinderVault] Dropping corrupt binder:', errors, b);
+    if (!valid) DEBUG && console.warn('[BinderVault] Dropping corrupt binder:', errors, b);
     return valid;
   });
 
@@ -75,7 +77,7 @@ function sanitizeState(raw) {
 
   const collections = (raw.collections ?? []).filter(c => {
     const { valid, errors } = validateCollection(c);
-    if (!valid) console.warn('[BinderVault] Dropping corrupt collection:', errors, c);
+    if (!valid) DEBUG && console.warn('[BinderVault] Dropping corrupt collection:', errors, c);
     return valid;
   });
 
@@ -83,15 +85,15 @@ function sanitizeState(raw) {
 
   const templateFields = (raw.templateFields ?? []).filter(f => {
     const { valid, errors } = validateTemplateField(f);
-    if (!valid) { console.warn('[BinderVault] Dropping corrupt template field:', errors, f); return false; }
-    if (!collectionIds.has(f.collectionId)) { console.warn('[BinderVault] Dropping orphan template field:', f.id); return false; }
+    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt template field:', errors, f); return false; }
+    if (!collectionIds.has(f.collectionId)) { DEBUG && console.warn('[BinderVault] Dropping orphan template field:', f.id); return false; }
     return true;
   });
 
   const cardDefinitions = (raw.cardDefinitions ?? []).filter(cd => {
     const { valid, errors } = validateCardDefinition(cd);
-    if (!valid) { console.warn('[BinderVault] Dropping corrupt card definition:', errors, cd); return false; }
-    if (!collectionIds.has(cd.collectionId)) { console.warn('[BinderVault] Dropping orphan card definition:', cd.id); return false; }
+    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt card definition:', errors, cd); return false; }
+    if (!collectionIds.has(cd.collectionId)) { DEBUG && console.warn('[BinderVault] Dropping orphan card definition:', cd.id); return false; }
     return true;
   });
 
@@ -99,16 +101,16 @@ function sanitizeState(raw) {
 
   const inventory = (raw.inventory ?? []).filter(inv => {
     const { valid, errors } = validateInventoryItem(inv);
-    if (!valid) { console.warn('[BinderVault] Dropping corrupt inventory item:', errors, inv); return false; }
-    if (!cardDefIds.has(inv.cardDefId)) { console.warn('[BinderVault] Dropping orphan inventory item:', inv.id); return false; }
+    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt inventory item:', errors, inv); return false; }
+    if (!cardDefIds.has(inv.cardDefId)) { DEBUG && console.warn('[BinderVault] Dropping orphan inventory item:', inv.id); return false; }
     return true;
   });
 
   const binderSlots = (raw.binderSlots ?? []).filter(s => {
     const { valid, errors } = validateBinderSlot(s);
-    if (!valid) { console.warn('[BinderVault] Dropping corrupt binder slot:', errors, s); return false; }
-    if (!binderIds.has(s.binderId)) { console.warn('[BinderVault] Dropping orphan binder slot (no binder):', s.id); return false; }
-    if (!cardDefIds.has(s.cardDefId)) { console.warn('[BinderVault] Dropping orphan binder slot (no card def):', s.id); return false; }
+    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt binder slot:', errors, s); return false; }
+    if (!binderIds.has(s.binderId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder slot (no binder):', s.id); return false; }
+    if (!cardDefIds.has(s.cardDefId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder slot (no card def):', s.id); return false; }
     return true;
   });
 
