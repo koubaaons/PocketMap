@@ -1,17 +1,15 @@
 /**
- * @fileoverview useSupabaseSync — loads user data from Supabase on mount.
+ * @fileoverview useSupabaseSync — loads user data from Supabase on mount
+ * and keeps it in sync across devices via Supabase Realtime.
  *
- * Called once in App.jsx after the user is authenticated. Fetches all
- * seven tables in parallel (loadStateFromSupabase), then dispatches a
- * single HYDRATE action to replace the store's current state with the
- * server data.
+ * Two effects:
+ *   1. Initial load — fetches all tables, hydrates store
+ *   2. Realtime subscription — re-fetches on any change from another device
  *
- * Falls back to localStorage silently if Supabase returns an error —
- * the user sees their local data and can keep working offline. The
- * next successful Supabase load will overwrite the local data.
+ * Last-write-wins conflict resolution — always takes server data.
+ * Debounced re-fetch (300ms) so rapid changes don't hammer Supabase.
  *
- * Returns { syncing } so App.jsx can show a loading screen while the
- * initial fetch is in flight, preventing a flash of empty state.
+ * Returns { syncing, lastSynced } for App.jsx and AccountView.
  */
 
 import { useEffect, useState } from 'react';
@@ -19,15 +17,16 @@ import { useDispatch } from './useStore.js';
 import { ACTIONS } from '../store/index.js';
 import { loadStateFromSupabase } from '../store/storage.js';
 import { useAuth } from './useAuth.js';
+import { supabase } from '../services/supabase.js';
 
 export function useSupabaseSync() {
-  const dispatch  = useDispatch();
-  const { user }  = useAuth();
-  const [syncing, setSyncing] = useState(true);
+  const dispatch = useDispatch();
+  const { user } = useAuth();
+  const [syncing, setSyncing]       = useState(true);
+  const [lastSynced, setLastSynced] = useState(null);
 
+  // ── Effect 1: Initial load ───────────────────────────────────────────────────
   useEffect(() => {
-    // Only run when we have an authenticated user.
-    // If there's no user, the AuthGate will handle showing the login screen.
     if (!user) {
       setSyncing(false);
       return;
@@ -37,31 +36,64 @@ export function useSupabaseSync() {
 
     async function sync() {
       setSyncing(true);
-
       const serverState = await loadStateFromSupabase();
-
       if (cancelled) return;
 
       if (serverState) {
-        // Server data loaded successfully — hydrate the store.
-        // HYDRATE replaces all data slices at once without touching nav.
-        dispatch({
-          type:    ACTIONS.HYDRATE,
-          payload: serverState,
-        });
+        dispatch({ type: ACTIONS.HYDRATE, payload: serverState });
+        setLastSynced(new Date());
       } else {
-        // Supabase failed — keep the localStorage data already in the
-        // store from the initial buildInitialState() call.
         console.warn('[useSupabaseSync] Supabase unavailable, using localStorage fallback');
       }
-
       setSyncing(false);
     }
 
     sync();
-
     return () => { cancelled = true; };
-  }, [user?.id]); // re-sync when the logged-in user changes
+  }, [user?.id]);
 
-  return { syncing };
+  // ── Effect 2: Realtime subscription ─────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+
+    let debounceTimer = null;
+
+    async function handleChange() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async () => {
+        const serverState = await loadStateFromSupabase();
+        if (serverState) {
+          dispatch({ type: ACTIONS.HYDRATE, payload: serverState });
+          setLastSynced(new Date());
+        }
+      }, 300);
+    }
+
+    const channel = supabase
+      .channel(`user-data-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  '*',
+          schema: 'public',
+          filter: `user_id=eq.${user.id}`,
+        },
+        handleChange
+      )
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') {
+          console.info('[useSupabaseSync] Realtime connected');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.warn('[useSupabaseSync] Realtime connection error');
+        }
+      });
+
+    return () => {
+      clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
+  return { syncing, lastSynced };
 }

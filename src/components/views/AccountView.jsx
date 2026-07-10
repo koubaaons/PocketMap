@@ -18,6 +18,7 @@ import { Button, ConfirmModal } from '../ui/index.jsx';
 import { clearState } from '../../store/storage.js';
 import { supabase } from '../../services/supabase.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { useSupabaseSync } from '../../hooks/useSupabaseSync.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -227,6 +228,7 @@ function ChangePasswordSection({ toast }) {
 
 export function AccountView({ toast }) {
   const { user } = useAuth();
+  const { lastSynced } = useSupabaseSync();
 
   const [confirmReset, setConfirmReset]   = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -271,6 +273,11 @@ export function AccountView({ toast }) {
         <h4 className="account-section-title">Session</h4>
         <p className="account-section-subtitle">
           Logged in as <strong>{user?.email}</strong>.
+          {lastSynced && (
+            <span className="account-section-subtitle" style={{ display: 'block', marginTop: 4 }}>
+              Last synced: {lastSynced.toLocaleTimeString()}
+            </span>
+          )}
         </p>
         <Button
           variant="ghost"
