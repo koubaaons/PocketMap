@@ -220,6 +220,7 @@ export function CreateBinderModal({ onSubmit, onClose }) {
   // Step 1 — Configure
   return (
     <Modal title="Create New Binder" onClose={onClose}>
+      <form onSubmit={(e) => { e.preventDefault(); handleNext(); }}>
 
       <Input
         id="binder-name"
@@ -303,6 +304,7 @@ export function CreateBinderModal({ onSubmit, onClose }) {
         <strong>{Number.isFinite(capacity) ? capacity.toLocaleString() : '—'} cards</strong>
       </p>
 
+      </form>
       <ModalActions>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button

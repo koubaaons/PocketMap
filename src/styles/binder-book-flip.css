@@ -25,6 +25,7 @@
   perspective: 2400px;
   display: flex;
   overflow: hidden;
+  transform: translateZ(0);
 }
 
 /* === Fixed left panel — NOT part of the 3D flipping stack at all.
@@ -59,6 +60,11 @@
   transform-style: preserve-3d;
   transform-origin: left center;
   transition: transform 0.7s ease-in-out;
+  /* Pre-promote to GPU compositor layer so the first flip animates
+     immediately without waiting for layer promotion on first interaction.
+     Without this, first flip is slow and subsequent ones stutter
+     until the browser has composited all pairs. */
+  will-change: transform;
 }
 
 .book-page-pair.is-flipped {

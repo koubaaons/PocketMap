@@ -25,8 +25,20 @@ function getInitialTheme() {
   return 'light';
 }
 
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
+function applyTheme(theme, animate = false) {
+  const root = document.documentElement;
+  if (animate) {
+    // Add transitioning attribute so CSS transitions fire simultaneously
+    root.setAttribute('data-theme-transitioning', '');
+    // Switch theme on next frame so the attribute is applied first
+    requestAnimationFrame(() => {
+      root.setAttribute('data-theme', theme);
+      // Remove after transition completes (--transition-slow = 0.3s)
+      setTimeout(() => root.removeAttribute('data-theme-transitioning'), 350);
+    });
+  } else {
+    root.setAttribute('data-theme', theme);
+  }
 }
 
 export function useTheme() {
@@ -38,7 +50,8 @@ export function useTheme() {
 
   // Apply whenever theme changes
   useEffect(() => {
-    applyTheme(theme);
+    // Don't animate on mount or localStorage restore — only on user toggle
+    document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
@@ -53,7 +66,11 @@ export function useTheme() {
     return () => media.removeEventListener('change', handler);
   }, []);
 
-  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    applyTheme(next, true); // animate the switch
+    setTheme(next);
+  };
   const setDark  = () => setTheme('dark');
   const setLight = () => setTheme('light');
 

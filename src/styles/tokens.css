@@ -154,3 +154,22 @@
 }
 
 /* === ISSUE #68 END: Design Token System === */
+
+/* ── Smooth theme transitions ───────────────────────────────────────────────
+   Applied only during the theme switch itself via a JS-toggled attribute,
+   so the transition fires once cleanly without interfering with component
+   animations (page flip, cover open, sticker drag etc).
+   useTheme.js adds [data-theme-transitioning] before switching, removes it
+   after --transition-slow completes. */
+
+[data-theme-transitioning],
+[data-theme-transitioning] *,
+[data-theme-transitioning] *::before,
+[data-theme-transitioning] *::after {
+  transition:
+    background-color var(--transition-slow),
+    border-color     var(--transition-slow),
+    color            var(--transition-slow),
+    fill             var(--transition-slow),
+    stroke           var(--transition-slow);
+}

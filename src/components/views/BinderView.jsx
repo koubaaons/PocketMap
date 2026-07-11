@@ -77,7 +77,7 @@
  *   not an estimate. See bookAspectRatio below.
  */
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
@@ -249,9 +249,41 @@ export function BinderView({ toast, onNavigate }) {
     view.closeCardDetail();
     if (onNavigate && cardDef?.collectionId) {
       onNavigate('collection', cardDef.collectionId);
-      toast(`Navigated to ${cardDef.name}'s collection to edit`);
+      toast(`Opening ${cardDef.name}`);
     }
   };
+
+  // ── Keyboard navigation ──────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't capture keys when user is typing in an input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      // Don't capture if a modal is open
+      if (document.querySelector('.modal-overlay')) return;
+
+      if (e.key === 'Enter' && isClosed) {
+        e.preventDefault();
+        handleOpenBinder();
+        return;
+      }
+      if (e.key === 'ArrowRight' && !isClosed) {
+        e.preventDefault();
+        view.goToPage(spread + 1);
+        return;
+      }
+      if (e.key === 'ArrowLeft' && !isClosed) {
+        e.preventDefault();
+        view.goToPage(spread - 1);
+        return;
+      }
+      if (e.key === 'Escape' && !isClosed) {
+        e.preventDefault();
+        handleCloseBinder();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isClosed, spread, view, handleOpenBinder, handleCloseBinder]);
 
   // ── Preview mode handlers ───────────────────────────────────────────────
 
@@ -368,9 +400,9 @@ export function BinderView({ toast, onNavigate }) {
   return (
     <div ref={rootRef} className={`binder-view-root ${isFullscreen ? 'binder-view-root-fullscreen' : ''}`}>
 
-      {/* Topbar — hidden while closed, stays visible in fullscreen otherwise */}
-      {!isClosed && (
-      <div className="binder-topbar">
+      {/* Topbar — always rendered so it occupies space and prevents layout shift
+          when the binder opens. Invisible and non-interactive while closed. */}
+      <div className="binder-topbar" style={isClosed ? { visibility: 'hidden', pointerEvents: 'none' } : {}}>
         <div className="binder-topbar-left">
           <span className="binder-title" style={{ color }}>{binder.name}</span>
           <span className="binder-fill-count">{filled}/{capacity} cards</span>
@@ -415,14 +447,12 @@ export function BinderView({ toast, onNavigate }) {
           <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>Delete</Button>
         </div>
       </div>
-      )}
 
       {/* Page navigation — hidden while closed, same as topbar. Editable
           page number, replaces the old thumbnails bar entirely. Click
           the number, clear it, type a new page (1-binder.pages), press
           Enter or click away to jump. */}
-      {!isClosed && (
-      <div className="binder-page-nav">
+      <div className="binder-page-nav" style={isClosed ? { visibility: 'hidden', pointerEvents: 'none' } : {}}>
         <input
           type="number"
           className="binder-page-input"
@@ -444,7 +474,6 @@ export function BinderView({ toast, onNavigate }) {
         />
         <span className="binder-page-indicator-suffix">/ {binder.pages} pages</span>
       </div>
-      )}
 
       {/* Book — BinderBookFlip is now the only book. The wrapper div is
           what fullscreen's width-cap measurement targets (see
