@@ -225,6 +225,18 @@ function ChangePasswordSection({ toast }) {
 
 // ── main component ─────────────────────────────────────────────────────────
 
+function formatLastSynced(date) {
+  if (!date) return null;
+  const seconds = Math.floor((new Date() - date) / 1000);
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds} seconds ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export function AccountView({ toast, lastSynced }) {
   const { user } = useAuth();
 
@@ -273,7 +285,7 @@ export function AccountView({ toast, lastSynced }) {
           Logged in as <strong>{user?.email}</strong>.
           {lastSynced && (
             <span className="account-section-subtitle" style={{ display: 'block', marginTop: 4 }}>
-              Last synced: {lastSynced.toLocaleTimeString()}
+              Last synced {formatLastSynced(lastSynced)}
             </span>
           )}
         </p>

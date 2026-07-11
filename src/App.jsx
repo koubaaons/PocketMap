@@ -124,6 +124,7 @@ export default function App() {
             templateFields={templateFields}
             inventory={inventory}
             toast={toast}
+            onNavigate={navigate}
           />
         );
 

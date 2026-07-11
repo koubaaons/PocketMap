@@ -47,6 +47,9 @@ export function useSupabaseSync() {
       } else {
         DEBUG && console.warn('[useSupabaseSync] Supabase unavailable, using localStorage fallback');
       }
+      // Always reset nav to home on login — the store is a singleton
+      // and persists in memory across logout/login in the same browser session.
+      dispatch({ type: ACTIONS.NAV_SET, payload: { currentView: 'home', currentBinderId: null, currentCollectionId: null, currentPage: 1 } });
       setSyncing(false);
     }
 

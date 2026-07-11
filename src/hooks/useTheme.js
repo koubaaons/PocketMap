@@ -6,6 +6,13 @@
  * - Persists user choice to localStorage
  * - Applies data-theme attribute to document root
  * - Exposes toggle function and current theme
+ *
+ * Theme switching approach:
+ * All CSS transitions reference --transition-fast or --transition-slow.
+ * On toggle, we temporarily override both to the same value (0.3s) at
+ * the :root level so every element changes colour simultaneously.
+ * GPU-composited elements (.book-flip-container etc) are demoted by
+ * adding a no-compositing class before the switch and removed after.
  */
 
 // === ISSUE #69 START: Theme Toggle ===
@@ -13,32 +20,44 @@
 import { useState, useEffect } from 'react';
 
 const STORAGE_KEY = 'bindervault-theme';
+const TRANSITION_DURATION = '0.3s';
 
 function getInitialTheme() {
-  // Check localStorage first — user preference wins
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === 'dark' || stored === 'light') return stored;
-
-  // Fall back to system preference
   if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
-
   return 'light';
 }
 
 function applyTheme(theme, animate = false) {
   const root = document.documentElement;
-  if (animate) {
-    // Add transitioning attribute so CSS transitions fire simultaneously
-    root.setAttribute('data-theme-transitioning', '');
-    // Switch theme on next frame so the attribute is applied first
-    requestAnimationFrame(() => {
-      root.setAttribute('data-theme', theme);
-      // Remove after transition completes (--transition-slow = 0.3s)
-      setTimeout(() => root.removeAttribute('data-theme-transitioning'), 350);
-    });
-  } else {
+
+  if (!animate) {
     root.setAttribute('data-theme', theme);
+    return;
   }
+
+  // Step 1: override both transition duration variables to the same value
+  // so every element — fast or slow — transitions simultaneously
+  root.style.setProperty('--transition-fast', TRANSITION_DURATION);
+  root.style.setProperty('--transition-slow', TRANSITION_DURATION);
+
+  // Step 2: add a class that forces GPU-composited binder elements off
+  // their compositor layer so they paint in sync with the rest of the page
+  root.classList.add('theme-switching');
+
+  // Step 3: switch the theme on the next frame so steps 1 and 2 have
+  // already been applied by the browser before the colour values change
+  requestAnimationFrame(() => {
+    root.setAttribute('data-theme', theme);
+
+    // Step 4: restore everything after the transition completes
+    setTimeout(() => {
+      root.style.removeProperty('--transition-fast');
+      root.style.removeProperty('--transition-slow');
+      root.classList.remove('theme-switching');
+    }, 400);
+  });
 }
 
 export function useTheme() {
@@ -48,18 +67,15 @@ export function useTheme() {
     return initial;
   });
 
-  // Apply whenever theme changes
+  // Persist to localStorage whenever theme changes
   useEffect(() => {
-    // Don't animate on mount or localStorage restore — only on user toggle
-    document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
-  // Listen for system preference changes
+  // Follow system preference if user hasn't set an explicit preference
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return; // user has explicit preference, don't override
-
+    if (stored) return;
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = (e) => setTheme(e.matches ? 'dark' : 'light');
     media.addEventListener('change', handler);
@@ -68,11 +84,12 @@ export function useTheme() {
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    applyTheme(next, true); // animate the switch
+    applyTheme(next, true);
     setTheme(next);
   };
-  const setDark  = () => setTheme('dark');
-  const setLight = () => setTheme('light');
+
+  const setDark  = () => { applyTheme('dark',  true); setTheme('dark');  };
+  const setLight = () => { applyTheme('light', true); setTheme('light'); };
 
   return { theme, toggleTheme, setDark, setLight, isDark: theme === 'dark' };
 }

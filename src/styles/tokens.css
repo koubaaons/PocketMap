@@ -155,21 +155,21 @@
 
 /* === ISSUE #68 END: Design Token System === */
 
-/* ── Smooth theme transitions ───────────────────────────────────────────────
-   Applied only during the theme switch itself via a JS-toggled attribute,
-   so the transition fires once cleanly without interfering with component
-   animations (page flip, cover open, sticker drag etc).
-   useTheme.js adds [data-theme-transitioning] before switching, removes it
-   after --transition-slow completes. */
+/* Theme transitions are handled in useTheme.js by temporarily
+   overriding --transition-fast and --transition-slow to the same
+   duration so all elements change colour simultaneously. */
 
-[data-theme-transitioning],
-[data-theme-transitioning] *,
-[data-theme-transitioning] *::before,
-[data-theme-transitioning] *::after {
-  transition:
-    background-color var(--transition-slow),
-    border-color     var(--transition-slow),
-    color            var(--transition-slow),
-    fill             var(--transition-slow),
-    stroke           var(--transition-slow);
+/* ── Theme switching ────────────────────────────────────────────────────────
+   Applied by useTheme.js during the ~400ms theme switch window.
+   Forces GPU-composited binder elements back onto the normal paint layer
+   so they repaint in sync with the rest of the page.
+   Without this, .book-flip-container (which has translateZ(0)) sits on its
+   own compositor layer and visually updates at a different time. */
+
+.theme-switching .book-flip-container,
+.theme-switching .book-page-pair,
+.theme-switching .book-page-front,
+.theme-switching .book-page-back {
+  will-change: auto !important;
+  transform: none !important;
 }

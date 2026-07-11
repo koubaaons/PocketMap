@@ -28,7 +28,7 @@ export function useBinderSlotActions(toast, callbacks = {}) {
       return;
     }
     dispatch({ type: ACTIONS.BINDER_SLOT_ADD, payload: { slot } });
-    toast('Card added to binder');
+    toast(`Added to page ${pageNumber}, slot ${slotIndex + 1}`);
     callbacks.onAddSuccess?.();
   }, [dispatch, toast, callbacks.onAddSuccess]);
 

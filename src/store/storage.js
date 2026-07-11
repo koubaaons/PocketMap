@@ -130,6 +130,8 @@ function sanitizeState(raw) {
     cardDefinitions,
     inventory,
     binderSlots,
+    // nav is never restored from localStorage — always reset to home on load
+    nav: undefined,
   };
 }
 

@@ -243,6 +243,7 @@ export function BinderView({ toast, onNavigate }) {
     dispatch({ type: ACTIONS.BINDER_DELETE, payload: { binderId: binder.id } });
     toast(`"${binder.name}" moved to trash`);
     setConfirmDelete(false);
+    onNavigate('home'); // navigate away immediately, don't wait for App.jsx guard
   };
 
   const handleEditCardFromBinder = (cardDef) => {

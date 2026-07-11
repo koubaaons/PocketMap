@@ -196,7 +196,15 @@ export function SearchView({
         </div>
       )}
 
-      {!query && (
+      {!query && cardDefinitions.length === 0 && (
+        <EmptyState
+          icon="◎"
+          title="Nothing to search yet"
+          subtitle="Add cards to your collections first, then search for them here"
+        />
+      )}
+
+      {!query && cardDefinitions.length > 0 && (
         <p className="search-count" style={{ textAlign: 'center', marginTop: 'var(--space-8)' }}>
           Start typing to search across all {cardDefinitions.length} cards, {collections.length} collections, and {binders.length} binders…
         </p>
