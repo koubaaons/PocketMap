@@ -1,14 +1,6 @@
 // === ISSUE #1 START: Split Views — SearchView ===
 // === ISSUE #80 START: Card Images ===
 // === ISSUE #86 START: Search View Polish ===
-//   - Table layout: Card / Collection / Location / Owned columns
-//   - Tabs: All, Cards, Collections, Binders
-//   - Collections/Binders match by name OR by containing a matching card
-//   - Empty state includes an Add New Card shortcut
-//
-//   Table stays at 4 fixed columns even for Collection/Binder rows —
-//   those just leave Location/Owned blank (—) rather than using a
-//   different layout per result type.
 
 import { useStore } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
@@ -33,7 +25,7 @@ export function SearchView({
   const inventory       = useStore(s => s.inventory);
   const binders         = useStore(s => s.binders);
   const binderSlots     = useStore(s => s.binderSlots ?? []);
-  const [query, setQuery] = useState('');
+  const [query, setQuery]       = useState('');
   const [activeTab, setActiveTab] = useState('All');
 
   const collectionMap = useMemo(() => {
@@ -50,20 +42,30 @@ export function SearchView({
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
-  const cardResults       = useMemo(() => searchCardResults(cardDefinitions, query), [cardDefinitions, query]);
-  const collectionResults = useMemo(() => searchCollectionResults(collections, cardDefinitions, query), [collections, cardDefinitions, query]);
+  // Each result type is computed separately so tabs filter correctly
+  const cardResults       = useMemo(() => searchCardResults(cardDefinitions, query),                         [cardDefinitions, query]);
+  const collectionResults = useMemo(() => searchCollectionResults(collections, cardDefinitions, query),       [collections, cardDefinitions, query]);
   const binderResults     = useMemo(() => searchBinderResults(binders, binderSlots, cardDefinitions, query), [binders, binderSlots, cardDefinitions, query]);
 
+  // Tab filtering — each tab only shows its own type
   const results = useMemo(() => {
     switch (activeTab) {
       case 'Cards':       return cardResults;
-      case 'Collections':  return collectionResults;
-      case 'Binders':      return binderResults;
+      case 'Collections': return collectionResults;
+      case 'Binders':     return binderResults;
       case 'All':
       default:
         return [...cardResults, ...collectionResults, ...binderResults];
     }
   }, [activeTab, cardResults, collectionResults, binderResults]);
+
+  // Tab counts shown in tab labels
+  const counts = useMemo(() => ({
+    Cards:       cardResults.length,
+    Collections: collectionResults.length,
+    Binders:     binderResults.length,
+    All:         cardResults.length + collectionResults.length + binderResults.length,
+  }), [cardResults, collectionResults, binderResults]);
 
   const getCardLocation = (card) => {
     const isOwned = ownershipMap[card.id] !== undefined;
@@ -72,7 +74,7 @@ export function SearchView({
     if (slot) {
       const binder = binderMap[slot.binderId];
       return {
-        label: `${binder?.name ?? 'Binder'} · Page ${slot.pageNumber} · Slot ${slot.slotIndex + 1}`,
+        label: `${binder?.name ?? 'Binder'} · p${slot.pageNumber} · slot ${slot.slotIndex + 1}`,
         type: 'organised',
         binderId: slot.binderId,
       };
@@ -80,90 +82,172 @@ export function SearchView({
     return { label: 'Unorganised', type: 'unorganised' };
   };
 
-  const renderRow = (result) => {
-    if (result.type === 'card') {
-      const { card } = result;
-      const collection = collectionMap[card.collectionId];
-      const isOwned    = ownershipMap[card.id] !== undefined;
-      const isFav      = ownershipMap[card.id]?.is_favorite ?? false;
-      const location   = getCardLocation(card);
+  // ── Row renderers ───────────────────────────────────────────────────────────
 
-      return (
-        <tr
-          key={`card-${card.id}`}
-          className="search-table-row"
-          onClick={() => location.binderId && onNavigateToBinder?.(location.binderId)}
-        >
-          <td className="search-cell search-cell-card">
-            {card.image_url ? (
-              <img src={card.image_url} alt={card.name} className="search-thumb" />
-            ) : (
-              <div className="search-thumb-placeholder" aria-hidden="true">🃏</div>
-            )}
-            <span className="search-card-name">
-              {isFav && <span className="search-fav-dot" title="Favorite">★</span>}
-              {card.name}
-            </span>
-          </td>
-          <td className="search-cell">{collection?.name ?? '—'}</td>
-          <td className="search-cell">
-            <span className={`result-org-status result-org-${location.type}`}>
-              {location.type === 'organised'   && '📖 '}
-              {location.type === 'unorganised' && '○ '}
-              {location.type === 'not-owned'   && '✕ '}
-              {location.label}
-            </span>
-          </td>
-          <td className="search-cell search-cell-owned">
-            <span className={`badge ${isOwned ? 'badge-owned' : 'badge-missing'}`}>
-              {isOwned ? 'Owned' : 'Not owned'}
-            </span>
-          </td>
-        </tr>
-      );
-    }
+  const renderCardRow = (result) => {
+    const { card } = result;
+    const collection = collectionMap[card.collectionId];
+    const isOwned    = ownershipMap[card.id] !== undefined;
+    const isFav      = ownershipMap[card.id]?.is_favorite ?? false;
+    const location   = getCardLocation(card);
 
-    if (result.type === 'collection') {
-      const { collection, matchedCardCount } = result;
-      return (
-        <tr
-          key={`collection-${collection.id}`}
-          className="search-table-row"
-          onClick={() => onNavigateToCollection?.(collection.id)}
-        >
-          <td className="search-cell search-cell-card">
-            <div className="search-thumb-placeholder" aria-hidden="true">📚</div>
-            <span className="search-card-name">{collection.name}</span>
-          </td>
-          <td className="search-cell">—</td>
-          <td className="search-cell">
-            {matchedCardCount > 0 ? `${matchedCardCount} matching card${matchedCardCount !== 1 ? 's' : ''}` : '—'}
-          </td>
-          <td className="search-cell search-cell-owned">—</td>
-        </tr>
-      );
-    }
-
-    // binder
-    const { binder, matchedCardCount } = result;
     return (
       <tr
-        key={`binder-${binder.id}`}
-        className="search-table-row"
-        onClick={() => onNavigateToBinder?.(binder.id)}
+        key={`card-${card.id}`}
+        className={`search-table-row ${location.binderId ? 'search-table-row-clickable' : ''}`}
+        onClick={() => location.binderId && onNavigateToBinder?.(location.binderId)}
       >
         <td className="search-cell search-cell-card">
-          <div className="search-thumb-placeholder" aria-hidden="true">📒</div>
-          <span className="search-card-name">{binder.name}</span>
+          {card.image_url ? (
+            <img src={card.image_url} alt={card.name} className="search-thumb" />
+          ) : (
+            <div className="search-thumb-placeholder" aria-hidden="true">🃏</div>
+          )}
+          <span className="search-card-name">
+            {isFav && <span className="search-fav-dot" title="Favorite">★ </span>}
+            {card.name}
+          </span>
         </td>
-        <td className="search-cell">—</td>
         <td className="search-cell">
-          {matchedCardCount > 0 ? `${matchedCardCount} matching card${matchedCardCount !== 1 ? 's' : ''}` : '—'}
+          {collection
+            ? <button className="search-link" onClick={e => { e.stopPropagation(); onNavigateToCollection?.(collection.id); }}>{collection.name}</button>
+            : '—'}
         </td>
-        <td className="search-cell search-cell-owned">—</td>
+        <td className="search-cell">
+          <span className={`result-org-status result-org-${location.type}`}>
+            {location.type === 'organised'   && '📖 '}
+            {location.type === 'unorganised' && '○ '}
+            {location.type === 'not-owned'   && '✕ '}
+            {location.label}
+          </span>
+        </td>
+        <td className="search-cell search-cell-owned">
+          <span className={`badge ${isOwned ? 'badge-owned' : 'badge-missing'}`}>
+            {isOwned ? 'Owned' : 'Missing'}
+          </span>
+        </td>
       </tr>
     );
   };
+
+  const renderCollectionRow = (result) => {
+    const { collection, matchedCardCount } = result;
+    const totalCards  = cardDefinitions.filter(cd => cd.collectionId === collection.id).length;
+    const ownedCards  = inventory.filter(i => {
+      const cd = cardDefinitions.find(c => c.id === i.cardDefId);
+      return cd?.collectionId === collection.id;
+    }).length;
+
+    return (
+      <tr
+        key={`collection-${collection.id}`}
+        className="search-table-row search-table-row-clickable"
+        onClick={() => onNavigateToCollection?.(collection.id)}
+      >
+        <td className="search-cell search-cell-card">
+          <div className="search-thumb-placeholder" aria-hidden="true">📚</div>
+          <span className="search-card-name">{collection.name}</span>
+        </td>
+        <td className="search-cell search-cell-meta">
+          {totalCards} card{totalCards !== 1 ? 's' : ''}
+        </td>
+        <td className="search-cell">
+          {matchedCardCount > 0
+            ? `${matchedCardCount} matching card${matchedCardCount !== 1 ? 's' : ''}`
+            : 'Name match'}
+        </td>
+        <td className="search-cell search-cell-owned">
+          <span className="badge badge-owned">
+            {ownedCards}/{totalCards} owned
+          </span>
+        </td>
+      </tr>
+    );
+  };
+
+  const renderBinderRow = (result) => {
+    const { binder, matchedCardCount } = result;
+    const slotCount = binderSlots.filter(s => s.binderId === binder.id).length;
+    const capacity  = binder.rows * binder.cols * binder.pages;
+
+    return (
+      <tr
+        key={`binder-${binder.id}`}
+        className="search-table-row search-table-row-clickable"
+        onClick={() => onNavigateToBinder?.(binder.id)}
+      >
+        <td className="search-cell search-cell-card">
+          <div
+            className="search-binder-swatch"
+            style={{ background: binder.cover_color }}
+            aria-hidden="true"
+          />
+          <span className="search-card-name">{binder.name}</span>
+        </td>
+        <td className="search-cell search-cell-meta">
+          {binder.rows}×{binder.cols} · {binder.pages}p
+        </td>
+        <td className="search-cell">
+          {matchedCardCount > 0
+            ? `${matchedCardCount} matching card${matchedCardCount !== 1 ? 's' : ''} inside`
+            : 'Name match'}
+        </td>
+        <td className="search-cell search-cell-owned">
+          <span className="badge badge-owned">
+            {slotCount}/{capacity} filled
+          </span>
+        </td>
+      </tr>
+    );
+  };
+
+  const renderRow = (result) => {
+    if (result.type === 'card')       return renderCardRow(result);
+    if (result.type === 'collection') return renderCollectionRow(result);
+    if (result.type === 'binder')     return renderBinderRow(result);
+    return null;
+  };
+
+  // ── Section headings when in All tab ───────────────────────────────────────
+  const renderAllResults = () => {
+    const rows = [];
+
+    if (cardResults.length > 0) {
+      rows.push(
+        <tr key="heading-cards" className="search-section-heading">
+          <td colSpan={4}>Cards ({cardResults.length})</td>
+        </tr>
+      );
+      cardResults.forEach(r => rows.push(renderCardRow(r)));
+    }
+
+    if (collectionResults.length > 0) {
+      rows.push(
+        <tr key="heading-collections" className="search-section-heading">
+          <td colSpan={4}>Collections ({collectionResults.length})</td>
+        </tr>
+      );
+      collectionResults.forEach(r => rows.push(renderCollectionRow(r)));
+    }
+
+    if (binderResults.length > 0) {
+      rows.push(
+        <tr key="heading-binders" className="search-section-heading">
+          <td colSpan={4}>Binders ({binderResults.length})</td>
+        </tr>
+      );
+      binderResults.forEach(r => rows.push(renderBinderRow(r)));
+    }
+
+    return rows;
+  };
+
+  // ── Column headers per tab ──────────────────────────────────────────────────
+  const columnHeaders = activeTab === 'Binders'
+    ? ['Binder', 'Grid', 'Match', 'Capacity']
+    : activeTab === 'Collections'
+    ? ['Collection', 'Cards', 'Match', 'Owned']
+    : ['Card', 'Collection', 'Location', 'Owned'];
 
   return (
     <div className="view">
@@ -173,7 +257,7 @@ export function SearchView({
           className="search-input"
           placeholder="Search cards, collections, and binders…"
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => { setQuery(e.target.value); setActiveTab('All'); }}
           autoFocus
           aria-label="Search"
         />
@@ -191,6 +275,9 @@ export function SearchView({
               onClick={() => setActiveTab(tab)}
             >
               {tab}
+              {counts[tab] > 0 && (
+                <span className="tab-count">{counts[tab]}</span>
+              )}
             </button>
           ))}
         </div>
@@ -210,7 +297,7 @@ export function SearchView({
         </p>
       )}
 
-      {query && results.length === 0 && (
+      {query && counts.All === 0 && (
         <EmptyState
           icon="◎"
           title={`No results for "${query}"`}
@@ -218,25 +305,27 @@ export function SearchView({
         />
       )}
 
+      {query && counts.All > 0 && results.length === 0 && (
+        <EmptyState
+          icon="◎"
+          title={`No ${activeTab.toLowerCase()} match "${query}"`}
+          subtitle="Try a different tab or search term"
+        />
+      )}
+
       {query && results.length > 0 && (
-        <>
-          <p className="search-count">{results.length} result{results.length !== 1 ? 's' : ''}</p>
-          <div className="search-table-wrapper">
-            <table className="search-table">
-              <thead>
-                <tr>
-                  <th>Card</th>
-                  <th>Collection</th>
-                  <th>Location</th>
-                  <th>Owned</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map(renderRow)}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <div className="search-table-wrapper">
+          <table className="search-table">
+            <thead>
+              <tr>
+                {columnHeaders.map(h => <th key={h}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {activeTab === 'All' ? renderAllResults() : results.map(renderRow)}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

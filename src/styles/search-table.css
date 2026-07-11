@@ -90,3 +90,66 @@
 .search-cell-owned {
   white-space: nowrap;
 }
+/* ── Search section headings (All tab) ───────────────────────────────────── */
+.search-section-heading td {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+/* ── Clickable rows ──────────────────────────────────────────────────────── */
+.search-table-row-clickable {
+  cursor: pointer;
+}
+.search-table-row-clickable:hover td {
+  background: var(--bg-hover);
+}
+
+/* ── Collection link inside cell ─────────────────────────────────────────── */
+.search-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.search-link:hover { opacity: 0.8; }
+
+/* ── Binder colour swatch ────────────────────────────────────────────────── */
+.search-binder-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+/* ── Tab count badge ─────────────────────────────────────────────────────── */
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  background: var(--accent);
+  color: white;
+  border-radius: 9px;
+}
+
+/* ── Meta cell (secondary info) ──────────────────────────────────────────── */
+.search-cell-meta {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
