@@ -15,9 +15,11 @@
 import { useEffect, useState } from 'react';
 import { useDispatch } from './useStore.js';
 import { ACTIONS } from '../store/index.js';
-import { loadStateFromSupabase } from '../store/storage.js';
+import { loadStateFromSupabase } from '../store/supabaseStorage.js';
 import { useAuth } from './useAuth.js';
 import { supabase } from '../services/supabase.js';
+
+const DEBUG = import.meta.env.DEV;
 
 export function useSupabaseSync() {
   const dispatch = useDispatch();
@@ -43,7 +45,7 @@ export function useSupabaseSync() {
         dispatch({ type: ACTIONS.HYDRATE, payload: serverState });
         setLastSynced(new Date());
       } else {
-        console.warn('[useSupabaseSync] Supabase unavailable, using localStorage fallback');
+        DEBUG && console.warn('[useSupabaseSync] Supabase unavailable, using localStorage fallback');
       }
       setSyncing(false);
     }
@@ -82,10 +84,10 @@ export function useSupabaseSync() {
       )
       .subscribe(status => {
         if (status === 'SUBSCRIBED') {
-          console.info('[useSupabaseSync] Realtime connected');
+          DEBUG && console.info('[useSupabaseSync] Realtime connected');
         }
         if (status === 'CHANNEL_ERROR') {
-          console.warn('[useSupabaseSync] Realtime connection error');
+          DEBUG && console.warn('[useSupabaseSync] Realtime connection error');
         }
       });
 

@@ -1,12 +1,11 @@
 /**
- * @fileoverview Storage Repository — abstracts all persistence concerns.
- * Swap localStorage for AsyncStorage (React Native) by changing only this file.
+ * @fileoverview localStorage storage layer — local cache and state persistence.
  *
- * === Issue #115: Supabase API Layer ===
- * Added loadStateFromSupabase() and saveStateToSupabase() alongside the
- * existing localStorage functions. The app now loads from Supabase on
- * startup (via useSupabaseSync.js) and falls back to localStorage if
- * Supabase is unavailable. Issue #116 wires per-entity writes.
+ * This file owns only localStorage concerns. Supabase read/write lives in
+ * supabaseStorage.js. Keeping them separate means adding new entity types
+ * in Milestone 12 only touches supabaseStorage.js — this file stays stable.
+ *
+ * Swap localStorage for AsyncStorage (React Native) by changing only this file.
  */
 
 import {
@@ -14,7 +13,6 @@ import {
   validateCollection, validateTemplateField, validateCardDefinition,
   validateInventoryItem, validateBinderSlot,
 } from '../types/index.js';
-import { supabase } from '../services/supabase.js';
 
 const DEBUG = import.meta.env.DEV;
 
@@ -67,7 +65,7 @@ function sanitizeState(raw) {
     if (!b.cover_color) b.cover_color = '#e8627a';
     if (!Array.isArray(b.stickers)) b.stickers = [];
     b.stickers = b.stickers.map(s => (typeof s.scale === 'number' ? s : { ...s, scale: 1 }));
-    b.stickers = b.stickers.map(s => (typeof s.size === 'number' ? s : { ...s, size: 17.5 }));
+    b.stickers = b.stickers.map(s => (typeof s.size  === 'number' ? s : { ...s, size: 17.5 }));
     const { valid, errors } = validateBinder(b);
     if (!valid) DEBUG && console.warn('[BinderVault] Dropping corrupt binder:', errors, b);
     return valid;
@@ -109,8 +107,8 @@ function sanitizeState(raw) {
   const binderSlots = (raw.binderSlots ?? []).filter(s => {
     const { valid, errors } = validateBinderSlot(s);
     if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt binder slot:', errors, s); return false; }
-    if (!binderIds.has(s.binderId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder slot (no binder):', s.id); return false; }
-    if (!cardDefIds.has(s.cardDefId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder slot (no card def):', s.id); return false; }
+    if (!binderIds.has(s.binderId))    { DEBUG && console.warn('[BinderVault] Dropping orphan binder slot (no binder):', s.id); return false; }
+    if (!cardDefIds.has(s.cardDefId))  { DEBUG && console.warn('[BinderVault] Dropping orphan binder slot (no card def):', s.id); return false; }
     return true;
   });
 
@@ -134,8 +132,6 @@ function sanitizeState(raw) {
     binderSlots,
   };
 }
-
-// ── localStorage (existing, unchanged) ────────────────────────────────────────
 
 export function loadState() {
   try {
@@ -170,256 +166,4 @@ export function getStorageUsage() {
     const raw = localStorage.getItem(STORAGE_KEY) ?? '';
     return Math.round((raw.length * 2) / 1024);
   } catch { return 0; }
-}
-
-// ── Supabase (Issue #115) ──────────────────────────────────────────────────────
-
-/**
- * Maps a Supabase binder row back to the JS shape the store expects.
- * Supabase uses snake_case column names and timestamptz — we need the
- * same camelCase + numeric timestamps the existing type system uses.
- */
-function rowToBinder(row) {
-  return {
-    id:          row.id,
-    userId:      row.user_id,
-    name:        row.name,
-    rows:        row.rows,
-    cols:        row.cols,
-    pages:       row.pages,
-    cover_color: row.cover_color,
-    page_color:  row.page_color,
-    stickers:    row.stickers ?? [],
-    createdAt:   new Date(row.created_at).getTime(),
-    updatedAt:   new Date(row.updated_at).getTime(),
-  };
-}
-
-function rowToBinderSlot(row) {
-  return {
-    id:           row.id,
-    userId:       row.user_id,
-    binderId:     row.binder_id,
-    cardDefId:    row.card_def_id,
-    collectionId: row.collection_id,
-    pageNumber:   row.page_number,
-    slotIndex:    row.slot_index,
-    createdAt:    new Date(row.created_at).getTime(),
-    updatedAt:    new Date(row.updated_at).getTime(),
-  };
-}
-
-function rowToCollection(row) {
-  return {
-    id:              row.id,
-    userId:          row.user_id,
-    name:            row.name,
-    is_custom:       row.is_custom,
-    import_source:   row.import_source,
-    cover_image_url: row.cover_image_url,
-    createdAt:       new Date(row.created_at).getTime(),
-    updatedAt:       new Date(row.updated_at).getTime(),
-  };
-}
-
-function rowToTemplateField(row) {
-  return {
-    id:           row.id,
-    userId:       row.user_id,
-    collectionId: row.collection_id,
-    fieldName:    row.field_name,
-    fieldType:    row.field_type,
-    isRequired:   row.is_required,
-    order:        row.field_order,
-    options:      row.options ?? [],
-    createdAt:    new Date(row.created_at).getTime(),
-    updatedAt:    new Date(row.updated_at).getTime(),
-  };
-}
-
-function rowToCardDefinition(row) {
-  return {
-    id:           row.id,
-    userId:       row.user_id,
-    collectionId: row.collection_id,
-    name:         row.name,
-    image_url:    row.image_url,
-    holoType:     row.holo_type,
-    attributes:   row.attributes ?? {},
-    createdAt:    new Date(row.created_at).getTime(),
-    updatedAt:    new Date(row.updated_at).getTime(),
-  };
-}
-
-function rowToInventoryItem(row) {
-  return {
-    id:                 row.id,
-    userId:             row.user_id,
-    cardDefId:          row.card_def_id,
-    collectionId:       row.collection_id,
-    is_favorite:        row.is_favorite,
-    condition_rating:   row.condition_rating,
-    // Map Supabase column names back to JS field names used by the app
-    acquired_at:        row.date_acquired,
-    personal_notes:     row.notes,
-    is_tradeable:       row.available_for_trade,
-    is_sellable:        row.available_for_sale,
-    // Keep both names so existing code that reads either still works
-    date_acquired:      row.date_acquired,
-    notes:              row.notes,
-    available_for_trade: row.available_for_trade,
-    available_for_sale:  row.available_for_sale,
-    createdAt:          new Date(row.created_at).getTime(),
-    updatedAt:          new Date(row.updated_at).getTime(),
-  };
-}
-
-function rowToBinItem(row) {
-  return {
-    ...row.snapshot,
-    _supabaseBinId: row.id,
-    _type:          row.entity_type,
-    deletedAt:      new Date(row.deleted_at).getTime(),
-  };
-}
-
-/**
- * Loads ALL user data from Supabase in parallel.
- * Returns the same shape as loadState() so the store can use it directly.
- * Returns null if any fetch fails, so the caller can fall back to localStorage.
- */
-export async function loadStateFromSupabase() {
-  try {
-    const [
-      bindersRes,
-      slotsRes,
-      collectionsRes,
-      fieldsRes,
-      cardsRes,
-      inventoryRes,
-      binRes,
-    ] = await Promise.all([
-      supabase.from('binders').select('*').is('deleted_at', null),
-      supabase.from('binder_slots').select('*'),
-      supabase.from('collections').select('*').is('deleted_at', null),
-      supabase.from('template_fields').select('*'),
-      supabase.from('card_definitions').select('*').is('deleted_at', null),
-      supabase.from('user_inventory').select('*').is('deleted_at', null),
-      supabase.from('bin').select('*'),
-    ]);
-
-    // If any fetch errored, bail out and let the caller fall back
-    const errors = [bindersRes, slotsRes, collectionsRes, fieldsRes, cardsRes, inventoryRes, binRes]
-      .filter(r => r.error)
-      .map(r => r.error);
-
-    if (errors.length > 0) {
-      console.error('[BinderVault] Supabase load errors:', errors);
-      return null;
-    }
-
-    return {
-      version:         SCHEMA_VERSION,
-      binders:         (bindersRes.data ?? []).map(rowToBinder),
-      binderSlots:     (slotsRes.data ?? []).map(rowToBinderSlot),
-      collections:     (collectionsRes.data ?? []).map(rowToCollection),
-      templateFields:  (fieldsRes.data ?? []).map(rowToTemplateField),
-      cardDefinitions: (cardsRes.data ?? []).map(rowToCardDefinition),
-      inventory:       (inventoryRes.data ?? []).map(rowToInventoryItem),
-      bin:             (binRes.data ?? []).map(rowToBinItem),
-    };
-  } catch (err) {
-    console.error('[BinderVault] Supabase load failed:', err);
-    return null;
-  }
-}
-
-/**
- * Converts a JS binder object to the Supabase row shape.
- * Used by the per-entity write functions in Issue #116.
- */
-export function binderToRow(binder) {
-  return {
-    id:          binder.id,
-    user_id:     binder.userId,
-    name:        binder.name,
-    rows:        binder.rows,
-    cols:        binder.cols,
-    pages:       binder.pages,
-    cover_color: binder.cover_color,
-    page_color:  binder.page_color,
-    stickers:    binder.stickers ?? [],
-    updated_at:  new Date().toISOString(),
-  };
-}
-
-export function binderSlotToRow(slot) {
-  return {
-    id:            slot.id,
-    user_id:       slot.userId,
-    binder_id:     slot.binderId,
-    card_def_id:   slot.cardDefId,
-    collection_id: slot.collectionId,
-    page_number:   slot.pageNumber,
-    slot_index:    slot.slotIndex,
-    updated_at:    new Date().toISOString(),
-  };
-}
-
-export function collectionToRow(collection) {
-  return {
-    id:              collection.id,
-    user_id:         collection.userId,
-    name:            collection.name,
-    is_custom:       collection.is_custom,
-    import_source:   collection.import_source ?? null,
-    cover_image_url: collection.cover_image_url ?? null,
-    updated_at:      new Date().toISOString(),
-  };
-}
-
-export function templateFieldToRow(field) {
-  return {
-    id:            field.id,
-    user_id:       field.userId,
-    collection_id: field.collectionId,
-    // JS uses snake_case: field_name, field_type, is_required, order
-    field_name:    field.field_name ?? field.fieldName,
-    field_type:    field.field_type ?? field.fieldType,
-    is_required:   field.is_required ?? field.isRequired ?? false,
-    field_order:   field.order ?? 0,
-    options:       field.options ?? [],
-    updated_at:    new Date().toISOString(),
-  };
-}
-
-export function cardDefinitionToRow(cd) {
-  return {
-    id:            cd.id,
-    user_id:       cd.userId,
-    collection_id: cd.collectionId,
-    name:          cd.name,
-    image_url:     cd.image_url ?? null,
-    holo_type:     cd.holoType ?? 'none',
-    attributes:    cd.attributes ?? {},
-    updated_at:    new Date().toISOString(),
-  };
-}
-
-export function inventoryItemToRow(item) {
-  return {
-    id:                  item.id,
-    user_id:             item.userId,
-    card_def_id:         item.cardDefId,
-    collection_id:       item.collectionId,
-    is_favorite:         item.is_favorite ?? false,
-    condition_rating:    item.condition_rating ?? null,
-    // JS uses acquired_at / personal_notes / is_tradeable / is_sellable
-    // Supabase columns use date_acquired / notes / available_for_trade / available_for_sale
-    date_acquired:       item.acquired_at ?? item.date_acquired ?? null,
-    notes:               item.personal_notes ?? item.notes ?? null,
-    available_for_trade: item.is_tradeable ?? item.available_for_trade ?? false,
-    available_for_sale:  item.is_sellable  ?? item.available_for_sale  ?? false,
-    updated_at:          new Date().toISOString(),
-  };
 }

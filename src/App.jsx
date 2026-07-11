@@ -4,7 +4,7 @@
 
 // === ISSUE #71 START: Layout Shell ===
 
-import { useCallback } from 'react';
+import { useCallback, lazy, Suspense } from 'react';
 import { useStore, useDispatch } from './hooks/useStore.js';
 import { useToast } from './hooks/useToast.js';
 import { useSupabaseSync } from './hooks/useSupabaseSync.js';
@@ -14,14 +14,17 @@ import { Sidebar } from './components/Sidebar.jsx';
 import { ToastContainer } from './components/ui/index.jsx';
 import { FeedbackButton } from './components/FeedbackButton.jsx';
 
-import { HomeView }             from './components/views/HomeView.jsx';
-import { BinderView }           from './components/views/BinderView.jsx';
-import { SearchView }           from './components/views/SearchView.jsx';
-import { CollectionsView }      from './components/views/CollectionsView.jsx';
-import { CollectionDetailView } from './components/views/CollectionDetailView.jsx';
-import { AccountView }          from './components/views/AccountView.jsx';
-import { FavoritesView }        from './components/views/FavoritesView.jsx';
-import { BinView }              from './components/views/BinView.jsx';
+// Eagerly loaded — used on almost every session
+import { HomeView }        from './components/views/HomeView.jsx';
+import { BinderView }      from './components/views/BinderView.jsx';
+import { SearchView }      from './components/views/SearchView.jsx';
+import { CollectionsView } from './components/views/CollectionsView.jsx';
+
+// Lazily loaded — only fetched when the user navigates there
+const CollectionDetailView = lazy(() => import('./components/views/CollectionDetailView.jsx').then(m => ({ default: m.CollectionDetailView })));
+const AccountView          = lazy(() => import('./components/views/AccountView.jsx').then(m => ({ default: m.AccountView })));
+const FavoritesView        = lazy(() => import('./components/views/FavoritesView.jsx').then(m => ({ default: m.FavoritesView })));
+const BinView              = lazy(() => import('./components/views/BinView.jsx').then(m => ({ default: m.BinView })));
 
 const VIEW_TITLES = {
   home:        'Home',
@@ -210,6 +213,7 @@ export default function App() {
   }
 
   return (
+    <Suspense fallback={<div className="sync-loading"><div className="sync-loading-inner"><div className="sync-spinner" /></div></div>}>
     <div className="app-shell">
       <Sidebar nav={nav} binders={binders} bin={bin} onNavigate={navigate} />
       <div className="main-area">
@@ -236,6 +240,7 @@ export default function App() {
       <ToastContainer toasts={toasts} dismiss={dismiss} />
       <FeedbackButton toast={toast} />
     </div>
+    </Suspense>
   );
 }
 // === ISSUE #71 END: Layout Shell ===
