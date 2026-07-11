@@ -15,9 +15,15 @@
 
 import { generateId } from './utils.js';
 
+// === FIX (binder covers looking too saturated/basic — user reference:
+// soft pastel covers with a subtle spine + light decorative accent):
+// same 8-hue wheel as before, just lightened/desaturated so covers
+// read as soft pastel card stock instead of vivid flat color blocks.
+// DEFAULT_BINDER_COLOR stays BINDER_COLORS[0] automatically — no
+// separate update needed there.
 export const BINDER_COLORS = Object.freeze([
-  '#e8627a', '#a855f7', '#6366f1', '#3b82f6',
-  '#06b6d4', '#22c55e', '#f59e0b', '#ef4444',
+  '#f6c9d6', '#d3c6ef', '#c7c9f0', '#bfe0ea',
+  '#bfeaea', '#c9e4c5', '#f6dfb8', '#f2c6c6',
 ]);
 
 export const DEFAULT_BINDER_COLOR = BINDER_COLORS[0];

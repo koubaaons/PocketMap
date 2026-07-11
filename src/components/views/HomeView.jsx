@@ -8,8 +8,8 @@
 //   - "View All" link for binders
 // === ISSUE #92 START: Customize Cover — hover-revealed button on BinderCard ===
 
-import { useState, useCallback, useMemo } from 'react';
-import { Button, EmptyState, StatCard } from '../ui/index.jsx';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Button, EmptyState, StatCard, useCountUp } from '../ui/index.jsx';
 import { CreateBinderModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useStore, useDispatch } from '../../hooks/useStore.js';
@@ -69,11 +69,11 @@ export function HomeView({ toast, onNavigate, mode = 'dashboard' }) {
       {isDashboard && (
         <div className="view-header">
           <div className="stat-row">
-            <StatCard value={stats.totalCards}     label="total cards"   />
-            <StatCard value={stats.totalBinders}    label="binders"       />
-            <StatCard value={stats.favorites}       label="favorites"     />
-            <StatCard value={stats.unorganised}     label="unorganised"   />
-            <StatCard value={stats.recentlyAdded}   label="recently added" />
+            <StatCard value={stats.totalCards}     label="total cards"    icon="ti-cards"      tone="accent"  />
+            <StatCard value={stats.totalBinders}    label="binders"       icon="ti-books"      tone="info"    />
+            <StatCard value={stats.favorites}       label="favorites"     icon="ti-heart"      tone="danger"  />
+            <StatCard value={stats.unorganised}     label="unorganised"   icon="ti-box"        tone="warning" />
+            <StatCard value={stats.recentlyAdded}   label="recently added" icon="ti-sparkles"  tone="success" />
           </div>
         </div>
       )}
@@ -168,12 +168,32 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
   // === ISSUE #81: use cover_color, fall back to default for old binders ===
   const color = binder.cover_color ?? DEFAULT_BINDER_COLOR;
 
+  // === FIX (progress animation wasn't actually visible): the badge
+  // number was static ({pct}% never changed), and the only thing that
+  // ever animated was the 3px bar's width via a CSS transition — with
+  // typical low percentages that's a 1-2px change, imperceptible in
+  // practice. Reusing the same useCountUp hook the stat cards already
+  // use makes BOTH the number and the bar animate together, driven by
+  // the same live-counting value, over the same ~900ms window.
+  const animatedPct = useCountUp(pct);
+
   // === ISSUE #94: mini-cover replaces the old flat rectangle entirely —
   // reuses the same visual recipe as the real cover (binder-cover-frame:
   // gradient sheen, inset shadows, rounded corners) at a smaller scale,
   // with stickers rendered in their actual saved positions/rotations/
   // scale so the home grid genuinely previews what the real cover looks
   // like, not a simplified stand-in. ===
+  //
+  // === FIX (reference-image redesign): percent badge + progress bar
+  // moved OFF the cover entirely and into the label area below,
+  // alongside a real "X / Y cards" fraction — matching the reference's
+  // layout, and simply more informative than a bare percentage. The
+  // cover itself now carries two thin spine-ridge lines (suggesting
+  // binder rings) and a few sparkle accents — a light decorative touch
+  // in place of the reference's floral/vine illustration, per request
+  // to skip the flowers specifically. Both are pure decoration
+  // (aria-hidden), so a customized cover's own stickers still read as
+  // the primary content — these sit behind/around them, not over. ===
   return (
     <div className="binder-card-wrapper">
       {/* === FIX: style={{ color }} added here — this was missing
@@ -193,6 +213,13 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
             backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
           }}
         >
+          <span className="binder-mini-cover-spine-line binder-mini-cover-spine-line-1" aria-hidden="true" />
+          <span className="binder-mini-cover-spine-line binder-mini-cover-spine-line-2" aria-hidden="true" />
+
+          <i className="ti ti-sparkles binder-mini-cover-sparkle binder-mini-cover-sparkle-1" aria-hidden="true" />
+          <i className="ti ti-sparkles binder-mini-cover-sparkle binder-mini-cover-sparkle-2" aria-hidden="true" />
+          <i className="ti ti-sparkles binder-mini-cover-sparkle binder-mini-cover-sparkle-3" aria-hidden="true" />
+
           {/* === ISSUE #94 FIX: width now a percentage of the mini
               cover's own width (same sticker.size field used
               everywhere else), with aspect-ratio:1 to stay square
@@ -204,30 +231,30 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
             <MiniCoverSticker key={sticker.id} sticker={sticker} />
           ))}
 
-          <div className="binder-mini-cover-progress">
-            <div className="binder-mini-cover-progress-fill" style={{ width: `${pct}%` }} />
-          </div>
+          <button
+            className="binder-mini-cover-menu-btn"
+            onClick={(e) => { e.stopPropagation(); onCustomizeCover(); }}
+            title="Customize cover"
+            aria-label="Customize cover"
+          >
+            <i className="ti ti-dots" aria-hidden="true"></i>
+          </button>
         </div>
       </button>
 
-      {/* Binder name and meta always shown below the cover */}
+      {/* Binder name, card count, and progress always shown below the
+          cover — matching the reference layout instead of overlaying
+          this information on the cover itself. */}
       <div className="binder-cover-label">
         <div className="binder-cover-label-name">{binder.name}</div>
-        <div className="binder-cover-label-meta">{binder.pages}p · {pct}%</div>
+        <div className="binder-cover-label-meta">{cardCount} / {capacity} cards</div>
+        <div className="binder-cover-label-progress">
+          <div className="binder-cover-label-progress-track">
+            <div className="binder-cover-label-progress-fill" style={{ width: `${animatedPct}%`, background: color }} />
+          </div>
+          <span className="binder-cover-label-progress-pct">{animatedPct}%</span>
+        </div>
       </div>
-
-      {/* === ISSUE #92: hover-revealed customize button — only visible
-          on hover via CSS (.binder-card-customize-btn), stopPropagation
-          so it doesn't also trigger onClick (navigating into the
-          binder) when clicked. === */}
-      <button
-        className="binder-card-customize-btn"
-        onClick={(e) => { e.stopPropagation(); onCustomizeCover(); }}
-        title="Customize cover"
-        aria-label="Customize cover"
-      >
-        🎨
-      </button>
     </div>
   );
 }
