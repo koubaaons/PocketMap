@@ -20,7 +20,7 @@
 import { useState, useEffect } from 'react';
 
 const STORAGE_KEY = 'bindervault-theme';
-const TRANSITION_DURATION = '0.3s';
+const TRANSITION_DURATION = '0.05s';
 
 function getInitialTheme() {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -50,7 +50,7 @@ function applyTheme(theme, animate = false) {
     setTimeout(() => {
       root.style.removeProperty('--transition-fast');
       root.style.removeProperty('--transition-slow');
-    }, 400);
+    }, 250);
   });
 }
 

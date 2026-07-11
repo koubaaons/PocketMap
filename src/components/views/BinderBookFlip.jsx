@@ -100,6 +100,22 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FLIP_TRANSITION_MS, useTransitioningPairs, getEffectiveZIndex } from './useTransitioningPairs.js';
 import { BinderPage } from '../collections/BinderPage.jsx';
 
+// === PERF (opening a binder feels heavy, scales with binder.pages):
+// every page-pair is permanently mounted so the flip has real content
+// to rotate — but that means React creates the DOM for EVERY page's
+// slot grid, holo overlays, etc. up front on mount, even the ones
+// buried under the pile that are never visible (only ~2 pairs are ever
+// actually visible at rest: the topmost unflipped one and the topmost
+// flipped one). RENDER_RADIUS pairs, this many steps in either
+// direction from the current spread, are the only ones actually
+// mounted; everything further isn't created at all until navigation
+// brings it within range. A pair mounts fresh the moment it re-enters
+// range — well before the user could ever navigate to it — so there's
+// no pop or flash, and since it has no prior rendered state, it simply
+// appears at rest with no animation (nothing was visible to animate
+// away from anyway).
+const RENDER_RADIUS = 3;
+
 /**
  * @param {object} binder - the binder being viewed
  * @param {object[]} binderSlots - all slots for this binder (or preview slots)
@@ -329,6 +345,15 @@ export function BinderBookFlip({
           exactly tracks when each side's frame half is shown). === */}
       {pagePairs.map(({ spreadIndex, frontPageNum, backPageNum }) => {
         const flipped = isFlipped(spreadIndex);
+
+        // === PERF: see RENDER_RADIUS comment above. A transitioning
+        // pair is always within 1 of spread anyway (see
+        // useTransitioningPairs), but transitioning.has() is checked
+        // too as a hard safety net so an actively-animating pair can
+        // never be skipped mid-flip regardless of distance math.
+        const isFarFromSpread = !transitioning.has(spreadIndex)
+          && Math.abs(spreadIndex - spread) > RENDER_RADIUS;
+        if (isFarFromSpread) return null;
 
         // === THE FIX (other AI's diagnosis): page faces ALWAYS carry
         // their inset properties by default, never waiting for spread
