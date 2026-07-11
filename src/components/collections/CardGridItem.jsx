@@ -19,20 +19,62 @@
  * Takes the actual inventoryItem (not separate isOwned/isFavorite
  * booleans) because handleToggleFavorite (useInventoryActions.js) needs
  * the full item object, not just an id or a boolean.
- */
+ *
+ * === FIX (new card reveal animation): plays once when a card
+ * transitions from not-owned to owned — the "you now have this card"
+ * moment, which is what a flip-in + light sweep is meant to celebrate.
+ * This is deliberately SEPARATE from the binder-slot animation (a
+ * slide-in, see BinderSlot.jsx) — getting a card into your collection
+ * and physically placing it into a binder page are different actions
+ * that call for different motion. hadOwnedRef tracks whether THIS
+ * card was owned on the previous render; justRevealed flips on for one
+ * animation cycle when it wasn't and now is, then back off
+ * automatically.
+ *
+ * === FIX (own/unown flow): the ✓/○ circle is now a real button,
+ * mirroring the favorite star exactly — click to toggle ownership on
+ * the spot, no modal needed for the common case (handleOwn/handleUnown
+ * are already simple, instant actions — see useInventoryActions.js).
+ * The reveal animation above needs no changes for this: it already
+ * triggers off isOwned transitioning from false to true regardless of
+ * WHAT caused that change, so clicking the circle gets the same
+ * flip+shine the card detail modal's own "mark as owned" already gets.
+ * onToggleOwned is optional — FavoritesView only ever shows already-
+ * owned cards (see the isOwned-gated star above), so the circle simply
+ * stays non-interactive there, exactly like before. ===*/
 
-export function CardGridItem({ card, inventoryItem, collectionName, onView, onToggleFavorite }) {
+import { useEffect, useRef, useState } from 'react';
+
+export function CardGridItem({ card, inventoryItem, collectionName, onView, onToggleFavorite, onToggleOwned }) {
   const isOwned    = inventoryItem !== null && inventoryItem !== undefined;
   const isFavorite = inventoryItem?.is_favorite ?? false;
+
+  const hadOwnedRef = useRef(isOwned);
+  const [justRevealed, setJustRevealed] = useState(false);
+
+  useEffect(() => {
+    if (isOwned && !hadOwnedRef.current) {
+      setJustRevealed(true);
+      const t = setTimeout(() => setJustRevealed(false), 500);
+      hadOwnedRef.current = true;
+      return () => clearTimeout(t);
+    }
+    hadOwnedRef.current = isOwned;
+  }, [isOwned]);
 
   const handleStarClick = (e) => {
     e.stopPropagation(); // don't also trigger onView
     if (isOwned && onToggleFavorite) onToggleFavorite(inventoryItem);
   };
 
+  const handleStatusClick = (e) => {
+    e.stopPropagation(); // don't also trigger onView
+    if (onToggleOwned) onToggleOwned(card, inventoryItem);
+  };
+
   return (
     <button
-      className={`card-grid-item ${isOwned ? 'card-grid-item-owned' : 'card-grid-item-not-owned'}`}
+      className={`card-grid-item ${isOwned ? 'card-grid-item-owned' : 'card-grid-item-not-owned'} ${justRevealed ? 'card-grid-item-reveal' : ''}`}
       onClick={onView}
       aria-label={card.name}
     >
@@ -61,12 +103,30 @@ export function CardGridItem({ card, inventoryItem, collectionName, onView, onTo
           </button>
         )}
 
-        <span
-          className={`card-grid-item-status ${isOwned ? 'card-grid-item-status-owned' : 'card-grid-item-status-missing'}`}
-          title={isOwned ? 'Owned' : 'Not owned'}
-        >
-          {isOwned ? '✓' : '○'}
-        </span>
+        {onToggleOwned ? (
+          <button
+            className={`card-grid-item-status card-grid-item-status-clickable ${isOwned ? 'card-grid-item-status-owned' : 'card-grid-item-status-missing'}`}
+            onClick={handleStatusClick}
+            aria-label={isOwned ? `Remove ${card.name} from your collection` : `Mark ${card.name} as owned`}
+            aria-pressed={isOwned}
+          >
+            {isOwned ? '✓' : '○'}
+          </button>
+        ) : (
+          <span
+            className={`card-grid-item-status ${isOwned ? 'card-grid-item-status-owned' : 'card-grid-item-status-missing'}`}
+            title={isOwned ? 'Owned' : 'Not owned'}
+          >
+            {isOwned ? '✓' : '○'}
+          </span>
+        )}
+
+        {/* === FIX: light-sweep overlay, only rendered for the ~0.5s the
+            reveal is playing. Lives inside .card-grid-item-image-wrapper
+            (which already has position:relative + overflow:hidden — see
+            card-grid.css) so it clips to the image area, not the tile's
+            text label below. ===*/}
+        {justRevealed && <span className="card-grid-item-reveal-shine" aria-hidden="true" />}
       </div>
 
       <div className="card-grid-item-info">

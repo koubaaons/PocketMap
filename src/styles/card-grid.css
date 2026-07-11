@@ -146,6 +146,23 @@
 .card-grid-item-status-owned   { color: var(--success); }
 .card-grid-item-status-missing { color: rgba(255,255,255,0.6); }
 
+/* === FIX (own/unown flow): only applied when the circle is an actual
+   <button> (onToggleOwned provided — see CardGridItem.jsx), matching
+   the favorite star's hover treatment so it reads as clickable. The
+   plain <span> version (no handler available, e.g. FavoritesView)
+   keeps its original border:none/background/cursor:default look
+   untouched — this rule only fires alongside the extra class. ===*/
+.card-grid-item-status-clickable {
+  border: none;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.card-grid-item-status-clickable:hover {
+  background: rgba(0,0,0,0.7);
+  transform: scale(1.15);
+}
+
 .card-grid-item-info {
   display: flex;
   flex-direction: column;
@@ -168,4 +185,40 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* === FIX (new card reveal animation — collection view): plays once
+   when a card transitions from not-owned to owned (see justRevealed in
+   CardGridItem.jsx). The flip applies to the whole tile; the light
+   sweep lives inside .card-grid-item-image-wrapper specifically (see
+   that rule above for its position:relative + overflow:hidden) so it
+   clips to the image, not the text label below. Deliberately a
+   DIFFERENT animation from the binder-slot slide-in (see
+   binder-view-feature.css) — this is a "you now have this card"
+   celebration moment, not a physical-placement one. ===*/
+@keyframes card-grid-item-reveal-flip {
+  0%   { transform: rotateY(90deg) scale(0.85); opacity: 0; }
+  60%  { transform: rotateY(0deg) scale(1.04); opacity: 1; }
+  100% { transform: rotateY(0deg) scale(1); }
+}
+
+.card-grid-item-reveal {
+  animation: card-grid-item-reveal-flip 0.5s ease;
+}
+
+@keyframes card-grid-item-reveal-sweep {
+  0%   { transform: translateX(-120%) rotate(20deg); }
+  100% { transform: translateX(220%) rotate(20deg); }
+}
+
+.card-grid-item-reveal-shine {
+  position: absolute;
+  top: -50%;
+  left: 0;
+  width: 30%;
+  height: 200%;
+  background: rgba(255,255,255,0.35);
+  animation: card-grid-item-reveal-sweep 0.5s ease;
+  pointer-events: none;
+  z-index: 3;
 }

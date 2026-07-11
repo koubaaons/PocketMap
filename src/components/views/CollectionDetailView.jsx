@@ -80,6 +80,19 @@ export function CollectionDetailView({ toast, onBack }) {
 
   const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection.id);
 
+  // === FIX (own/unown flow — quick-toggle from the grid): reused by
+  // the Cards tab below AND by sharedTabProps, so Missing/Owned get
+  // the same click-to-toggle circle without duplicating this logic —
+  // Missing in particular is arguably the most useful place for it,
+  // since it's specifically the list of cards you don't have yet.
+  const handleToggleOwned = (card, inventoryItem) => {
+    if (inventoryItem) {
+      handleUnown(inventoryItem.id);
+    } else {
+      handleOwn({ cardDefId: card.id, collectionId: collection.id });
+    }
+  };
+
   const sharedTabProps = {
     collectionCards,
     collectionTemplateFields,
@@ -89,6 +102,7 @@ export function CollectionDetailView({ toast, onBack }) {
     onEdit:   editor.openEdit,
     onDelete: editor.openDelete,
     onToggleFavorite: handleToggleFavorite,
+    onToggleOwned: handleToggleOwned,
   };
 
   return (
@@ -141,6 +155,7 @@ export function CollectionDetailView({ toast, onBack }) {
             onEdit={editor.openEdit}
             onDelete={editor.openDelete}
             onToggleFavorite={handleToggleFavorite}
+            onToggleOwned={handleToggleOwned}
             emptyTitle={editor.query ? `No results for "${editor.query}"` : 'No cards yet'}
             emptySubtitle={editor.query ? 'Try a different search' : 'Add your first card to start building this collection'}
           />

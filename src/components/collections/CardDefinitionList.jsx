@@ -20,6 +20,7 @@ export function CardDefinitionList({
   onEdit,
   onDelete,
   onToggleFavorite,
+  onToggleOwned,
   emptyTitle = 'No cards yet',
   emptySubtitle = 'Add your first card to this collection',
 }) {
@@ -37,6 +38,7 @@ export function CardDefinitionList({
             inventoryItem={ownershipMap[card.id] ?? null}
             onView={() => onView(card)}
             onToggleFavorite={onToggleFavorite}
+            onToggleOwned={onToggleOwned}
           />
         ))}
       </div>

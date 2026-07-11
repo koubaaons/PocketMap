@@ -11,7 +11,7 @@ import { CARD_SORT_OPTIONS, applyCardDefinitionFilters } from '../../selectors/c
 import { getOwnedCards } from '../../selectors/inventorySelectors.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
-export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipMap, summary, onView, onEdit, onDelete }) {
+export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipMap, summary, onView, onEdit, onDelete, onToggleOwned }) {
   const [query, setQuery] = useState('');
   const [sort,  setSort]  = useState('newest');
 
@@ -31,6 +31,7 @@ export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipM
         onView={onView}
         onEdit={onEdit}
         onDelete={onDelete}
+        onToggleOwned={onToggleOwned}
         emptyTitle={query ? `No results for "${query}"` : 'No owned cards yet'}
         emptySubtitle={query ? 'Try a different search' : 'Mark cards as owned to see them here'}
       />

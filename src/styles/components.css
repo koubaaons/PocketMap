@@ -329,6 +329,31 @@ textarea.form-input {
   transition: background var(--transition-slow);
 }
 
+/* === FIX (five identical gray boxes read as flat/beginner-looking):
+   tone variants reuse the app's EXISTING semantic tokens (--accent,
+   --info, --danger, --warning, --success + their -light tints, all
+   already defined in tokens.css) rather than introducing new colors.
+   Only background + icon/value color change; layout, spacing, and
+   dark-mode behavior are all inherited from the base .stat-card rule
+   above. ===*/
+.stat-card-accent  { background: var(--accent-light); }
+.stat-card-info    { background: var(--info-light); }
+.stat-card-danger  { background: var(--danger-light); }
+.stat-card-warning { background: var(--warning-light); }
+.stat-card-success { background: var(--success-light); }
+
+.stat-card-accent  .stat-card-value, .stat-card-accent  .stat-card-icon { color: var(--accent); }
+.stat-card-info    .stat-card-value, .stat-card-info    .stat-card-icon { color: var(--info); }
+.stat-card-danger  .stat-card-value, .stat-card-danger  .stat-card-icon { color: var(--danger); }
+.stat-card-warning .stat-card-value, .stat-card-warning .stat-card-icon { color: var(--warning); }
+.stat-card-success .stat-card-value, .stat-card-success .stat-card-icon { color: var(--success); }
+
+.stat-card-icon {
+  display: block;
+  font-size: 18px;
+  margin-bottom: var(--space-2);
+}
+
 .stat-card-label {
   font-size: var(--text-xs);
   color: var(--text-muted);

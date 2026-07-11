@@ -102,6 +102,26 @@
 
 .binder-slot-filled:hover { border-color: var(--accent); }
 
+/* === FIX (slide-in didn't read as a real physical insertion): the
+   original 16px nudge was too subtle to register as "sliding in" at
+   all. Now starts well above the slot's own resting position (60% of
+   its own height, so it's genuinely off-slot at the start of the
+   animation) and slightly overshoots past rest before settling back —
+   the momentary dip below 0 and bounce back up is what sells "sliding
+   down and coming to rest in the pocket" rather than just fading in
+   place. cubic-bezier gives the overshoot its ease; a linear/ease
+   timing function can't produce it since the transform never goes
+   PAST its final value with those. ===*/
+@keyframes binder-slot-reveal-slide {
+  0%   { transform: translateY(-60%); opacity: 0; }
+  70%  { transform: translateY(6%); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.binder-slot-reveal {
+  animation: binder-slot-reveal-slide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 .slot-index {
   position: absolute;
   top: 4px;

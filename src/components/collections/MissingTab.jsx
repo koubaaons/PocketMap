@@ -11,7 +11,7 @@ import { applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelect
 import { getMissingCards } from '../../selectors/inventorySelectors.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
-export function MissingTab({ collectionCards, collectionTemplateFields, ownershipMap, summary, onView, onEdit, onDelete }) {
+export function MissingTab({ collectionCards, collectionTemplateFields, ownershipMap, summary, onView, onEdit, onDelete, onToggleOwned }) {
   const [query, setQuery] = useState('');
   const [sort,  setSort]  = useState('newest');
 
@@ -31,6 +31,7 @@ export function MissingTab({ collectionCards, collectionTemplateFields, ownershi
         onView={onView}
         onEdit={onEdit}
         onDelete={onDelete}
+        onToggleOwned={onToggleOwned}
         emptyTitle={query ? `No results for "${query}"` : 'No missing cards'}
         emptySubtitle={query ? 'Try a different search' : 'You own every card in this collection!'}
       />
