@@ -193,11 +193,6 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
             backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%)`,
           }}
         >
-          <div className="binder-mini-cover-content">
-            <div className="binder-mini-cover-name">{binder.name}</div>
-            <div className="binder-mini-cover-meta">{binder.pages}p · {pct}%</div>
-          </div>
-
           {/* === ISSUE #94 FIX: width now a percentage of the mini
               cover's own width (same sticker.size field used
               everywhere else), with aspect-ratio:1 to stay square
@@ -214,6 +209,12 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
           </div>
         </div>
       </button>
+
+      {/* Binder name and meta always shown below the cover */}
+      <div className="binder-cover-label">
+        <div className="binder-cover-label-name">{binder.name}</div>
+        <div className="binder-cover-label-meta">{binder.pages}p · {pct}%</div>
+      </div>
 
       {/* === ISSUE #92: hover-revealed customize button — only visible
           on hover via CSS (.binder-card-customize-btn), stopPropagation

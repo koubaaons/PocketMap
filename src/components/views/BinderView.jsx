@@ -504,6 +504,14 @@ export function BinderView({ toast, onNavigate }) {
           />
         </div>
 
+        {/* Binder name and meta always shown below the binder */}
+        {isCover && (
+          <div className="binder-cover-label">
+            <div className="binder-cover-label-name">{binder.name}</div>
+            <div className="binder-cover-label-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
+          </div>
+        )}
+
         <button
           className="binder-nav-arrow binder-nav-arrow-side binder-nav-arrow-right"
           onClick={() => view.goToPage(spread + 1)}

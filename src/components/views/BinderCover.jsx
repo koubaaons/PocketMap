@@ -59,11 +59,6 @@ export function BinderCoverFront({
       onClick={isEditingCover ? (e) => e.stopPropagation() : undefined}
       onMouseDown={isEditingCover ? () => setSelectedStickerId(null) : undefined}
     >
-      <div className="binder-cover-content">
-        <div className="binder-cover-name">{binder.name}</div>
-        <div className="binder-cover-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
-      </div>
-
       {(isEditingCover ? draftStickers : (binder.stickers ?? [])).map(sticker => (
         <CustomizerSticker
           key={sticker.id}
