@@ -351,12 +351,37 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     : [];
 
   // === ISSUE: editable page-number jump, replaces the thumbnails bar ===
-  // Displayed page number is the lower page currently shown (1 on cover
-  // spread, otherwise leftPageNum). Typing a number and committing jumps
-  // to whichever spread contains that page.
+  // === FIX (typing "1" landed on the cover, and the displayed page
+  // number didn't match what was actually on screen): per
+  // BinderBookFlip's own numbering (spread N: left=page(2N-2),
+  // right=page(2N-1) for N>=1), page 1 belongs to spread 1 — it's a
+  // normal right-hand page, not the cover. This used to special-case
+  // pageNum<=1 to spread 0, which is the CLOSED cover, a different
+  // thing entirely (reaching the cover is already handleCloseBinder's
+  // job, not the page-number input's). Separately, the displayed page
+  // number used `spread * 2`, which is 2 pages ahead of the real right-
+  // hand page at that spread (2*spread - 1) — e.g. spread 1 (page 1
+  // showing) displayed "2".
+  //
+  // ONE MORE EDGE CASE: when binder.pages is even, BinderBookFlip's own
+  // last-pair special case (see its big header comment) flips the
+  // final pair as soon as ITS OWN spread is reached rather than
+  // strictly past it — so the final page (an even, back-face page)
+  // actually appears one spread EARLIER than `spread * 2 - 1` would
+  // predict, and that final spread's right side is empty (there's no
+  // next pair to hand off to). lastPairSpreadIndex below mirrors
+  // BinderBookFlip's own pagePairs.length exactly (same generating
+  // condition), so both the displayed number and its inverse agree
+  // with what's actually rendered at that spread instead of pointing
+  // at a right-hand page that no longer exists there. ===
   const isCover = spread === 0;
-  const leftPageNum = isCover ? null : spread * 2;
-  const currentDisplayPage = isCover ? 1 : leftPageNum;
+  const lastPairSpreadIndex = Math.ceil(binder.pages / 2);
+  const isFinalEvenSpread = binder.pages % 2 === 0 && spread === lastPairSpreadIndex;
+  const currentDisplayPage = isCover
+    ? 1
+    : isFinalEvenSpread
+      ? binder.pages
+      : spread * 2 - 1;
   const [pageInputValue, setPageInputValue] = useState(String(currentDisplayPage));
 
   // Keep the input in sync when navigating via other means (arrows, etc.)
@@ -366,9 +391,14 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     setPageInputValue(String(currentDisplayPage));
   }
 
+  // Exact inverse of currentDisplayPage's mapping. Works for every page
+  // number with a single special case: binder.pages itself, when even,
+  // maps to lastPairSpreadIndex (see comment above) rather than one
+  // spread further, matching BinderBookFlip's own early-flip rule for
+  // the final pair.
   const pageNumberToSpread = (pageNum) => {
-    if (pageNum <= 1) return 0;
-    return Math.ceil(pageNum / 2);
+    if (binder.pages % 2 === 0 && pageNum === binder.pages) return lastPairSpreadIndex;
+    return Math.ceil((pageNum + 1) / 2);
   };
 
   const commitPageInput = () => {

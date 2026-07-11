@@ -208,9 +208,16 @@ export function BinderBookFlip({
     () => [0, ...pagePairs.map(p => p.spreadIndex)],
     [pagePairs.map(p => p.spreadIndex).join(',')]
   );
-  const transitioningPairs = useTransitioningPairs(allPairSpreadIndices, isFlipped, spread);
+  const { transitioning, snapInstantly } = useTransitioningPairs(allPairSpreadIndices, isFlipped, spread);
   const getZIndexFor = (pairSpreadIndex) =>
-    getEffectiveZIndex(pairSpreadIndex, totalSpreads, isFlipped(pairSpreadIndex), transitioningPairs.has(pairSpreadIndex));
+    getEffectiveZIndex(pairSpreadIndex, totalSpreads, isFlipped(pairSpreadIndex), transitioning.has(pairSpreadIndex));
+  // === PERF: pairs buried deep in a multi-spread jump (see
+  // useTransitioningPairs) skip their animated turn entirely — this
+  // disables the CSS transition on just those pairs for the one frame
+  // they snap in, so they land at rest instantly instead of playing a
+  // 700ms rotation nobody would see anyway. ===
+  const getTransitionStyleFor = (pairSpreadIndex) =>
+    snapInstantly.has(pairSpreadIndex) ? { transition: 'none' } : undefined;
 
   return (
     <div
@@ -274,7 +281,7 @@ export function BinderBookFlip({
           inside-of-cover (visible on the left once flipped open). === */}
       <div
         className={`book-page-pair book-page-pair-cover ${isFlipped(0) ? 'is-flipped' : ''}`}
-        style={{ zIndex: getZIndexFor(0) }}
+        style={{ zIndex: getZIndexFor(0), ...getTransitionStyleFor(0) }}
       >
         <div
           className="book-page-pair-face book-page-pair-front"
@@ -334,7 +341,7 @@ export function BinderBookFlip({
           <div
             key={spreadIndex}
             className={`book-page-pair ${flipped ? 'is-flipped' : ''}`}
-            style={{ zIndex: getZIndexFor(spreadIndex) }}
+            style={{ zIndex: getZIndexFor(spreadIndex), ...getTransitionStyleFor(spreadIndex) }}
           >
             <div
               className="book-page-pair-face book-page-pair-front binder-book-page"
