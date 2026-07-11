@@ -96,7 +96,7 @@ import { ACTIONS } from '../../store/index.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 import { createBinderSlot } from '../../types/index.js';
 
-export function BinderView({ toast, onNavigate }) {
+export function BinderView({ toast, onNavigate, initialPage = null }) {
   const nav             = useStore(s => s.nav);
   const binders         = useStore(s => s.binders);
   const allBinderSlots  = useStore(s => s.binderSlots ?? []);
@@ -108,6 +108,16 @@ export function BinderView({ toast, onNavigate }) {
   const binderSlots     = allBinderSlots.filter(s => s.binderId === binder?.id);
   const dispatch   = useDispatch();
   const view       = useBinderView(binder, binderSlots);
+
+  // If navigated here from search with a specific page, open to that page.
+  // pageNumber from slot is 1-based; spread = Math.ceil(pageNumber / 2).
+  // Run only once on mount (empty deps) — user controls page after that.
+  useEffect(() => {
+    if (initialPage && initialPage > 0) {
+      const spread = Math.ceil(initialPage / 2);
+      view.goToPage(spread);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // === MIGRATION: "closed" is now purely spread === 0. BinderBookFlip's

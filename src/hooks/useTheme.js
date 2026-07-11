@@ -42,20 +42,14 @@ function applyTheme(theme, animate = false) {
   root.style.setProperty('--transition-fast', TRANSITION_DURATION);
   root.style.setProperty('--transition-slow', TRANSITION_DURATION);
 
-  // Step 2: add a class that forces GPU-composited binder elements off
-  // their compositor layer so they paint in sync with the rest of the page
-  root.classList.add('theme-switching');
-
-  // Step 3: switch the theme on the next frame so steps 1 and 2 have
-  // already been applied by the browser before the colour values change
+  // Switch on next frame so the variable overrides are applied first
   requestAnimationFrame(() => {
     root.setAttribute('data-theme', theme);
 
-    // Step 4: restore everything after the transition completes
+    // Restore original variable values after transition completes
     setTimeout(() => {
       root.style.removeProperty('--transition-fast');
       root.style.removeProperty('--transition-slow');
-      root.classList.remove('theme-switching');
     }, 400);
   });
 }

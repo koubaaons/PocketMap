@@ -3,10 +3,14 @@
 // === ISSUE #86 START: Search View Polish ===
 
 import { useStore } from '../../hooks/useStore.js';
+import { useDispatch } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
+import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { getSlotForCard } from '../../selectors/binderSelectors.js';
+import { useInventoryActions } from '../../hooks/useInventoryActions.js';
+import { ACTIONS } from '../../store/index.js';
 import {
   searchCardResults,
   searchCollectionResults,
@@ -17,13 +21,13 @@ const TABS = ['All', 'Cards', 'Collections', 'Binders'];
 
 export function SearchView({
   toast,
+  binders = [],
   onNavigateToBinder,
   onNavigateToCollection,
 }) {
   const cardDefinitions = useStore(s => s.cardDefinitions);
   const collections     = useStore(s => s.collections);
   const inventory       = useStore(s => s.inventory);
-  const binders         = useStore(s => s.binders);
   const binderSlots     = useStore(s => s.binderSlots ?? []);
   const [query, setQuery]       = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -42,10 +46,21 @@ export function SearchView({
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
 
+  // Only consider slots whose binder is still active (not soft-deleted).
+  // Soft-deleted binders are filtered out of the store, so any slot
+  // referencing a missing binder is an orphan and should be ignored.
+  const activeBinderSlots = useMemo(
+    () => binderSlots.filter(s => binderMap[s.binderId] !== undefined),
+    [binderSlots, binderMap]
+  );
+  const templateFields = useStore(s => s.templateFields);
+  const [viewingCard, setViewingCard] = useState(null);
+  const { handleOwn, handleUnown } = useInventoryActions(toast);
+
   // Each result type is computed separately so tabs filter correctly
   const cardResults       = useMemo(() => searchCardResults(cardDefinitions, query),                         [cardDefinitions, query]);
   const collectionResults = useMemo(() => searchCollectionResults(collections, cardDefinitions, query),       [collections, cardDefinitions, query]);
-  const binderResults     = useMemo(() => searchBinderResults(binders, binderSlots, cardDefinitions, query), [binders, binderSlots, cardDefinitions, query]);
+  const binderResults     = useMemo(() => searchBinderResults(binders, activeBinderSlots, cardDefinitions, query), [binders, activeBinderSlots, cardDefinitions, query]);
 
   // Tab filtering — each tab only shows its own type
   const results = useMemo(() => {
@@ -70,13 +85,16 @@ export function SearchView({
   const getCardLocation = (card) => {
     const isOwned = ownershipMap[card.id] !== undefined;
     if (!isOwned) return { label: 'Not owned', type: 'not-owned' };
-    const slot = getSlotForCard(binderSlots, null, card.id);
+    const slot = getSlotForCard(activeBinderSlots, null, card.id);
     if (slot) {
       const binder = binderMap[slot.binderId];
+      // If binder no longer exists (orphan slot), treat as unorganised
+      if (!binder) return { label: 'Unorganised', type: 'unorganised' };
       return {
-        label: `${binder?.name ?? 'Binder'} · p${slot.pageNumber} · slot ${slot.slotIndex + 1}`,
+        label: `${binder.name} · p${slot.pageNumber} · slot ${slot.slotIndex + 1}`,
         type: 'organised',
         binderId: slot.binderId,
+        pageNumber: slot.pageNumber,
       };
     }
     return { label: 'Unorganised', type: 'unorganised' };
@@ -94,8 +112,8 @@ export function SearchView({
     return (
       <tr
         key={`card-${card.id}`}
-        className={`search-table-row ${location.binderId ? 'search-table-row-clickable' : ''}`}
-        onClick={() => location.binderId && onNavigateToBinder?.(location.binderId)}
+        className="search-table-row search-table-row-clickable"
+        onClick={() => setViewingCard(card)}
       >
         <td className="search-cell search-cell-card">
           {card.image_url ? (
@@ -114,12 +132,21 @@ export function SearchView({
             : '—'}
         </td>
         <td className="search-cell">
-          <span className={`result-org-status result-org-${location.type}`}>
-            {location.type === 'organised'   && '📖 '}
-            {location.type === 'unorganised' && '○ '}
-            {location.type === 'not-owned'   && '✕ '}
-            {location.label}
-          </span>
+          {location.type === 'organised' ? (
+            <button
+              className="search-link search-location-link"
+              onClick={e => { e.stopPropagation(); onNavigateToBinder?.(location.binderId, location.pageNumber); }}
+              title={`Open ${binderMap[location.binderId]?.name ?? 'binder'}`}
+            >
+              📖 {location.label}
+            </button>
+          ) : (
+            <span className={`result-org-status result-org-${location.type}`}>
+              {location.type === 'unorganised' && '○ '}
+              {location.type === 'not-owned'   && '✕ '}
+              {location.label}
+            </span>
+          )}
         </td>
         <td className="search-cell search-cell-owned">
           <span className={`badge ${isOwned ? 'badge-owned' : 'badge-missing'}`}>
@@ -326,6 +353,19 @@ export function SearchView({
             </tbody>
           </table>
         </div>
+      )}
+
+      {viewingCard && (
+        <CardDetailModal
+          card={viewingCard}
+          inventoryItem={ownershipMap[viewingCard.id] ?? null}
+          templateFields={templateFields}
+          onOwn={() => handleOwn({ cardDefId: viewingCard.id, collectionId: viewingCard.collectionId })}
+          onUnown={(itemId) => handleUnown(itemId)}
+          onEdit={() => { onNavigateToCollection?.(viewingCard.collectionId); setViewingCard(null); }}
+          onDelete={() => setViewingCard(null)}
+          onClose={() => setViewingCard(null)}
+        />
       )}
     </div>
   );

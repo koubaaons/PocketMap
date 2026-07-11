@@ -4,7 +4,7 @@
 
 // === ISSUE #71 START: Layout Shell ===
 
-import { useCallback, lazy, Suspense } from 'react';
+import { useCallback, lazy, Suspense, useEffect } from 'react';
 import { useStore, useDispatch } from './hooks/useStore.js';
 import { useToast } from './hooks/useToast.js';
 import { useSupabaseSync } from './hooks/useSupabaseSync.js';
@@ -54,20 +54,30 @@ export default function App() {
   const inventory       = useStore(s => s.inventory);
   const binderSlots     = useStore(s => s.binderSlots ?? []);
 
-  const navigate = useCallback((view, id = null) => {
+  const navigate = useCallback((view, id = null, page = null) => {
     dispatch({
       type: ACTIONS.NAV_SET,
       payload: {
         currentView: view,
         currentBinderId:     view === 'binder'     ? id : null,
         currentCollectionId: view === 'collection' ? id : null,
-        currentPage: 1,
+        currentPage: page ?? 1,
       },
     });
   }, [dispatch]);
 
   const currentBinder     = binders.find(b => b.id === nav.currentBinderId)     ?? null;
   const currentCollection = collections.find(c => c.id === nav.currentCollectionId) ?? null;
+
+  // Navigate away if current binder/collection was deleted
+  // Done in useEffect to avoid calling dispatch during render
+  useEffect(() => {
+    if (nav.currentView === 'binder' && !currentBinder) navigate('home');
+  }, [nav.currentView, currentBinder]);
+
+  useEffect(() => {
+    if (nav.currentView === 'collection' && !currentCollection) navigate('collections');
+  }, [nav.currentView, currentCollection]);
 
   const pageTitle = nav.currentView === 'binder'
     ? (currentBinder?.name ?? 'Binder')
@@ -114,7 +124,9 @@ export default function App() {
         );
 
       case 'binder':
-        if (!currentBinder) { navigate('home'); return null; }
+        // Guard handled by useEffect below — return null here to avoid
+        // calling navigate() during render which React disallows
+        if (!currentBinder) return null;
         return (
           <BinderView
             binder={currentBinder}
@@ -125,6 +137,7 @@ export default function App() {
             inventory={inventory}
             toast={toast}
             onNavigate={navigate}
+            initialPage={nav.currentPage ?? null}
           />
         );
 
@@ -137,7 +150,7 @@ export default function App() {
             binders={binders}
             inventory={inventory}
             toast={toast}
-            onNavigateToBinder={(id) => navigate('binder', id)}
+            onNavigateToBinder={(id, page) => navigate('binder', id, page)}
             onNavigateToCollection={(id) => navigate('collection', id)}
           />
         );
@@ -168,7 +181,7 @@ export default function App() {
         );
 
       case 'collection':
-        if (!currentCollection) { navigate('collections'); return null; }
+        if (!currentCollection) return null;
         return (
           <CollectionDetailView
             collection={currentCollection}

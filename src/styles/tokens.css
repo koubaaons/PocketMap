@@ -158,18 +158,3 @@
 /* Theme transitions are handled in useTheme.js by temporarily
    overriding --transition-fast and --transition-slow to the same
    duration so all elements change colour simultaneously. */
-
-/* ── Theme switching ────────────────────────────────────────────────────────
-   Applied by useTheme.js during the ~400ms theme switch window.
-   Forces GPU-composited binder elements back onto the normal paint layer
-   so they repaint in sync with the rest of the page.
-   Without this, .book-flip-container (which has translateZ(0)) sits on its
-   own compositor layer and visually updates at a different time. */
-
-.theme-switching .book-flip-container,
-.theme-switching .book-page-pair,
-.theme-switching .book-page-front,
-.theme-switching .book-page-back {
-  will-change: auto !important;
-  transform: none !important;
-}
