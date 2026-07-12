@@ -1,22 +1,7 @@
 /**
  * @fileoverview Styles for BinderBookFlip — the stacked page-pair flip
  * mechanism, adapted from a CodePen reference (credit: Nidhanshu
- * Sharma). Cover-related pieces have been removed entirely — this is
- * currently just the card-page mechanism, a clean baseline.
- *
- * === Geometry mapping from the reference ===
- * Reference: .container is the whole book box; each .right div takes
- * the RIGHT HALF of that box, hinged at its own left edge
- * (transform-origin: left), holding one image on .front (facing the
- * viewer) and one on .back (pre-rotated 180deg, only visible once
- * flipped). Flipping rotates the whole .right div -180deg, swinging it
- * onto the left half.
- *
- * Here: .book-flip-container is the whole two-page spread's bounding
- * box. Each .book-page-pair takes the right half of that box (one
- * page's width), hinged at its own left edge — same mechanism, just
- * holding a real BinderPage (a 3x3+ slot grid) on each face instead of
- * a background-image.
+ * Sharma).
  */
 
 .book-flip-container {
@@ -66,9 +51,6 @@
   transform: rotateY(180deg);
 }
 
-/* A subtle shading overlay on the currently-turning page, echoing the
-   reference's .flip::before — gives a slight sense of depth/shadow
-   during the turn itself rather than a perfectly flat rotation. */
 .book-page-pair.is-flipped .book-page-pair-front::after {
   content: '';
   position: absolute;
@@ -77,29 +59,17 @@
   pointer-events: none;
 }
 
-/* === Cover pair — entirely dedicated classes, deliberately NOT
-   sharing .book-page-pair/.book-page-pair-face/-front/-back at all,
-   so content pages above are completely untouched. Same rotation
-   mechanism (is-flipped + rotateY around the left edge), just its own
-   bigger box (extends 24px outward on top/right/bottom vs. the
-   standard pair) and its own cover-color.
-   === FIX (cover looked bigger mid-rotation, then snapped to the
-   right size once settled): extending this box's LEFT edge too (even
-   by just 2px) made it asymmetric relative to its own rotation pivot
-   — during the actual 3D rotateY, that asymmetry causes visible size
-   distortion that only resolves once the rotation finishes. Reverted
-   the left edge to sit exactly at the spine/pivot (matching the
-   default "left" transform-origin again, no compensation needed) —
-   the small sliver this was covering is now handled by a completely
-   SEPARATE, non-rotating strip below instead of by the rotating box
-   itself, since a static element has no rotation to distort. ===*/
+/* === COVER CONTAINER — SINGLE UNIT THAT ROTATES ===
+   Both front and back faces are inside this container.
+   The container is slightly larger than pages and overlaps the spine.
+   Both faces are always perfectly aligned because they share the same container. */
 .book-page-pair-cover {
   position: absolute;
+  /* Position on the right side, slightly larger than pages */
   top: -24px;
   right: -24px;
   bottom: -24px;
-  /* === FIX: increase width slightly to hide the spine gap === */
-  width: calc(50% + 27px);
+  width: calc(50% + 25px);
   height: calc(100% + 48px);
   transform-style: preserve-3d;
   transform-origin: left center;
@@ -107,12 +77,18 @@
   will-change: transform;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  z-index: 1;
+  /* 1px overlap past the center to prevent gaps */
+  margin-left: -1px;
 }
 
 .book-page-pair-cover.is-flipped {
   transform: rotateY(-180deg);
 }
 
+/* === COVER FACES — BOTH INSIDE THE SAME CONTAINER ===
+   They share the same container, so they're always aligned.
+   No separate positioning needed — they fill the container. */
 .book-page-pair-cover-face {
   position: absolute;
   top: 0;
@@ -126,40 +102,47 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transform: translateZ(0) !important;
-  -webkit-transform: translateZ(0) !important;
-  height: 100%;
-  min-height: 100%;
-  max-height: 100%;
 }
 
 .book-page-pair-cover-front {
-  transform: rotateY(0deg) translateZ(0) !important;
+  transform: rotateY(0deg);
   border-radius: 0 20px 20px 0;
-  width: 100%;
-  margin: 0;
+  box-shadow:
+    inset 0 3px 16px rgba(255, 255, 255, 0.15),
+    inset 0 -6px 16px rgba(0, 0, 0, 0.35),
+    0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
 .book-page-pair-cover-back {
-  transform: rotateY(180deg) translateZ(0) !important;
+  transform: rotateY(180deg);
   border-radius: 20px 0 0 20px;
-  width: 100%;
-  margin: 0;
+  box-shadow:
+    inset 0 3px 16px rgba(255, 255, 255, 0.15),
+    inset 0 -6px 16px rgba(0, 0, 0, 0.35),
+    0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
-/* === Static back-cover placeholder — same box model/size as
-   .book-page-pair-cover (24px on top/right/bottom), same position.
-   No rotation, so no transform-origin concern here — just needs to
-   match the cover's size/position exactly. ===*/
+/* Content inside the cover faces fills them */
+.book-page-pair-cover-face > * {
+  width: 100%;
+  height: 100%;
+}
+
+/* === STATIC BACK COVER — SAME SIZE AS THE COVER CONTAINER ===
+   Stays behind the rotating cover. Uses pseudo-element for the overhang. */
 .book-page-pair-back-cover {
   position: absolute;
   top: -24px;
   right: -24px;
   bottom: -24px;
-  width: calc(50% + 27px);
+  width: calc(50% + 25px);
   height: calc(100% + 48px);
   box-sizing: border-box;
   background-color: var(--cover-color, #e8627a);
   border-radius: 0 20px 20px 0;
   z-index: -1;
+  margin-left: -1px;
+  box-shadow:
+    inset 0 3px 16px rgba(255, 255, 255, 0.15),
+    inset 0 -6px 16px rgba(0, 0, 0, 0.35);
 }
