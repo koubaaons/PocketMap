@@ -3,15 +3,13 @@
  * Extracted from CollectionDetailView in Refactor7e.
  */
 
-// === REFACTOR7e START: Extract OwnedTab component ===
-
 import { useState, useMemo } from 'react';
 import { CardDefinitionList } from './CardDefinitionList.jsx';
 import { CARD_SORT_OPTIONS, applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
 import { getOwnedCards } from '../../selectors/inventorySelectors.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
-export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipMap, summary, onView, onEdit, onDelete, onToggleOwned }) {
+export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipMap, summary, onView, onEdit, onDelete, onToggleOwned, onToggleFavorite }) {
   const [query, setQuery] = useState('');
   const [sort,  setSort]  = useState('newest');
 
@@ -32,11 +30,10 @@ export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipM
         onEdit={onEdit}
         onDelete={onDelete}
         onToggleOwned={onToggleOwned}
+        onToggleFavorite={onToggleFavorite}
         emptyTitle={query ? `No results for "${query}"` : 'No owned cards yet'}
         emptySubtitle={query ? 'Try a different search' : 'Mark cards as owned to see them here'}
       />
     </div>
   );
 }
-
-// === REFACTOR7e END ===

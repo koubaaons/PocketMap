@@ -45,7 +45,11 @@ export function BinderBookFlip({
     ? pagePairs[pagePairs.length - 1].spreadIndex
     : 0;
 
-  const isFlipped = (pairSpreadIndex) => pairSpreadIndex === lastPairSpreadIndex
+  // Early-flip (`<=`) only applies to even page counts, where the last
+  // pair's BACK face is the true final page. For odd counts the last
+  // pair's FRONT face is final instead — early-flipping would hide it,
+  // so odd counts use the normal strict "<" comparison.
+  const isFlipped = (pairSpreadIndex) => (pairSpreadIndex === lastPairSpreadIndex && binder.pages % 2 === 0)
     ? pairSpreadIndex <= spread
     : pairSpreadIndex < spread;
 

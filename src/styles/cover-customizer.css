@@ -33,16 +33,8 @@
      width) — not fixed here, see CustomizeCoverModal.jsx */
   cursor: grab;
   touch-action: none;
-  /* === FIX: the actual bug, found by elimination. .binder-cover-content
-     (the WINX name/meta text, rendered as a sibling before stickers in
-     this same canvas) has z-index:2 — even though stickers paint
-     visually on top (later in DOM, default z-index:auto doesn't
-     override an ancestor's explicit stacking), .binder-cover-content's
-     stacking context was intercepting clicks in the canvas's center
-     region BEFORE they reached the sticker beneath it. A fixed-position
-     debug box placed outside that region worked fine, which is what
-     isolated this. z-index:5 here ensures stickers are genuinely on
-     top for both paint AND click purposes. */
+  /* z-index:5 ensures stickers paint and receive clicks above
+     .binder-cover-content, which has its own stacking context. */
   z-index: 5;
 }
 
@@ -128,18 +120,9 @@
    :hover selector, per explicit design decision (only on the CLOSED
    cover, never once a binder is open). === */
 
-/* === FIX (resting 3D tilt not actually visible — flat rectangle
-   instead of a tilted book, no page-edge or rear-cover showing): the
-   classic CSS 3D mistake. perspective was declared on
-   .binder-mini-cover itself, the SAME element that also carries its
-   own rotateY transform (see the animation below) — but perspective
-   only establishes a 3D viewing context for an element's CHILDREN's
-   transforms, never for that element's own transform. Without
-   perspective on the PARENT, .binder-mini-cover's rotateY had no
-   camera to project through, so it rendered as an essentially flat,
-   nearly-undistorted rectangle instead of a genuinely tilted 3D book
-   — and the page-edge/rear-cover (which only read as real depth WITH
-   correct perspective) came out invisible/degenerate too. ===*/
+/* perspective must live on the PARENT, not the element that also
+   carries its own rotateY — perspective only affects children's 3D
+   transforms, never the element's own. */
 .binder-card-wrapper {
   position: relative;
   perspective: 1000px;
@@ -163,7 +146,7 @@
   white-space: nowrap;
 }
 
-.book-page-pair-cover-front:hover .binder-cover-customize-btn {
+.book-page-pair-cover-right-front:hover .binder-cover-customize-btn {
   opacity: 1;
 }
 
@@ -217,21 +200,11 @@
 }
 
 /* ── Mini binder cover — replaces the old flat BinderCard rectangle ──────── */
-/* === 3D book effect, adapted from a CodePen "flat-cover-to-3D-book"
-   technique. Mapping onto this project's real structure:
-   - their .book-3d        -> .binder-mini-cover (perspective host)
-   - their .book-3d__inner -> .binder-mini-cover itself also carries the
-     rotation + preserve-3d (collapsed into one element since there's no
-     need for a separate wrapper here)
-   - their .book-3d__cover (a flat <img>) -> .binder-mini-cover-frame
-     (real DOM content: name, meta, stickers — not a flat image)
-   - their --cover-color custom property -> currentColor, which
-     resolves to binder.cover_color via the inline style={{ color }}
-     already set on the <button class="binder-mini-cover"> in
-     HomeView.jsx — no new CSS variable needed, no JSX change required
-     beyond what's already there.
-   Purely decorative: clicking still opens the binder exactly as
-   before, nothing about that behavior changes. === */
+/* 3D book effect, adapted from a CodePen "flat-cover-to-3D-book"
+   technique. .binder-mini-cover is both the perspective host and the
+   rotating element (collapsed from their two-element structure);
+   .binder-mini-cover-frame holds the real content in place of their
+   flat <img>. Purely decorative — click behavior is unchanged. */
 
 .binder-mini-cover {
   position: relative;
@@ -251,17 +224,10 @@
   to   { transform: rotateY(-25deg); }
 }
 
-/* === FIX (hover never actually rotated it flat): a plain
-   `transform: rotateY(0deg)` here was always losing to the mount
-   animation above — CSS animations occupy a cascade priority that
-   beats normal declarations (including :hover) for the SAME property,
-   even after the animation has finished and is only "holding" its end
-   value via forwards. Giving hover its own animation instead puts both
-   states on equal footing (animation vs animation), so :hover's higher
-   specificity can actually decide which one wins, the way it's
-   supposed to. Un-hovering naturally falls back to
-   binder-mini-cover-open above, animating smoothly back to tilted
-   rather than snapping. ===*/
+/* A plain transform here always lost to the mount animation's
+   forwards fill — CSS animations beat normal declarations on the same
+   property. Giving hover its own competing animation instead lets
+   :hover actually win. */
 .binder-mini-cover:hover {
   animation: binder-mini-cover-flatten 0.4s ease forwards;
 }
@@ -286,20 +252,9 @@
   transition: opacity 0.3s ease;
 }
 
-/* === FIX: filter:drop-shadow() on the PARENT (.binder-mini-cover,
-   which has transform-style:preserve-3d and rotated 3D children) was
-   causing the whole card to render as a solid black silhouette on
-   hover in at least one browser — CSS filter forces its own
-   compositing layer, which conflicts with how 3D-transformed children
-   underneath it get painted, apparently hiding the real content and
-   showing only a flat black shape with the glow color bleeding around
-   its edge. Moved the glow to a plain box-shadow on the FRONT FACE
-   alone instead (.binder-mini-cover-frame, a flat 2D element, not the
-   3D-rotating parent) — this avoids the filter/3D conflict entirely.
-   translateZ(0) here removes this layer's own depth offset too, so
-   on hover there's genuinely zero 3D thickness left anywhere, not
-   just a rotation facing the viewer while still technically having
-   depth. ===*/
+/* filter:drop-shadow() on a 3D-rotating parent renders the whole
+   card as a black silhouette on hover in some browsers — moved the
+   glow to a plain box-shadow on the flat front face instead. */
 .binder-mini-cover:hover .binder-mini-cover-frame {
   transform: translateZ(0);
   transition: transform 0.4s ease, box-shadow 0.4s ease;

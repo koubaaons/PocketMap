@@ -1,13 +1,3 @@
-// === ISSUE #1 START: Split Views — HomeView ===
-// === ISSUE #81 START: Binder Color Picker — use cover_color on binder cards ===
-// === ISSUE #83 START: Home Dashboard ===
-//   - 5 stat cards (Total Cards, Binders, Favorites, Unorganised, Recently Added)
-//   - Recently Added section — last 5 owned cards
-//   - Recent Activity feed — derived from existing timestamps, see
-//     selectors/homeStats.js for why this isn't a real event log
-//   - "View All" link for binders
-// === ISSUE #92 START: Customize Cover — hover-revealed button on BinderCard ===
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, EmptyState, StatCard, useCountUp } from '../ui/index.jsx';
 import { CreateBinderModal } from '../modals/index.js';
@@ -165,46 +155,19 @@ export function HomeView({ toast, onNavigate, mode = 'dashboard' }) {
 
 function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) {
   const pct   = capacity > 0 ? Math.round((cardCount / capacity) * 100) : 0;
-  // === ISSUE #81: use cover_color, fall back to default for old binders ===
   const color = binder.cover_color ?? DEFAULT_BINDER_COLOR;
-
-  // === FIX (progress animation wasn't actually visible): the badge
-  // number was static ({pct}% never changed), and the only thing that
-  // ever animated was the 3px bar's width via a CSS transition — with
-  // typical low percentages that's a 1-2px change, imperceptible in
-  // practice. Reusing the same useCountUp hook the stat cards already
-  // use makes BOTH the number and the bar animate together, driven by
-  // the same live-counting value, over the same ~900ms window.
   const animatedPct = useCountUp(pct);
 
-  // === ISSUE #94: mini-cover replaces the old flat rectangle entirely —
-  // reuses the same visual recipe as the real cover (binder-cover-frame:
-  // gradient sheen, inset shadows, rounded corners) at a smaller scale,
-  // with stickers rendered in their actual saved positions/rotations/
-  // scale so the home grid genuinely previews what the real cover looks
-  // like, not a simplified stand-in. ===
-  //
-  // === FIX (reference-image redesign): percent badge + progress bar
-  // moved OFF the cover entirely and into the label area below,
-  // alongside a real "X / Y cards" fraction — matching the reference's
-  // layout, and simply more informative than a bare percentage. The
-  // cover itself now carries two thin spine-ridge lines (suggesting
-  // binder rings) and a few sparkle accents — a light decorative touch
-  // in place of the reference's floral/vine illustration, per request
-  // to skip the flowers specifically. Both are pure decoration
-  // (aria-hidden), so a customized cover's own stickers still read as
-  // the primary content — these sit behind/around them, not over. ===
+  // Mini-cover mirrors the real cover's stickers (actual saved
+  // positions/rotations/scale) at a smaller size, so Home genuinely
+  // previews the real cover instead of a simplified stand-in.
+
   return (
     <div className="binder-card-wrapper">
-      {/* === FIX: style={{ color }} added here — this was missing
-          entirely. The 3D mini-cover effect's CSS (rear-cover fill,
-          hover glow) uses currentColor on .binder-mini-cover's own
-          ::before/::after pseudo-elements and on .binder-mini-cover-
-          frame's hover box-shadow, all of which need `color` set HERE,
-          on this exact button, to resolve to the binder's actual
-          cover_color. Without it, color falls back to its default
-          (black), which is exactly why the rear edge and hover glow
-          were rendering solid black instead of the binder's pink. === */}
+      {/* style={{ color }} is needed here — the mini-cover's
+          ::before/::after and hover box-shadow use currentColor,
+          which without this falls back to black instead of the
+          binder's actual cover_color. */}
       <button className="binder-mini-cover" onClick={onClick} aria-label={`Open ${binder.name}`} style={{ color }}>
         <div
           className="binder-mini-cover-frame"
@@ -216,17 +179,9 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
           <span className="binder-mini-cover-spine-line binder-mini-cover-spine-line-1" aria-hidden="true" />
           <span className="binder-mini-cover-spine-line binder-mini-cover-spine-line-2" aria-hidden="true" />
 
-          <i className="ti ti-sparkles binder-mini-cover-sparkle binder-mini-cover-sparkle-1" aria-hidden="true" />
-          <i className="ti ti-sparkles binder-mini-cover-sparkle binder-mini-cover-sparkle-2" aria-hidden="true" />
-          <i className="ti ti-sparkles binder-mini-cover-sparkle binder-mini-cover-sparkle-3" aria-hidden="true" />
-
-          {/* === ISSUE #94 FIX: width now a percentage of the mini
-              cover's own width (same sticker.size field used
-              everywhere else), with aspect-ratio:1 to stay square
-              regardless of the cover's own taller-than-wide shape —
-              previously a fixed 24px here was just as disconnected
-              from the actual rendered size as the real cover's old
-              fixed 56px was. === */}
+          {/* width is a percentage of the cover's own width (matching
+              sticker.size elsewhere), aspect-ratio:1 to stay square
+              regardless of the cover's own shape. */}
           {(binder.stickers ?? []).map(sticker => (
             <MiniCoverSticker key={sticker.id} sticker={sticker} />
           ))}
@@ -259,18 +214,6 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
   );
 }
 
-// === FIX: a tall/narrow source image (e.g. a standing character with
-// most of its width unused) inside a forced aspectRatio:'1' box gets
-// shrunk dramatically by object-fit:contain to fit the box's narrower
-// dimension — leaving visible empty space above/below and making it
-// look much smaller than a squarer image at the IDENTICAL stored
-// scale, even though the math/data was never wrong. Rather than special
-// -case any specific image, this component measures whatever image is
-// actually uploaded (via the img's own onLoad — naturalWidth/
-// naturalHeight, the same technique already used on the real cover's
-// CustomizerSticker) and sizes the box to match THAT image's real
-// shape automatically. Works the same way for every future upload —
-// tall, wide, or square — with no per-image logic at all. ===
 function MiniCoverSticker({ sticker }) {
   const [aspectRatio, setAspectRatio] = useState(1);
 
@@ -294,8 +237,3 @@ function MiniCoverSticker({ sticker }) {
     </div>
   );
 }
-
-// === ISSUE #92 END: Customize Cover ===
-// === ISSUE #83 END: Home Dashboard ===
-// === ISSUE #81 END: Binder Color Picker ===
-// === ISSUE #1 END: Split Views — HomeView ===

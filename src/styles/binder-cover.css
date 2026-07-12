@@ -1,158 +1,17 @@
 /**
- * @fileoverview Binder cover — inline page-flip, sticker layer.
- * === ISSUE #92: Binder close/open animation with sticker customisation ===
+ * @fileoverview Binder cover label styling.
  *
- * The cover lives INLINE, directly on top of page 1's slot, as a real
- * page-flip button. Page 1's actual content is already rendering
- * underneath it at all times; opening is just rotating the cover button
- * away to reveal what was already there — true visual continuity, no
- * overlay, no separate branch, no timing-based swap.
+ * The cover's actual shape/color/rotation lives entirely in
+ * BinderBookFlip's own cover-pair classes now — this file only holds
+ * the name/meta label rendered below the cover in HomeView,
+ * BinderView (closed state), and the creation-modal preview.
  *
- * Cover starts flat (facing viewer, covering page 1). Clicking it
- * rotates it around its LEFT edge (the spine) so it flips onto the left
- * slot, showing its back face there, while page 1 becomes visible on
- * the right — exactly like opening a real binder.
+ * (Cleanup note: this file used to hold a whole separate cover
+ * implementation — .binder-cover-flip, -frame, -spine-line, -face-
+ * front/-back, -content, -name, -meta, -sticker — from before the
+ * cover was rebuilt on BinderBookFlip's own pair mechanism. None of
+ * it was still referenced by any component, so it's been removed.)
  */
-
-.binder-cover-flip {
-  position: absolute;
-  /* Fixed 12px oversize on every side, rather than the slot's exact
-     size — predictable and consistent regardless of how big the
-     underlying slot is. */
-  inset: -12px;
-  z-index: 10;
-  cursor: pointer;
-  border: none;
-  padding: 0;
-  background: none;
-  perspective: 70rem;
-  transform-style: preserve-3d;
-}
-
-/* Flipping: PURE rotation around the LEFT edge — no translation at all.
-   Positive angle on a left-hinged element swings the free right edge
-   away from the viewer — the correct "lifting open" motion. */
-.binder-cover-flip.is-flipping {
-  pointer-events: none;
-  transform-origin: 0% 50%;
-  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: rotateY(180deg);
-}
-
-/* ── Frame — border-radius + shadow, identical for both faces ───────────── */
-
-.binder-cover-frame {
-  position: absolute;
-  inset: 0;
-  backface-visibility: hidden;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  box-shadow:
-    inset 0 3px 16px rgba(255,255,255,0.15),
-    inset 0 -6px 16px rgba(0,0,0,0.35),
-    0 12px 30px rgba(0,0,0,0.35);
-}
-
-/* === FIX (real cover missing the redesign the Home-grid mini preview
-   already has): same motif, same percentage-based positions as
-   .binder-mini-cover-spine-line/-sparkle in cover-customizer.css —
-   just given its own classes here since this cover is a much larger
-   canvas and the sparkle sizing needed to scale up accordingly to
-   still read clearly at this size instead of looking sparse. ===*/
-.binder-cover-spine-line {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: rgba(0,0,0,0.08);
-  z-index: 1;
-  pointer-events: none;
-}
-
-.binder-cover-spine-line-1 { left: 14%; }
-.binder-cover-spine-line-2 { left: 19%; width: 2px; background: rgba(0,0,0,0.06); }
-
-.binder-cover-sparkle {
-  position: absolute;
-  color: rgba(255,255,255,0.55);
-  z-index: 1;
-  pointer-events: none;
-}
-
-.binder-cover-sparkle-1 { top: 22%; left: 46%; font-size: 34px; color: rgba(255,255,255,0.7); }
-.binder-cover-sparkle-2 { top: 55%; left: 68%; font-size: 22px; }
-.binder-cover-sparkle-3 { top: 74%; left: 38%; font-size: 16px; color: rgba(255,255,255,0.4); }
-
-.binder-cover-face-front {
-  transform: rotateY(0deg);
-}
-
-/* Back face — pre-rotated 180° so it only faces the viewer once the
-   rotation passes the midpoint — genuinely part of the same 3D
-   rotation as the front face. */
-.binder-cover-face-back {
-  transform: rotateY(180deg);
-}
-
-.binder-cover-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  text-align: center;
-  position: relative;
-  z-index: 2;
-  padding: var(--space-4);
-}
-
-.binder-cover-name {
-  font-size: var(--text-xl);
-  font-weight: var(--weight-medium);
-  color: rgba(255,255,255,0.95);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.binder-cover-meta {
-  font-size: var(--text-xs);
-  color: rgba(255,255,255,0.4);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-
-/* ── Sticker layer ─────────────────────────────────────────────────────────── */
-/* === FIX (the long-standing 56px bug, finally found in its actual
-   file): this rule used to hardcode width/height: 56px — a leftover
-   from before stickers were percentage-based at all. A fixed height
-   here silently overrides the aspect-ratio (or, when set, the inline
-   percentage width) on whatever renders the sticker, since an explicit
-   height declaration always wins over aspect-ratio filling in the same
-   dimension. This produced a squashed box: full percentage width, but
-   pinned to 56px tall — proportionally tiny on the real (much wider
-   than 320px) binder cover, which is exactly the "shrinks when saved"
-   symptom chased across this entire session. No width/height belongs
-   here at all anymore — every render site (BinderView.jsx, HomeView.jsx,
-   CustomizerSticker.jsx) sets its own sizing inline now. ===*/
-.binder-cover-sticker {
-  position: absolute;
-  z-index: 3;
-  pointer-events: none;
-}
-
-.binder-cover-sticker img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-}
-/* ── Binder label below cover ───────────────────────────────────────────────
-   Replaces the name/meta that used to live inside the cover face.
-   Rendered below the binder in HomeView, BinderView (when closed),
-   and the creation modal preview. */
 
 .binder-cover-label {
   text-align: center;

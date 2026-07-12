@@ -1,47 +1,22 @@
 /**
- * @fileoverview CardGridItem — single image-first tile in a card grid.
- * === ISSUE #84: fixed column grid layout, consistent card size everywhere ===
- * === ISSUE: click-to-favorite star, owned cards only ===
- * === ISSUE #85: optional collectionName subtext, used by Favorites only —
- *     Collections tabs are already scoped to one collection so it'd be
- *     redundant there; Favorites spans multiple collections so it's
- *     genuinely useful context there. ===
+ * @fileoverview CardGridItem — single image-first tile, shared by
+ * Collections' All Cards/Owned/Missing/Unorganised tabs and Favorites.
  *
- * Replaces the old row-style display (CardDefinitionRow, FavoritesView's
- * inline result-row markup) with one shared tile component used by every
- * card listing: Collections' All Cards / Owned / Missing / Unorganised
- * tabs, and Favorites.
+ * Visual-only — no Edit/Delete on the tile; clicking it (outside the
+ * star) calls onView to open the card detail instead. Takes the full
+ * inventoryItem rather than isOwned/isFavorite booleans since
+ * handleToggleFavorite needs the whole object.
  *
- * Deliberately visual-only otherwise — no Edit/Delete buttons on the tile
- * itself. Clicking the tile (outside the star) calls onView, which opens
- * the card detail where those actions already live.
+ * The flip+shine reveal plays once when a card transitions from
+ * not-owned to owned (hadOwnedRef tracks the previous state). It's
+ * deliberately separate from BinderSlot's slide-in — collecting a card
+ * and placing it in a binder page are different actions.
  *
- * Takes the actual inventoryItem (not separate isOwned/isFavorite
- * booleans) because handleToggleFavorite (useInventoryActions.js) needs
- * the full item object, not just an id or a boolean.
- *
- * === FIX (new card reveal animation): plays once when a card
- * transitions from not-owned to owned — the "you now have this card"
- * moment, which is what a flip-in + light sweep is meant to celebrate.
- * This is deliberately SEPARATE from the binder-slot animation (a
- * slide-in, see BinderSlot.jsx) — getting a card into your collection
- * and physically placing it into a binder page are different actions
- * that call for different motion. hadOwnedRef tracks whether THIS
- * card was owned on the previous render; justRevealed flips on for one
- * animation cycle when it wasn't and now is, then back off
- * automatically.
- *
- * === FIX (own/unown flow): the ✓/○ circle is now a real button,
- * mirroring the favorite star exactly — click to toggle ownership on
- * the spot, no modal needed for the common case (handleOwn/handleUnown
- * are already simple, instant actions — see useInventoryActions.js).
- * The reveal animation above needs no changes for this: it already
- * triggers off isOwned transitioning from false to true regardless of
- * WHAT caused that change, so clicking the circle gets the same
- * flip+shine the card detail modal's own "mark as owned" already gets.
- * onToggleOwned is optional — FavoritesView only ever shows already-
- * owned cards (see the isOwned-gated star above), so the circle simply
- * stays non-interactive there, exactly like before. ===*/
+ * The ✓/○ circle is a real button mirroring the favorite star — click
+ * to toggle ownership instantly. It triggers the same reveal animation
+ * automatically, since that's keyed off isOwned changing, not what
+ * caused it. onToggleOwned is optional (FavoritesView leaves it out;
+ * the circle stays non-interactive there). */
 
 import { useEffect, useRef, useState } from 'react';
 
