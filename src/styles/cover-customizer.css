@@ -128,8 +128,21 @@
    :hover selector, per explicit design decision (only on the CLOSED
    cover, never once a binder is open). === */
 
+/* === FIX (resting 3D tilt not actually visible — flat rectangle
+   instead of a tilted book, no page-edge or rear-cover showing): the
+   classic CSS 3D mistake. perspective was declared on
+   .binder-mini-cover itself, the SAME element that also carries its
+   own rotateY transform (see the animation below) — but perspective
+   only establishes a 3D viewing context for an element's CHILDREN's
+   transforms, never for that element's own transform. Without
+   perspective on the PARENT, .binder-mini-cover's rotateY had no
+   camera to project through, so it rendered as an essentially flat,
+   nearly-undistorted rectangle instead of a genuinely tilted 3D book
+   — and the page-edge/rear-cover (which only read as real depth WITH
+   correct perspective) came out invisible/degenerate too. ===*/
 .binder-card-wrapper {
   position: relative;
+  perspective: 1000px;
 }
 
 .binder-cover-customize-btn {
@@ -228,10 +241,9 @@
   padding: 0;
   background: none;
   cursor: pointer;
-  perspective: 1000px;
   --book-thickness: 10px;
   transform-style: preserve-3d;
-  animation: binder-mini-cover-open 1s ease forwards;
+  animation: binder-mini-cover-open 0.4s ease forwards;
 }
 
 @keyframes binder-mini-cover-open {
@@ -239,9 +251,24 @@
   to   { transform: rotateY(-25deg); }
 }
 
+/* === FIX (hover never actually rotated it flat): a plain
+   `transform: rotateY(0deg)` here was always losing to the mount
+   animation above — CSS animations occupy a cascade priority that
+   beats normal declarations (including :hover) for the SAME property,
+   even after the animation has finished and is only "holding" its end
+   value via forwards. Giving hover its own animation instead puts both
+   states on equal footing (animation vs animation), so :hover's higher
+   specificity can actually decide which one wins, the way it's
+   supposed to. Un-hovering naturally falls back to
+   binder-mini-cover-open above, animating smoothly back to tilted
+   rather than snapping. ===*/
 .binder-mini-cover:hover {
-  transform: rotateY(0deg);
-  transition: transform 0.4s ease;
+  animation: binder-mini-cover-flatten 0.4s ease forwards;
+}
+
+@keyframes binder-mini-cover-flatten {
+  from { transform: rotateY(-25deg); }
+  to   { transform: rotateY(0deg); }
 }
 
 /* === Genuinely flat on hover, not just rotated to face the viewer

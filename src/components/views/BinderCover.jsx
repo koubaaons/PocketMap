@@ -59,6 +59,19 @@ export function BinderCoverFront({
       onClick={isEditingCover ? (e) => e.stopPropagation() : undefined}
       onMouseDown={isEditingCover ? () => setSelectedStickerId(null) : undefined}
     >
+      {/* === FIX (real cover never got the redesign — only the
+          Home-grid mini preview did): same spine-line + sparkle motif,
+          same percentage-based positions, just on the actual full-size
+          cover so opening a binder feels consistent with its own
+          preview instead of switching to the old plain look. Purely
+          decorative (aria-hidden), rendered underneath stickers in DOM
+          order so a placed sticker still visually sits on top. */}
+      <span className="binder-cover-spine-line binder-cover-spine-line-1" aria-hidden="true" />
+      <span className="binder-cover-spine-line binder-cover-spine-line-2" aria-hidden="true" />
+      <i className="ti ti-sparkles binder-cover-sparkle binder-cover-sparkle-1" aria-hidden="true" />
+      <i className="ti ti-sparkles binder-cover-sparkle binder-cover-sparkle-2" aria-hidden="true" />
+      <i className="ti ti-sparkles binder-cover-sparkle binder-cover-sparkle-3" aria-hidden="true" />
+
       {(isEditingCover ? draftStickers : (binder.stickers ?? [])).map(sticker => (
         <CustomizerSticker
           key={sticker.id}
@@ -125,9 +138,20 @@ export function BinderCoverBack({ color }) {
       style={{
         width: '100%',
         height: '100%',
+        position: 'relative',
         background: color,
         backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 100%)`,
+        overflow: 'hidden',
       }}
-    />
+    >
+      {/* === FIX: same spine-line/sparkle motif as the front face and
+          the Home-grid mini preview, so the inside of the cover (shown
+          at spread 1, before the frame-halves take over from spread 2
+          onward) doesn't read as a plain, un-styled panel. ===*/}
+      <span className="binder-cover-spine-line binder-cover-spine-line-1" aria-hidden="true" />
+      <span className="binder-cover-spine-line binder-cover-spine-line-2" aria-hidden="true" />
+      <i className="ti ti-sparkles binder-cover-sparkle binder-cover-sparkle-1" aria-hidden="true" />
+      <i className="ti ti-sparkles binder-cover-sparkle binder-cover-sparkle-2" aria-hidden="true" />
+    </div>
   );
 }

@@ -56,6 +56,36 @@
     0 12px 30px rgba(0,0,0,0.35);
 }
 
+/* === FIX (real cover missing the redesign the Home-grid mini preview
+   already has): same motif, same percentage-based positions as
+   .binder-mini-cover-spine-line/-sparkle in cover-customizer.css —
+   just given its own classes here since this cover is a much larger
+   canvas and the sparkle sizing needed to scale up accordingly to
+   still read clearly at this size instead of looking sparse. ===*/
+.binder-cover-spine-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: rgba(0,0,0,0.08);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.binder-cover-spine-line-1 { left: 14%; }
+.binder-cover-spine-line-2 { left: 19%; width: 2px; background: rgba(0,0,0,0.06); }
+
+.binder-cover-sparkle {
+  position: absolute;
+  color: rgba(255,255,255,0.55);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.binder-cover-sparkle-1 { top: 22%; left: 46%; font-size: 34px; color: rgba(255,255,255,0.7); }
+.binder-cover-sparkle-2 { top: 55%; left: 68%; font-size: 22px; }
+.binder-cover-sparkle-3 { top: 74%; left: 38%; font-size: 16px; color: rgba(255,255,255,0.4); }
+
 .binder-cover-face-front {
   transform: rotateY(0deg);
 }
