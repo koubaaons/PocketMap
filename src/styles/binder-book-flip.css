@@ -25,14 +25,6 @@
   height: 100%;
   perspective: 2400px;
   display: flex;
-  /* === FIX (cover's rounded corner looked cut off/square): the cover
-     is intentionally bigger than this container's own bounds (extends
-     10px outward — see .book-page-pair-cover below), but overflow:
-     hidden here clipped that extension flat right at the container's
-     own edge, cutting off exactly the curved part of the corner.
-     Nothing else in this container ever exceeds its bounds, so
-     allowing overflow only affects the cover, which is the intended
-     behavior. ===*/
   overflow: visible;
   transform: translateZ(0);
 }
@@ -46,10 +38,6 @@
   transform-style: preserve-3d;
   transform-origin: left center;
   transition: transform 0.7s ease-in-out;
-  /* Pre-promote to GPU compositor layer so the first flip animates
-     immediately without waiting for layer promotion on first interaction.
-     Without this, first flip is slow and subsequent ones stutter
-     until the browser has composited all pairs. */
   will-change: transform;
 }
 
@@ -71,14 +59,10 @@
 }
 
 .book-page-pair-front {
-  /* Faces the viewer directly while this pair is unflipped, sitting
-     on the right side of the spread. */
   transform: rotateY(0deg);
 }
 
 .book-page-pair-back {
-  /* Pre-rotated 180deg so it only becomes visible once the pair has
-     actually rotated past the midpoint. */
   transform: rotateY(180deg);
 }
 
@@ -114,15 +98,13 @@
   top: -24px;
   right: -24px;
   bottom: -24px;
-  /* === FIX: make the cover wider to overlap the spine and hide gaps === */
-  width: calc(50% + 26px);
+  /* === FIX: increase width slightly to hide the spine gap === */
+  width: calc(50% + 27px);
   height: calc(100% + 48px);
   transform-style: preserve-3d;
   transform-origin: left center;
   transition: transform 0.7s ease-in-out;
   will-change: transform;
-  /* === FIX: force the entire cover onto one compositor layer to
-      prevent sub-pixel rounding differences between front/back === */
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
@@ -144,14 +126,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* === FIX: force both faces onto the same compositor layer with
-      consistent rounding. The !important ensures this overrides any
-      other transform rules that might cause different rendering
-      paths between front and back faces. === */
   transform: translateZ(0) !important;
   -webkit-transform: translateZ(0) !important;
-  /* === FIX: prevent height from being affected by transform
-      rounding differences === */
   height: 100%;
   min-height: 100%;
   max-height: 100%;
@@ -180,18 +156,10 @@
   top: -24px;
   right: -24px;
   bottom: -24px;
-  /* === FIX: match the cover's new width === */
-  width: calc(50% + 26px);
+  width: calc(50% + 27px);
   height: calc(100% + 48px);
   box-sizing: border-box;
   background-color: var(--cover-color, #e8627a);
   border-radius: 0 20px 20px 0;
   z-index: -1;
-}
-
-/* === FIX: Ensure content pages don't have gaps at the spine === */
-.book-page-pair .book-page-pair-face {
-  /* Slightly overlap the spine on the left side */
-  left: -1px;
-  width: calc(100% + 1px);
 }
