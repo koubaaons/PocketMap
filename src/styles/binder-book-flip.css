@@ -120,6 +120,10 @@
   transform-origin: left center;
   transition: transform 0.7s ease-in-out;
   will-change: transform;
+  /* === FIX: force the entire cover onto one compositor layer to
+      prevent sub-pixel rounding differences between front/back === */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .book-page-pair-cover.is-flipped {
@@ -128,7 +132,10 @@
 
 .book-page-pair-cover-face {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   box-sizing: border-box;
   backface-visibility: hidden;
   overflow: hidden;
@@ -136,16 +143,33 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* === FIX: force both faces onto the same compositor layer with
+      consistent rounding. The !important ensures this overrides any
+      other transform rules that might cause different rendering
+      paths between front and back faces. === */
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  /* === FIX: prevent height from being affected by transform
+      rounding differences === */
+  height: 100%;
+  min-height: 100%;
+  max-height: 100%;
 }
 
 .book-page-pair-cover-front {
-  transform: rotateY(0deg);
+  transform: rotateY(0deg) translateZ(0) !important;
   border-radius: 0 20px 20px 0;
+  /* === FIX: prevent sub-pixel gap between front and back cover === */
+  margin-right: -1px;
+  width: calc(100% + 1px);
 }
 
 .book-page-pair-cover-back {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) translateZ(0) !important;
   border-radius: 20px 0 0 20px;
+  /* === FIX: prevent sub-pixel gap between front and back cover === */
+  margin-left: -1px;
+  width: calc(100% + 1px);
 }
 
 /* === Static back-cover placeholder — same box model/size as
