@@ -70,34 +70,44 @@ export function BinderBookFlip({
       {/* Static back-cover placeholder */}
       <div className="book-page-pair-back-cover" />
 
-      {/* === COVER CONTAINER — SINGLE UNIT ===
-          Both front and back faces are inside this container.
-          The container rotates as a unit around the left edge.
-          Both faces are always perfectly aligned. */}
+      {/* === ONE SINGLE COVER === */}
       <div
-        className={`book-page-pair-cover ${coverFlipped ? 'is-flipped' : ''}`}
-        style={{ zIndex: getZIndexFor(0), ...getTransitionStyleFor(0) }}
+        className="book-page-pair-cover"
+        style={{ zIndex: getZIndexFor(0) }}
       >
-        {/* Front face — visible when closed */}
-        <div
-          className="book-page-pair-cover-face book-page-pair-cover-front"
-          onClick={!coverFlipped && isClickable && onCoverClick ? onCoverClick : undefined}
-          onKeyDown={(e) => {
-            if ((e.key === 'Enter' || e.key === ' ') && !coverFlipped && isClickable && onCoverClick) {
-              e.preventDefault();
-              onCoverClick();
-            }
-          }}
-          role={!coverFlipped && isClickable && onCoverClick ? 'button' : undefined}
-          tabIndex={!coverFlipped && isClickable && onCoverClick ? 0 : -1}
-          aria-label={!coverFlipped && isClickable && onCoverClick ? `Open ${binder.name}` : undefined}
-        >
-          {coverFrontContent}
+        {/* === LEFT HALF (STATIC BACK COVER) ===
+            Appears AFTER the rotation finishes (700ms delay).
+            Uses opacity with transition-delay. */}
+        <div className={`book-page-pair-cover-left-static ${coverFlipped ? 'is-flipped' : ''}`}>
+          {coverBackContent}
         </div>
 
-        {/* Back face — visible when flipped */}
-        <div className="book-page-pair-cover-face book-page-pair-cover-back">
-          {coverBackContent}
+        {/* === RIGHT HALF (ROTATES) === */}
+        <div
+          className={`book-page-pair-cover-right-rotating ${coverFlipped ? 'is-flipped' : ''}`}
+          style={{ ...getTransitionStyleFor(0) }}
+        >
+          {/* Front face — visible when closed */}
+          <div
+            className="book-page-pair-cover-right-front"
+            onClick={!coverFlipped && isClickable && onCoverClick ? onCoverClick : undefined}
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === ' ') && !coverFlipped && isClickable && onCoverClick) {
+                e.preventDefault();
+                onCoverClick();
+              }
+            }}
+            role={!coverFlipped && isClickable && onCoverClick ? 'button' : undefined}
+            tabIndex={!coverFlipped && isClickable && onCoverClick ? 0 : -1}
+            aria-label={!coverFlipped && isClickable && onCoverClick ? `Open ${binder.name}` : undefined}
+          >
+            {coverFrontContent}
+          </div>
+
+          {/* Back face — visible when flipped open */}
+          <div className="book-page-pair-cover-right-back">
+            {coverBackContent}
+          </div>
         </div>
       </div>
 

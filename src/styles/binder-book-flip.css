@@ -59,37 +59,74 @@
   pointer-events: none;
 }
 
-/* === COVER CONTAINER — SINGLE UNIT THAT ROTATES ===
-   Both front and back faces are inside this container.
-   The container is slightly larger than pages and overlaps the spine.
-   Both faces are always perfectly aligned because they share the same container. */
+/* === ONE SINGLE COVER === */
 .book-page-pair-cover {
   position: absolute;
-  /* Position on the right side, slightly larger than pages */
   top: -24px;
+  left: -24px;
   right: -24px;
   bottom: -24px;
-  width: calc(50% + 25px);
+  width: calc(100% + 48px);
   height: calc(100% + 48px);
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+/* === LEFT HALF - STATIC BACK COVER === */
+.book-page-pair-cover-left-static {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  box-sizing: border-box;
+  background-color: var(--cover-color, #e8627a);
+  border-radius: 20px 0 0 20px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 3px 16px rgba(255, 255, 255, 0.15),
+    inset 0 -6px 16px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.01s ease-in-out;
+  transition-delay: 0s;
+}
+
+.book-page-pair-cover-left-static.is-flipped {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0.7s;
+}
+
+/* === RIGHT HALF - ROTATING COVER === */
+.book-page-pair-cover-right-rotating {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
   transform-style: preserve-3d;
   transform-origin: left center;
   transition: transform 0.7s ease-in-out;
   will-change: transform;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  z-index: 1;
-  /* 1px overlap past the center to prevent gaps */
-  margin-left: -1px;
+  z-index: 2;
 }
 
-.book-page-pair-cover.is-flipped {
+.book-page-pair-cover-right-rotating.is-flipped {
   transform: rotateY(-180deg);
 }
 
-/* === COVER FACES — BOTH INSIDE THE SAME CONTAINER ===
-   They share the same container, so they're always aligned.
-   No separate positioning needed — they fill the container. */
-.book-page-pair-cover-face {
+/* === RIGHT HALF — FRONT FACE === */
+.book-page-pair-cover-right-front {
   position: absolute;
   top: 0;
   left: 0;
@@ -102,34 +139,44 @@
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.book-page-pair-cover-front {
-  transform: rotateY(0deg);
   border-radius: 0 20px 20px 0;
+  transform: rotateY(0deg);
   box-shadow:
     inset 0 3px 16px rgba(255, 255, 255, 0.15),
     inset 0 -6px 16px rgba(0, 0, 0, 0.35),
     0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
-.book-page-pair-cover-back {
-  transform: rotateY(180deg);
+/* === RIGHT HALF — BACK FACE === */
+.book-page-pair-cover-right-back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  backface-visibility: hidden;
+  overflow: hidden;
+  background-color: var(--cover-color, #e8627a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 20px 0 0 20px;
+  transform: rotateY(180deg);
   box-shadow:
     inset 0 3px 16px rgba(255, 255, 255, 0.15),
-    inset 0 -6px 16px rgba(0, 0, 0, 0.35),
-    0 12px 30px rgba(0, 0, 0, 0.35);
+    inset 0 -6px 16px rgba(0, 0, 0, 0.35);
 }
 
 /* Content inside the cover faces fills them */
-.book-page-pair-cover-face > * {
+.book-page-pair-cover-right-front > *,
+.book-page-pair-cover-right-back > *,
+.book-page-pair-cover-left-static > * {
   width: 100%;
   height: 100%;
 }
 
-/* === STATIC BACK COVER — SAME SIZE AS THE COVER CONTAINER ===
-   Stays behind the rotating cover. Uses pseudo-element for the overhang. */
+/* === STATIC BACK COVER === */
 .book-page-pair-back-cover {
   position: absolute;
   top: -24px;
