@@ -114,7 +114,8 @@
   top: -24px;
   right: -24px;
   bottom: -24px;
-  width: calc(50% + 24px);
+  /* === FIX: make the cover wider to overlap the spine and hide gaps === */
+  width: calc(50% + 26px);
   height: calc(100% + 48px);
   transform-style: preserve-3d;
   transform-origin: left center;
@@ -159,17 +160,15 @@
 .book-page-pair-cover-front {
   transform: rotateY(0deg) translateZ(0) !important;
   border-radius: 0 20px 20px 0;
-  /* === FIX: prevent sub-pixel gap between front and back cover === */
-  margin-right: -1px;
-  width: calc(100% + 1px);
+  width: 100%;
+  margin: 0;
 }
 
 .book-page-pair-cover-back {
   transform: rotateY(180deg) translateZ(0) !important;
   border-radius: 20px 0 0 20px;
-  /* === FIX: prevent sub-pixel gap between front and back cover === */
-  margin-left: -1px;
-  width: calc(100% + 1px);
+  width: 100%;
+  margin: 0;
 }
 
 /* === Static back-cover placeholder — same box model/size as
@@ -181,10 +180,18 @@
   top: -24px;
   right: -24px;
   bottom: -24px;
-  width: calc(50% + 24px);
+  /* === FIX: match the cover's new width === */
+  width: calc(50% + 26px);
   height: calc(100% + 48px);
   box-sizing: border-box;
   background-color: var(--cover-color, #e8627a);
   border-radius: 0 20px 20px 0;
   z-index: -1;
+}
+
+/* === FIX: Ensure content pages don't have gaps at the spine === */
+.book-page-pair .book-page-pair-face {
+  /* Slightly overlap the spine on the left side */
+  left: -1px;
+  width: calc(100% + 1px);
 }
