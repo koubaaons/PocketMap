@@ -13,8 +13,20 @@
   flex-direction: column;
   min-height: calc(100vh - var(--topbar-height));
   overflow-y: auto;
+  /* === FIX (same up/down scrollbar-arrow flash as .binder-book-wrapper,
+     just on this separate root-level scroll container instead — this
+     is the element that actually goes fullscreen, so its own
+     overflow-y:auto flashing a scrollbar during page/cover transitions
+     was a second, independent source of the same symptom). Hidden
+     visually only; scroll behavior itself is untouched. ===*/
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: var(--space-3) var(--space-4);
   gap: var(--space-2);
+}
+
+.binder-view-root::-webkit-scrollbar {
+  display: none;
 }
 
 /* === ISSUE #93 (final approach): real OS-level fullscreen via the
@@ -181,37 +193,64 @@
   justify-content: center;
   gap: var(--space-3);
   overflow-y: auto;
-  padding-bottom: var(--space-4);
+  /* === FIX (up/down arrows flashing briefly while opening/closing):
+     these were the native scrollbar's own arrow buttons — during the
+     cover's transform transition, the content's effective height
+     briefly changes before settling, which can trigger the scrollbar
+     to flash in and back out. Hidden visually here (scroll behavior
+     itself is untouched — still works via touch/trackpad/keyboard if
+     a binder is ever taller than the viewport), which removes the
+     flash without removing the actual functionality. ===*/
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* === FIX (cover's top-left corner looked square while bottom-left
+     was correctly rounded): this had padding-bottom but no
+     padding-top at all — combined with overflow-y:auto clipping
+     anything outside this wrapper's own bounds, the cover's 10px
+     upward extension (see .book-page-pair-cover) had no room to
+     breathe and got clipped flush at the wrapper's own top edge,
+     while the downward extension had the existing padding-bottom to
+     spare. Matching padding-top gives both directions the same
+     room.
+     === FIX (rounded corners clipped again): the cover's own
+     extension grew from 10px to 24px in a later change, but this
+     padding was never updated to match — 16px (--space-4) is 8px
+     short of the 24px now needed, so the top/bottom corners were
+     being clipped again by this wrapper's overflow-y:auto. 28px
+     gives a bit of real breathing room past the 24px extension. ===*/
+  padding-top: 28px;
+  padding-bottom: 28px;
+}
+
+/* WebKit (Chrome/Safari) doesn't respect scrollbar-width — needs its
+   own pseudo-element rule to actually hide the scrollbar there. */
+.binder-book-wrapper::-webkit-scrollbar {
+  display: none;
 }
 
 /* ── Book — #4 cover thickness ────────────────────────────────────────────── */
 
+/* === FIX (leftover shadow/border showing at front and back even after
+   the background fix): border-radius + box-shadow live on THIS class
+   directly, not just as an inline style — inline overrides on the
+   element (set in BinderView.jsx) can win against this rule's own
+   box-shadow, but can never reach the ::before pseudo-element below,
+   which has its own separate shadow ring. Neutralized both here while
+   the cover/book framing gets rebuilt from a clean base. ===*/
 .binder-book {
   display: flex;
   align-items: stretch;
   flex: 1 1 auto;
   min-width: 0;
   max-width: 1100px;
-  border-radius: 18px;
   padding: 10px;
   gap: 0;
   position: relative;
-  box-shadow:
-    inset 0 2px 4px rgba(255,255,255,0.25),
-    inset 0 -6px 10px rgba(0,0,0,0.25),
-    0 12px 30px rgba(0,0,0,0.35);
 }
 
-/* #4 Raised inner edge */
+/* #4 Raised inner edge — disabled for now, see comment above. */
 .binder-book::before {
-  content: '';
-  position: absolute;
-  inset: 12px;
-  border-radius: 14px;
-  box-shadow:
-    inset 0 0 0 2px rgba(255,255,255,0.08),
-    inset 0 0 20px rgba(0,0,0,0.2);
-  pointer-events: none;
+  display: none;
   z-index: 0;
 }
 

@@ -84,7 +84,7 @@ import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { SlotActionModal } from '../modals/SlotActionModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { useBinderCoverEditor } from '../../hooks/useBinderCoverEditor.js';
-import { BinderCoverFront, BinderCoverBack } from './BinderCover.jsx';
+import { BinderCoverStickers } from './BinderCover.jsx';
 import { getFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
@@ -272,7 +272,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       // Don't capture if a modal is open
       if (document.querySelector('.modal-overlay')) return;
 
-      if (e.key === 'Enter' && isClosed) {
+      if (e.key === 'Enter' && isClosed && !coverEditor.isEditingCover) {
         e.preventDefault();
         handleOpenBinder();
         return;
@@ -294,7 +294,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isClosed, spread, view, handleOpenBinder, handleCloseBinder]);
+  }, [isClosed, spread, view, handleOpenBinder, handleCloseBinder, coverEditor.isEditingCover]);
 
   // ── Preview mode handlers ───────────────────────────────────────────────
 
@@ -530,29 +530,31 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           ‹
         </button>
 
+        {/* === FIX (book position shifts slightly between open/closed):
+            this used to be conditionally rendered ({isCover && ...}),
+            which meant it was completely removed from the DOM once
+            opened — removing a flex sibling reflows the whole row,
+            shifting the book's centered position by however much
+            space this label used to occupy. Always mounted now, with
+            visibility toggled instead of the element itself, so its
+            space in the flex row is permanently reserved and the book
+            never moves regardless of open/closed state. === */}
+        <div className="binder-cover-label" style={{ visibility: isCover ? 'visible' : 'hidden' }}>
+          <div className="binder-cover-label-name">{binder.name}</div>
+          <div className="binder-cover-label-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
+        </div>
+
         <div
           ref={bookFlipWrapperRef}
           className={`binder-book ${(isCover || isAnimatingCoverFlip) ? 'binder-book-closed' : ''}`}
           style={{
             aspectRatio: effectiveBookAspectRatio,
-            // === FIX: .binder-book's 10px padding (binder.css) used to
-            // be invisible because the OLD book's page divs filled that
-            // padded interior edge-to-edge with their own matching
-            // background + shadow — the padding gap and the page's own
-            // edge were the same visual surface. BinderBookFlip supplies
-            // its own complete framing (frame-halves, page-face border-
-            // radii) independently, so that 10px gap is no longer
-            // covered by anything matching — it showed up as a visible
-            // second border ring between .binder-book's own rounded
-            // pink edge and BinderBookFlip's inner content edge, 10px
-            // further in. Zeroing it here lets BinderBookFlip's content
-            // run flush to .binder-book's own edge, same as the single
-            // border the original design intended.
             padding: 0,
-            background: (isCover || isAnimatingCoverFlip)
-              ? 'transparent'
-              : `linear-gradient(135deg, ${color}dd 0%, ${color} 50%, ${color}bb 100%)`,
-            ...((isCover || isAnimatingCoverFlip) ? { boxShadow: 'none' } : {}),
+            // Transparent — BinderBookFlip's own cover/back-cover
+            // placeholder provide their own coverColor background now,
+            // so this wrapper doesn't need to paint anything itself.
+            background: 'transparent',
+            boxShadow: 'none',
             ...(fullscreenMaxBookWidth ? { maxWidth: `${fullscreenMaxBookWidth}px` } : {}),
           }}
         >
@@ -567,20 +569,11 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
             makePageHandlers={makePageHandlers}
             coverColor={color}
             pageColor={binder.page_color ?? 'dark'}
-            coverFrontContent={<BinderCoverFront binder={binder} color={color} isCover={isCover} {...coverEditor} />}
-            coverBackContent={<BinderCoverBack color={color} />}
+            coverFrontContent={<BinderCoverStickers binder={binder} isCover={isCover} {...coverEditor} />}
             onCoverClick={handleOpenBinder}
             isClickable={isCover && !coverEditor.isEditingCover}
           />
         </div>
-
-        {/* Binder name and meta always shown below the binder */}
-        {isCover && (
-          <div className="binder-cover-label">
-            <div className="binder-cover-label-name">{binder.name}</div>
-            <div className="binder-cover-label-meta">{binder.pages} pages · {binder.rows}×{binder.cols}</div>
-          </div>
-        )}
 
         <button
           className="binder-nav-arrow binder-nav-arrow-side binder-nav-arrow-right"

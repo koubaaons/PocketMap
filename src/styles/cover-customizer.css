@@ -147,7 +147,7 @@
 
 .binder-cover-customize-btn {
   position: absolute;
-  bottom: var(--space-3);
+  top: var(--space-3);
   left: 50%;
   transform: translateX(-50%);
   padding: 6px var(--space-3);
@@ -163,7 +163,7 @@
   white-space: nowrap;
 }
 
-.binder-cover-flip:hover .binder-cover-customize-btn {
+.book-page-pair-cover-front:hover .binder-cover-customize-btn {
   opacity: 1;
 }
 
@@ -174,7 +174,7 @@
    person is actively mid-edit. === */
 .binder-cover-edit-controls {
   position: absolute;
-  bottom: var(--space-3);
+  top: var(--space-3);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -204,7 +204,7 @@
 
 .binder-cover-edit-error {
   position: absolute;
-  bottom: calc(var(--space-3) + 34px);
+  top: calc(var(--space-3) + 34px);
   left: 50%;
   transform: translateX(-50%);
   font-size: var(--text-xs);
@@ -425,21 +425,6 @@
 
 .binder-mini-cover-spine-line-1 { left: 14%; }
 .binder-mini-cover-spine-line-2 { left: 19%; width: 1px; background: rgba(0,0,0,0.06); }
-
-/* Light decorative sparkle accents — stand-in for the reference
-   image's floral/vine illustration, per request to skip the flowers
-   specifically. Fixed, tasteful positions rather than randomized per
-   binder, so every cover gets the same light touch consistently. */
-.binder-mini-cover-sparkle {
-  position: absolute;
-  color: rgba(255,255,255,0.55);
-  z-index: 1;
-  pointer-events: none;
-}
-
-.binder-mini-cover-sparkle-1 { top: 22%; left: 46%; font-size: 15px; color: rgba(255,255,255,0.7); }
-.binder-mini-cover-sparkle-2 { top: 55%; left: 68%; font-size: 10px; }
-.binder-mini-cover-sparkle-3 { top: 74%; left: 38%; font-size: 8px; color: rgba(255,255,255,0.4); }
 
 /* === FIX (reference-image redesign): round "..." menu button,
    always visible (not hover-revealed like the old customize button

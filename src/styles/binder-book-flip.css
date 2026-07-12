@@ -1,7 +1,8 @@
 /**
- * @fileoverview Styles for BinderBookFlip — the new stacked page-pair
- * flip mechanism, adapted from a CodePen reference (credit: Nidhanshu
- * Sharma).
+ * @fileoverview Styles for BinderBookFlip — the stacked page-pair flip
+ * mechanism, adapted from a CodePen reference (credit: Nidhanshu
+ * Sharma). Cover-related pieces have been removed entirely — this is
+ * currently just the card-page mechanism, a clean baseline.
  *
  * === Geometry mapping from the reference ===
  * Reference: .container is the whole book box; each .right div takes
@@ -24,31 +25,16 @@
   height: 100%;
   perspective: 2400px;
   display: flex;
-  overflow: hidden;
+  /* === FIX (cover's rounded corner looked cut off/square): the cover
+     is intentionally bigger than this container's own bounds (extends
+     10px outward — see .book-page-pair-cover below), but overflow:
+     hidden here clipped that extension flat right at the container's
+     own edge, cutting off exactly the curved part of the corner.
+     Nothing else in this container ever exceeds its bounds, so
+     allowing overflow only affects the cover, which is the intended
+     behavior. ===*/
+  overflow: visible;
   transform: translateZ(0);
-}
-
-/* === Fixed left panel — NOT part of the 3D flipping stack at all.
-   Plain, static, occupies the left half of the spread permanently;
-   its CONTENT changes (cover-back, or whichever page was most
-   recently flipped past) but it never rotates itself. === */
-.book-left-panel {
-  position: relative;
-  width: 50%;
-  height: 100%;
-  flex-shrink: 0;
-  /* === FIX: .binder-book-page (the second class on this element,
-     needed for BinderPage's own CSS to apply) sets flex:1 — which in
-     this flex ROW container overrides the intended width:50% entirely,
-     making the panel grow to consume the WHOLE container instead of
-     just its half. That's exactly why the cover's absolutely
-     positioned box (sitting on the right half) appeared to be hiding
-     this panel's content — the panel was actually rendering at full
-     width underneath it, with the cover's pink box simply painted on
-     top of its right half. flex: none !important forces this panel
-     back to its fixed 50% width regardless of binder-book-page's own
-     flex rule. ===*/
-  flex: none !important;
 }
 
 .book-page-pair {
@@ -80,12 +66,6 @@
   box-sizing: border-box;
   backface-visibility: hidden;
   overflow: hidden;
-  /* === THE FIX (other AI's diagnosis): removed top/right/bottom/
-     left/width/height from this transition entirely. Page insets are
-     now always-on (see BinderBookFlip.jsx — frontInset/backInset
-     forced to true), so there's nothing for these properties to
-     transition between anymore; only background-color still
-     animates. */
   transition: background-color 0.7s ease-in-out;
   background-color: var(--binder-page-bg, #fff);
 }
@@ -98,51 +78,8 @@
 
 .book-page-pair-back {
   /* Pre-rotated 180deg so it only becomes visible once the pair has
-     actually rotated past the midpoint — same trick the cover's own
-     front/back faces already use elsewhere in this project. */
+     actually rotated past the midpoint. */
   transform: rotateY(180deg);
-}
-
-/* === Background frame entities — separate from the pages, sitting
-   BEHIND them as their own layer. Drawn as two independent halves.
-   Both now track spread >= 1 identically (no special-casing for
-   spread 1's left side anymore, per request) — every spread from 1
-   onward gets the exact same left+right framing. z-index sits below
-   every real pair (z-index >= 0) and the back-cover placeholder
-   (-1). === */
-.book-flip-frame-half {
-  position: absolute;
-  top: 0;
-  width: 50%;
-  height: 100%;
-  z-index: -3;
-  pointer-events: none;
-  background: var(--cover-color, transparent);
-  background-image: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 100%);
-  opacity: 0;
-  /* === FIX (border losing its color/fading during close): removed
-     the opacity transition entirely, per request — the border should
-     stay solid and present, snapping instantly between visible/
-     invisible rather than fading. The previous 0.7s opacity fade,
-     timed to match the cover's own rotation, became noticeable once
-     pages started always carrying their inset (the gap revealing
-     this frame now stays open throughout the close instead of also
-     closing in sync) — the fade was doing its job correctly, it just
-     became visible in a way it wasn't before that other fix. */
-}
-
-.book-flip-frame-half-visible {
-  opacity: 1;
-}
-
-.book-flip-frame-half-left {
-  left: 0;
-  border-radius: 16px 0 0 16px;
-}
-
-.book-flip-frame-half-right {
-  right: 0;
-  border-radius: 0 16px 16px 0;
 }
 
 /* A subtle shading overlay on the currently-turning page, echoing the
@@ -156,32 +93,74 @@
   pointer-events: none;
 }
 
-/* Cover pair's front face — the OUTSIDE of the cover (name, stickers,
-   customize controls), facing the viewer while the binder is closed.
-   Content itself is passed in via the coverFrontContent prop from
-   BinderView. This selector is more specific than the bare
-   .book-page-pair-face rule above, so it wins and overrides the
-   generic page background with the cover's own color — no
-   !important needed for that override. Border baked directly onto
-   this face so it physically rotates WITH the cover. */
-.book-page-pair-cover .book-page-pair-front {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--cover-color, #e8627a);
-  border-radius: 0 16px 16px 0;
+/* === Cover pair — entirely dedicated classes, deliberately NOT
+   sharing .book-page-pair/.book-page-pair-face/-front/-back at all,
+   so content pages above are completely untouched. Same rotation
+   mechanism (is-flipped + rotateY around the left edge), just its own
+   bigger box (extends 24px outward on top/right/bottom vs. the
+   standard pair) and its own cover-color.
+   === FIX (cover looked bigger mid-rotation, then snapped to the
+   right size once settled): extending this box's LEFT edge too (even
+   by just 2px) made it asymmetric relative to its own rotation pivot
+   — during the actual 3D rotateY, that asymmetry causes visible size
+   distortion that only resolves once the rotation finishes. Reverted
+   the left edge to sit exactly at the spine/pivot (matching the
+   default "left" transform-origin again, no compensation needed) —
+   the small sliver this was covering is now handled by a completely
+   SEPARATE, non-rotating strip below instead of by the rotating box
+   itself, since a static element has no rotation to distort. ===*/
+.book-page-pair-cover {
+  position: absolute;
+  top: -24px;
+  right: -24px;
+  bottom: -24px;
+  width: calc(50% + 24px);
+  height: calc(100% + 48px);
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  transition: transform 0.7s ease-in-out;
+  will-change: transform;
 }
 
-/* === The cover's BACK face is the INSIDE of the cover — what's
-   visible once the cover has been flipped open and lies against the
-   left side. Border baked directly onto this face too (border-left),
-   same as the front, so both faces of the cover carry their own
-   border that rotates with it. ===*/
-.book-page-pair-cover .book-page-pair-back {
+.book-page-pair-cover.is-flipped {
+  transform: rotateY(-180deg);
+}
+
+.book-page-pair-cover-face {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  backface-visibility: hidden;
+  overflow: hidden;
+  background-color: var(--cover-color, #e8627a);
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--binder-page-bg, #fff);
-  border-left: 14px solid var(--cover-color, transparent);
-  border-radius: 16px 0 0 16px;
+}
+
+.book-page-pair-cover-front {
+  transform: rotateY(0deg);
+  border-radius: 0 20px 20px 0;
+}
+
+.book-page-pair-cover-back {
+  transform: rotateY(180deg);
+  border-radius: 20px 0 0 20px;
+}
+
+/* === Static back-cover placeholder — same box model/size as
+   .book-page-pair-cover (24px on top/right/bottom), same position.
+   No rotation, so no transform-origin concern here — just needs to
+   match the cover's size/position exactly. ===*/
+.book-page-pair-back-cover {
+  position: absolute;
+  top: -24px;
+  right: -24px;
+  bottom: -24px;
+  width: calc(50% + 24px);
+  height: calc(100% + 48px);
+  box-sizing: border-box;
+  background-color: var(--cover-color, #e8627a);
+  border-radius: 0 20px 20px 0;
+  z-index: -1;
 }
