@@ -1,3 +1,13 @@
+// === ISSUE #1 START: Split Views — HomeView ===
+// === ISSUE #81 START: Binder Color Picker — use cover_color on binder cards ===
+// === ISSUE #83 START: Home Dashboard ===
+//   - 5 stat cards (Total Cards, Binders, Favorites, Unorganised, Recently Added)
+//   - Recently Added section — last 5 owned cards
+//   - Recent Activity feed — derived from existing timestamps, see
+//     selectors/homeStats.js for why this isn't a real event log
+//   - "View All" link for binders
+// === ISSUE #92 START: Customize Cover — hover-revealed button on BinderCard ===
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, EmptyState, StatCard, useCountUp } from '../ui/index.jsx';
 import { CreateBinderModal } from '../modals/index.js';
@@ -158,9 +168,6 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
   const color = binder.cover_color ?? DEFAULT_BINDER_COLOR;
   const animatedPct = useCountUp(pct);
 
-  // Mini-cover mirrors the real cover's stickers (actual saved
-  // positions/rotations/scale) at a smaller size, so Home genuinely
-  // previews the real cover instead of a simplified stand-in.
 
   return (
     <div className="binder-card-wrapper">
@@ -168,7 +175,28 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
           ::before/::after and hover box-shadow use currentColor,
           which without this falls back to black instead of the
           binder's actual cover_color. */}
-      <button className="binder-mini-cover" onClick={onClick} aria-label={`Open ${binder.name}`} style={{ color }}>
+      {/* === FIX (invalid HTML, hydration error): this was a real
+          <button>, but it contains another real <button> below
+          (the customize menu) — a button can never contain another
+          button per the HTML spec, and React logged a hydration
+          error over it. Converted to a div with the same click/
+          keyboard/role/aria behavior a button already gives for
+          free, so it's still fully clickable and accessible, just
+          not literally a <button> element anymore. ===*/}
+      <div
+        className="binder-mini-cover"
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label={`Open ${binder.name}`}
+        style={{ color }}
+      >
         <div
           className="binder-mini-cover-frame"
           style={{
@@ -195,7 +223,7 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
             <i className="ti ti-dots" aria-hidden="true"></i>
           </button>
         </div>
-      </button>
+      </div>
 
       {/* Binder name, card count, and progress always shown below the
           cover — matching the reference layout instead of overlaying

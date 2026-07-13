@@ -15,6 +15,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase.js';
+import { runImageMigrationIfNeeded } from '../utils/migrateImagesToStorage.js';
 
 export function useAuth() {
   const [user, setUser]       = useState(null);
@@ -26,13 +27,33 @@ export function useAuth() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // === ISSUE #125: also check here, not just on the SIGNED_IN
+      // event below. onAuthStateChange's SIGNED_IN typically only
+      // fires on a fresh sign-in action — a restored session from a
+      // previous visit (the common case for anyone who stays logged
+      // in) wouldn't fire it at all, meaning the migration would
+      // never run for exactly the users most likely to have old
+      // base64 images sitting around. ===
+      if (session?.user?.id) {
+        runImageMigrationIfNeeded(session.user.id);
+      }
     });
 
     // Subscribe to future auth changes (login, logout, token refresh).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // === ISSUE #125: one-time base64→Storage image migration ===
+        // Only on an actual sign-in, not every token refresh — the
+        // migration's own localStorage flag already makes repeat
+        // calls a no-op, but there's no reason to even check on every
+        // refresh when SIGNED_IN already tells us definitively.
+        if (event === 'SIGNED_IN' && session?.user?.id) {
+          runImageMigrationIfNeeded(session.user.id);
+        }
       }
     );
 

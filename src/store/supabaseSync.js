@@ -26,10 +26,51 @@ import { supabase } from '../services/supabase.js';
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
 // Never trust the userId stored on entities — old data may carry 'local-user-1'.
+//
+// === FIX (deletes/upserts silently no-op'ing while the app itself
+// looked like they'd succeeded): this used to call
+// supabase.auth.getUser() — a fresh NETWORK REQUEST — on every single
+// sync operation, 13 separate call sites in this file alone. Any
+// hiccup in any one of those network calls resolved to null, and the
+// calling code's own `if (!userId) return;` guard silently aborted
+// with zero logging. Meanwhile the reducer's own local state update
+// runs completely independently and unconditionally, so the UI
+// updates immediately regardless — the app LOOKS like the delete/
+// upsert succeeded while the actual Supabase write never happened.
+//
+// Fixed two ways: (1) the user id is now cached locally via an
+// onAuthStateChange subscription instead of a fresh network round-
+// trip on every single call — far fewer chances for any one of them
+// to fail — and (2) if it's ever still null when a write needs it,
+// that now logs loudly here, centrally, which covers every call site
+// in this file at once instead of needing 13 individual edits.
+let cachedUserId = null;
+
+supabase.auth.getSession().then(({ data: { session } }) => {
+  cachedUserId = session?.user?.id ?? null;
+});
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  cachedUserId = session?.user?.id ?? null;
+});
 
 async function getRealUserId() {
+  if (cachedUserId) return cachedUserId;
+  // Cache not populated yet — e.g. a sync call fires before the
+  // initial getSession() above has resolved. Fall back to a real
+  // request rather than giving up immediately.
   const { data: { user } } = await supabase.auth.getUser();
-  return user?.id ?? null;
+  cachedUserId = user?.id ?? null;
+
+  if (!cachedUserId) {
+    console.error(
+      '[Sync] getRealUserId resolved to null — a write is about to be ' +
+      'silently skipped even though the local UI already updated. Is the ' +
+      'session actually valid right now?'
+    );
+  }
+
+  return cachedUserId;
 }
 
 // ── Upsert helpers ────────────────────────────────────────────────────────────
@@ -104,12 +145,6 @@ function upsertBinItem(item, entityType) {
 }
 
 // ── Delete helpers ────────────────────────────────────────────────────────────
-
-function deleteBinder(binderId) {
-  supabase.from('binders').delete().eq('id', binderId)
-    .then(({ error }) => { if (error) console.error('[Sync] binder delete failed:', error); })
-    .catch(err => console.error('[Sync] binder delete error:', err));
-}
 
 function deleteCollection(collectionId) {
   supabase.from('collections').delete().eq('id', collectionId)
@@ -335,7 +370,20 @@ export function syncToSupabase(action, nextState, prevState) {
       const binItem = prevState.bin.find(b => b.id === itemId);
       if (binItem) {
         if (binItem._type === 'binder') {
-          deleteBinder(itemId);
+          // === FIX: deleteBinder(itemId) alone only removed the
+          // binders row itself — binder_slots referencing this
+          // binder_id were never cleaned up, leaving orphans behind
+          // that get silently dropped (with a console warning) every
+          // time BinderVault loads. Collections and card definitions
+          // already correctly cascade to binder_slots below; binders
+          // just never got the same treatment. ===
+          getRealUserId().then(async userId => {
+            if (!userId) return;
+            await supabase.from('binder_slots').delete().eq('binder_id', itemId).eq('user_id', userId);
+            await supabase.from('binders').delete().eq('id', itemId).eq('user_id', userId);
+            await supabase.from('bin').delete().eq('id', itemId).eq('user_id', userId);
+          });
+          return;
         } else if (binItem._type === 'collection') {
           getRealUserId().then(async userId => {
             if (!userId) return;
