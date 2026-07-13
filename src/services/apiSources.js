@@ -50,20 +50,6 @@ export const API_SOURCES = [
     ],
     sampleCards: [],
   },
-  {
-    id: 'pokemon-api',
-    name: 'Pokémon TCG',
-    category: 'Trading Cards',
-    cardCount: 16192,
-    templateFields: [
-      { field_name: 'Pokémon',     field_type: 'text',   is_required: true  },
-      { field_name: 'Set',         field_type: 'text',   is_required: true  },
-      { field_name: 'HP',          field_type: 'number', is_required: false },
-      { field_name: 'Rarity',      field_type: 'select', is_required: true  },
-      { field_name: 'Card Number', field_type: 'text',   is_required: true  },
-    ],
-    sampleCards: [],
-  },
 ];
 
 /**

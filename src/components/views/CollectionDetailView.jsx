@@ -13,7 +13,7 @@
 
 import { useStore } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
-import { Button, ConfirmModal } from '../ui/index.jsx';
+import { Button, ConfirmModal, EmptyState } from '../ui/index.jsx';
 import { CardDefinitionList } from '../collections/CardDefinitionList.jsx';
 import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
 import { CollectionSummary } from '../collections/CollectionSummary.jsx';
@@ -50,8 +50,8 @@ export function CollectionDetailView({ toast, onBack }) {
   const ownership = useOwnershipEditor();
 
   const collectionCards = useMemo(
-    () => cardDefinitions.filter(cd => cd.collectionId === collection.id),
-    [cardDefinitions, collection.id]
+    () => cardDefinitions.filter(cd => cd.collectionId === collection?.id),
+    [cardDefinitions, collection?.id]
   );
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
@@ -78,7 +78,7 @@ export function CollectionDetailView({ toast, onBack }) {
       onUnownSuccess: ownership.closeDetail,
     });
 
-  const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection.id);
+  const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection?.id);
 
   // === FIX (own/unown flow — quick-toggle from the grid): reused by
   // the Cards tab below AND by sharedTabProps, so Missing/Owned get
@@ -104,6 +104,27 @@ export function CollectionDetailView({ toast, onBack }) {
     onToggleFavorite: handleToggleFavorite,
     onToggleOwned: handleToggleOwned,
   };
+
+  // === FIX (real crash): if this collection no longer exists — e.g.
+  // deleted while this view was still open/referenced, or nav state
+  // pointing at a stale id after a delete — collection is null, and
+  // every collection.id/name access below would throw. This can only
+  // go after every hook above (Rules of Hooks: hooks must run
+  // unconditionally, in the same order, every render), which is why
+  // those hooks were made null-safe (collection?.id) rather than
+  // just guarding here and calling it done.
+  if (!collection) {
+    return (
+      <div className="view">
+        <EmptyState
+          icon="◈"
+          title="Collection not found"
+          subtitle="This collection may have been deleted."
+          action={<Button variant="primary" onClick={onBack}>← Back to Collections</Button>}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="collection-detail-view">

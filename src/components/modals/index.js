@@ -6,6 +6,9 @@ export { CreateBinderModal } from './BinderModals.jsx';
 export { CreateCollectionModal, EditCollectionModal } from './CollectionModals.jsx';
 export { CardDetailModal } from './CardDetailModal.jsx';
 
+// === ISSUE #130 (redesign): full-page set browser's import modal ===
+export { PokemonImportModal } from './PokemonImportModal.jsx';
+
 // === ISSUE #54 START: Add Card to Binder modal ===
 export { AddCardToBinderModal } from './AddCardToBinderModal.jsx';
 // === ISSUE #54 END ===

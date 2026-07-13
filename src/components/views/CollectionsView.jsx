@@ -19,6 +19,7 @@ import { useState, useMemo } from 'react';
 import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
 import { CreateCollectionModal, EditCollectionModal } from '../modals/index.js';
 import { CollectionList } from '../collections/CollectionList.jsx';
+import { PokemonSetsBrowser } from '../collections/PokemonSetsBrowser.jsx';
 import { buildCollectionStatsMap } from '../../selectors/collectionStats.js';
 import { useCollectionActions } from '../../hooks/useCollectionActions.js';
 
@@ -31,6 +32,9 @@ export function CollectionsView({ toast, onNavigate }) {
   const [editingCollection, setEditingCollection] = useState(null);
   const [confirmDelete, setConfirmDelete]       = useState(null);
   const [openMenuId, setOpenMenuId]             = useState(null);
+  // === ISSUE #130 (redesign): which franchise's full-page set
+  // browser is currently showing, if any ===
+  const [browsingFranchise, setBrowsingFranchise] = useState(null);
 
   // Stats computed once in a single O(n) pass — not per row
   const statsMap = useMemo(
@@ -56,6 +60,17 @@ export function CollectionsView({ toast, onNavigate }) {
     setEditingCollection(null);
   };
 
+  // === ISSUE #130 (redesign): full-page browser replaces this view's
+  // normal content entirely while active, not a modal overlay ===
+  if (browsingFranchise === 'pokemon') {
+    return (
+      <PokemonSetsBrowser
+        onBack={() => setBrowsingFranchise(null)}
+        onImportSuccess={(payload) => { handleCreate(payload); setBrowsingFranchise(null); }}
+      />
+    );
+  }
+
   return (
     <div className="view">
 
@@ -65,6 +80,25 @@ export function CollectionsView({ toast, onNavigate }) {
         <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
           + Create Collection
         </Button>
+      </div>
+
+      {/* === ISSUE #130 (redesign): franchise import tiles ===
+          Pokémon opens the real full-page browser. Yu-Gi-Oh and One
+          Piece are #131/#132 — not implemented yet, so they show a
+          toast rather than a dead click with no feedback at all. */}
+      <div className="franchise-tiles-row">
+        <button className="franchise-tile" onClick={() => setBrowsingFranchise('pokemon')}>
+          <span className="franchise-tile-icon">⚡</span>
+          <span className="franchise-tile-name">Pokémon TCG</span>
+        </button>
+        <button className="franchise-tile" onClick={() => toast('Yu-Gi-Oh! import is coming soon')}>
+          <span className="franchise-tile-icon">🐉</span>
+          <span className="franchise-tile-name">Yu-Gi-Oh!</span>
+        </button>
+        <button className="franchise-tile" onClick={() => toast('One Piece import is coming soon')}>
+          <span className="franchise-tile-icon">🏴‍☠️</span>
+          <span className="franchise-tile-name">One Piece</span>
+        </button>
       </div>
 
       {/* Search bar */}

@@ -15,6 +15,15 @@
  * same spacing/color tokens the rest of the app already uses — this file
  * was the one inconsistency found during the #89 audit; every other modal
  * already used classes exclusively.
+ *
+ * === ISSUE #130 (redesign) ===
+ * Pokémon TCG used to have its own search → preview → import steps
+ * inline in this file. That flow moved to a dedicated full page
+ * (PokemonSetsBrowser.jsx, opened from CollectionsView, not this
+ * modal) plus a reusable PokemonImportModal.jsx for the preview/
+ * confirm/progress part — pokemon-api was removed from apiSources.js
+ * accordingly, so this file's API flow now only covers sources that
+ * don't have a real implementation yet (Yu-Gi-Oh, Winx mock).
  */
 
 import { useState } from 'react';
@@ -91,7 +100,8 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     onSubmit({ collection, templateFields: fields, cardDefinitions: [] });
   };
 
-  // ── API flow ────────────────────────────────────────────────────────────────
+  // ── API flow (Yu-Gi-Oh/Winx mock sources — Pokémon has its own
+  // real flow now, see PokemonSetsBrowser.jsx) ─────────────────────
 
   const handleApiConfirm = () => {
     if (!selectedSource) return;

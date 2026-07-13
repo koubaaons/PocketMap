@@ -71,6 +71,49 @@ export async function deleteImageFromStorage(path) {
 }
 
 /**
+ * Checks whether a file already exists at the given path in the
+ * bucket, without downloading it — used to skip re-uploading an
+ * image that's already there (see uploadSharedImageIfMissing below).
+ */
+async function fileExistsAtPath(path) {
+  const lastSlash = path.lastIndexOf('/');
+  const folder = lastSlash === -1 ? '' : path.slice(0, lastSlash);
+  const filename = lastSlash === -1 ? path : path.slice(lastSlash + 1);
+  const { data, error } = await supabase.storage
+    .from(CARD_IMAGES_BUCKET)
+    .list(folder, { search: filename });
+  if (error) return false; // fail open — treat as "doesn't exist", upload will just upsert
+  return (data ?? []).some(f => f.name === filename);
+}
+
+/**
+ * For images that are the SAME for every user — official card art
+ * from an API import, not a personal photo or sticker — this stores
+ * one shared copy instead of one copy per user who happens to import
+ * the same card. If the path already has a file (a previous user
+ * already imported this exact card), skips fetching the source image
+ * AND uploading entirely, just returns the existing public URL —
+ * getImage is a lazy function, not a pre-fetched blob, specifically
+ * so the (often slow, external-CDN) fetch only happens when actually
+ * needed. Only ever call this for genuinely shared, official artwork;
+ * user-uploaded photos and stickers must keep using
+ * uploadImageToStorage with a user-scoped path, since those are NOT
+ * the same across users.
+ *
+ * @param {() => Promise<Blob|string>} getImage - lazily fetches/builds
+ *   the image (base64 or Blob) — only called if not already cached
+ * @param {string} path
+ */
+export async function uploadSharedImageIfMissing(getImage, path) {
+  const alreadyExists = await fileExistsAtPath(path);
+  if (alreadyExists) {
+    return `${storageBaseUrl}/${path}`;
+  }
+  const image = await getImage();
+  return uploadImageToStorage(image, path);
+}
+
+/**
  * Uploads an image (base64 data URL or a Blob/File) to the card-images
  * bucket at the given path and returns its public URL. upsert:true so
  * re-uploading the same path (e.g. re-running the migration on a card
