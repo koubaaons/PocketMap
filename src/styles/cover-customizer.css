@@ -444,3 +444,131 @@
   min-width: 28px;
   text-align: right;
 }
+/* === Floating customize button + inline panel, both living in the
+   empty space left of the closed cover — see BinderCustomizePanel.jsx.
+   Positioned absolutely within .binder-left-panel-area so neither
+   affects that area's own flex width (avoids the open/close layout
+   shift fixed earlier). ===*/
+/* Wraps the floating button so centering and the float animation's
+   own transform (see animations.css) don't compete on the same
+   element — CSS animations fully replace the transform property
+   rather than merging with an existing static value, so putting both
+   on one element would make the button jump to the animation's
+   translateY and lose its centering entirely.
+   Positioned at the center of the LEFT HALF of .binder-book (25% from
+   its left edge) — the middle of the empty space, not tucked up
+   against the spine. */
+/* Horizontal again, centered in the empty space to the left of the
+   binder — wider than the original horizontal version, keeping the
+   translucent glass look from the vertical experiment. */
+.binder-customize-float-wrap {
+  position: absolute;
+  top: 50%;
+  left: 25%;
+  transform: translate(-50%, -50%);
+  z-index: 50;
+}
+
+.binder-customize-float-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  min-width: 220px;
+  border-radius: var(--radius-full);
+  /* Translucent fill + blur + glowing border, rather than a solid
+     gradient — reads as the binder's own light spilling into a
+     glass-like panel instead of an opaque button sitting next to it. */
+  background: rgba(255, 107, 157, 0.18);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1.5px solid rgba(255, 107, 157, 0.5);
+  color: #d94f8a;
+  cursor: pointer;
+  box-shadow:
+    0 0 24px 4px rgba(255, 107, 157, 0.25),
+    inset 0 0 20px rgba(255, 107, 157, 0.1);
+  transition: box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.binder-customize-float-btn-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold, 700);
+  letter-spacing: 0.02em;
+}
+
+.binder-customize-float-btn i {
+  font-size: 1.2em;
+}
+
+.binder-customize-float-btn:hover {
+  background: rgba(255, 107, 157, 0.28);
+  box-shadow:
+    0 0 32px 6px rgba(255, 107, 157, 0.35),
+    inset 0 0 24px rgba(255, 107, 157, 0.15);
+}
+
+/* Same exact position as .binder-customize-float-wrap — the panel
+   takes the button's place rather than appearing below it. */
+.binder-customize-panel-wrap {
+  position: absolute;
+  top: 50%;
+  left: 25%;
+  transform: translate(-50%, -50%);
+  z-index: 50;
+}
+
+.binder-customize-panel {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.binder-customize-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.binder-customize-field input[type="text"] {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.binder-customize-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.binder-customize-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.binder-customize-swatch-selected {
+  border-color: var(--text-primary);
+}
+
+.binder-customize-panel-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}

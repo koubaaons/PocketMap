@@ -1,0 +1,96 @@
+/**
+ * @fileoverview Reusable keyframe animations, shared across components.
+ * Add new general-purpose animations here rather than duplicating a
+ * @keyframes block inside a component-specific stylesheet.
+ */
+
+/* Gentle floating bob + shadow pulse, adapted from a CodePen "floating
+   avatar" technique. Apply via .animate-float to any element that
+   should read as gently hovering rather than static. */
+@keyframes float {
+  0% {
+    box-shadow: 0 5px 15px 0px rgba(0, 0, 0, 0.4);
+    transform: translateY(8px);
+  }
+  50% {
+    box-shadow: 0 25px 15px 0px rgba(0, 0, 0, 0.15);
+    transform: translateY(-16px);
+  }
+  100% {
+    box-shadow: 0 5px 15px 0px rgba(0, 0, 0, 0.4);
+    transform: translateY(8px);
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Holographic sliding-gradient sweep, adapted from a CodePen
+   "holographic interface" technique. Apply .animate-holo-sweep to an
+   element whose own background is a multi-stop gradient with
+   background-size set wide (e.g. 300% 100%) — this just slides that
+   gradient horizontally through its own background-position, giving
+   a shimmering, shifting-color look rather than a static gradient. */
+@keyframes holo-sweep {
+  to {
+    background-position: 300% 0;
+  }
+}
+
+.animate-holo-sweep {
+  background-size: 300% 100%;
+  animation: holo-sweep 3s linear infinite;
+}
+
+/* Slide-up + fade-in entrance — for panels/menus that should appear
+   as if rising into place from just below their final position,
+   rather than popping in instantly. */
+@keyframes slide-up-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up-fade-in {
+  animation: slide-up-fade-in 0.3s ease-out;
+}
+
+/* Pulsing glow behind the closed binder cover — lights up and dims
+   on a loop, rather than a static glow. Positioned to match the
+   cover's own footprint (right half of .binder-book), colored from
+   --cover-color. Lives in animations.css since box-shadow pulses
+   like this are a reasonable thing to reuse elsewhere too. */
+@keyframes cover-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px 4px color-mix(in srgb, var(--cover-color, #8bc796) 25%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 55px 14px color-mix(in srgb, var(--cover-color, #8bc796) 55%, transparent);
+  }
+}
+
+.binder-cover-glow-pulse {
+  position: absolute;
+  /* Matches the cover's OWN extended footprint (see
+     .book-page-pair-cover in binder-book-flip.css, which extends
+     24px beyond .binder-book on top/right/bottom) — not just
+     .binder-book's own un-extended box. The cover itself is opaque
+     and bigger than .binder-book, so a glow sized to only match
+     .binder-book was getting physically covered by the cover's own
+     body on those three sides, leaving only the left (where the
+     cover has no extension) actually visible. */
+  top: -24px;
+  right: -24px;
+  bottom: -24px;
+  left: 50%;
+  border-radius: 0 20px 20px 0;
+  pointer-events: none;
+  z-index: 0;
+  animation: cover-glow-pulse 3.5s ease-in-out infinite;
+}

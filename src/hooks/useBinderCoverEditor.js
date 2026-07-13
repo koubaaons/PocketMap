@@ -38,6 +38,8 @@ export function useBinderCoverEditor({ binder, toast }) {
   const [selectedStickerId, setSelectedStickerId] = useState(null);
   const [isUploadingSticker, setIsUploadingSticker] = useState(false);
   const [stickerUploadError, setStickerUploadError] = useState('');
+  const [draftName, setDraftName]   = useState(binder.name);
+  const [draftColor, setDraftColor] = useState(binder.cover_color);
 
   const coverRef            = useRef(null);
   const stickerFileInputRef = useRef(null);
@@ -46,17 +48,24 @@ export function useBinderCoverEditor({ binder, toast }) {
   const handleEnterCoverEdit = () => {
     setDraftStickers(binder.stickers ?? []);
     setSelectedStickerId(null);
+    setDraftName(binder.name);
+    setDraftColor(binder.cover_color);
     setIsEditingCover(true);
   };
 
   const handleCancelCoverEdit = () => {
     setDraftStickers(binder.stickers ?? []);
     setSelectedStickerId(null);
+    setDraftName(binder.name);
+    setDraftColor(binder.cover_color);
     setIsEditingCover(false);
   };
 
   const handleSaveCoverEdit = () => {
-    dispatch({ type: ACTIONS.BINDER_UPDATE, payload: { ...binder, stickers: draftStickers, updatedAt: Date.now() } });
+    dispatch({
+      type: ACTIONS.BINDER_UPDATE,
+      payload: { ...binder, stickers: draftStickers, name: draftName.trim() || binder.name, cover_color: draftColor, updatedAt: Date.now() },
+    });
     toast?.('Cover updated');
     setSelectedStickerId(null);
     setIsEditingCover(false);
@@ -121,7 +130,11 @@ export function useBinderCoverEditor({ binder, toast }) {
     selectedStickerId,
     isUploadingSticker,
     stickerUploadError,
+    draftName,
+    draftColor,
     setSelectedStickerId,
+    setDraftName,
+    setDraftColor,
     // handlers
     handleEnterCoverEdit,
     handleCancelCoverEdit,

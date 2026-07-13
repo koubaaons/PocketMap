@@ -32,11 +32,11 @@ import { useState, useEffect, useRef } from 'react';
 /**
  * @param {{ variant?: 'primary'|'ghost'|'danger'|'icon', size?: 'sm'|'md', children, onClick, disabled?, style?, title? }} props
  */
-export function Button({ variant = 'ghost', size = 'md', children, onClick, disabled, style, title, type = 'button' }) {
+export function Button({ variant = 'ghost', size = 'md', children, onClick, disabled, style, title, type = 'button', className = '' }) {
   return (
     <button
       type={type}
-      className={`btn btn-${variant} btn-${size}`}
+      className={`btn btn-${variant} btn-${size} ${className}`}
       onClick={onClick}
       disabled={disabled}
       style={style}

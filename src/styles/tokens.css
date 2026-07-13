@@ -13,7 +13,7 @@
 
 :root {
   /* ── Colour — Backgrounds ─────────────────────────────────────────────── */
-  --bg-primary:      #ffffff;
+  --bg-primary:      #faf7f2;
   --bg-secondary:    #f8f7f9;
   --bg-tertiary:     #f0eef3;
   --bg-hover:        #f3f1f6;
@@ -55,7 +55,7 @@
   --placeholder-color: #6b6375;
 
   /* ── Colour — Sidebar ─────────────────────────────────────────────────── */
-  --sidebar-bg:      #faf9fb;
+  --sidebar-bg:      #faf7f2;
   --sidebar-border:  #e5e4e7;
   --sidebar-active-bg: rgba(232, 98, 122, 0.08);
   --sidebar-active-border: #e8627a;
@@ -64,7 +64,7 @@
   --sidebar-hover-bg: #f3f1f6;
 
   /* ── Colour — Panels ──────────────────────────────────────────────────── */
-  --panel-bg:        #ffffff;
+  --panel-bg:        #fffdfa;
   --panel-border:    #e5e4e7;
 
   /* ── Typography ───────────────────────────────────────────────────────── */

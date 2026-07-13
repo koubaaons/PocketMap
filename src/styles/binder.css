@@ -9,6 +9,7 @@
 /* ── Binder view root ─────────────────────────────────────────────────────── */
 
 .binder-view-root {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - var(--topbar-height));
@@ -75,24 +76,90 @@
 
 .binder-topbar-left {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-3);
 }
 
 .binder-title {
   font-size: var(--text-lg);
   font-weight: var(--weight-medium);
+  opacity: 0;
+  animation: binder-title-fade-slide 0.4s ease-out 0.15s forwards;
 }
 
-.binder-fill-count {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
+/* Accent bar + staggered chip entrance — plays once per binder-view
+   mount, not on every render. --accent-bar-color is set inline
+   alongside the bar's own background (see BinderView.jsx), since the
+   glow needs to reference that same color and currentColor would
+   resolve to text color instead (this element has no text). */
+.binder-title-accent-bar {
+  width: 4px;
+  height: 36px;
+  border-radius: 2px;
+  opacity: 0;
+  animation:
+    binder-title-bar-grow 0.4s ease-out forwards,
+    binder-title-bar-pulse 2.5s ease-in-out 0.6s infinite;
+}
+
+@keyframes binder-title-bar-grow {
+  from { opacity: 0; height: 0; }
+  to   { opacity: 1; height: 36px; }
+}
+
+@keyframes binder-title-bar-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+  50%      { box-shadow: 0 0 8px 2px color-mix(in srgb, var(--accent-bar-color, currentColor) 50%, transparent); }
+}
+
+.binder-stat-chips {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 4px;
+}
+
+.binder-stat-chip {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  opacity: 0;
+  animation: binder-title-fade-slide 0.35s ease-out forwards;
+}
+
+.binder-stat-chip:nth-child(1) { animation-delay: 0.25s; }
+.binder-stat-chip:nth-child(2) { animation-delay: 0.35s; }
+.binder-stat-chip:nth-child(3) { animation-delay: 0.45s; }
+
+.binder-stat-chip-pct {
+  background: var(--accent-light);
+  color: var(--accent-hover);
+}
+
+@keyframes binder-title-fade-slide {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .binder-topbar-right {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* Applied to .binder-topbar and .binder-page-nav while the cover is
+   closed — everything dims and stops responding to clicks EXCEPT
+   whatever carries .binder-topbar-always-live (the fullscreen
+   button), which stays fully live so fullscreen works even closed. */
+.binder-topbar-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.binder-topbar-disabled .binder-topbar-always-live {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* ── Edit / Preview mode toggle ───────────────────────────────────────────── */
@@ -190,11 +257,19 @@
      scroll behavior itself still works. */
   scrollbar-width: none;
   -ms-overflow-style: none;
-  /* Padding must exceed the cover's own extension (currently 24px,
-     see .book-page-pair-cover) or overflow-y:auto clips its rounded
-     corners flush at this wrapper's edge. */
   padding-top: 28px;
   padding-bottom: 28px;
+}
+
+/* Extra padding only while closed — this is specifically to give the
+   pulsing cover glow (see .binder-cover-glow-pulse in animations.css)
+   room to bleed without overflow-y:auto clipping it. Applying this at
+   all times (even while open, when the glow doesn't exist) was adding
+   unnecessary space around the book permanently, pushing it down and
+   eating into the room fullscreen needs. */
+.binder-book-wrapper-closed {
+  padding-top: 80px;
+  padding-bottom: 80px;
 }
 
 /* WebKit (Chrome/Safari) doesn't respect scrollbar-width — needs its

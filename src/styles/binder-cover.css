@@ -13,6 +13,9 @@
  * it was still referenced by any component, so it's been removed.)
  */
 
+/* Wraps .binder-cover-label and the floating customize button/panel —
+   position:relative so the panel (absolutely positioned) anchors here
+   instead of drifting relative to some other ancestor. */
 .binder-cover-label {
   text-align: center;
   padding-top: var(--space-3);
