@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import { useDispatch } from './useStore.js';
-import { ACTIONS } from '../store/index.js';
+import { ACTIONS, waitForPendingSyncs } from '../store/index.js';
 import { loadStateFromSupabase } from '../store/supabaseStorage.js';
 import { useAuth } from './useAuth.js';
 import { supabase } from '../services/supabase.js';
@@ -66,6 +66,18 @@ export function useSupabaseSync() {
     async function handleChange() {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(async () => {
+        // === FIX: this used to re-fetch immediately after the 300ms
+        // debounce with no idea whether a write THIS SAME CLIENT just
+        // made had actually finished committing yet. Since this event
+        // fires on our own writes too (the filter is just "this
+        // user", not "changes from elsewhere"), a delete followed by
+        // Save could have its own re-fetch race ahead of the delete's
+        // own upsert, read stale data, and silently overwrite the
+        // just-made change back to its old state. Waiting for
+        // everything currently in flight to settle first closes that
+        // race — see store/index.js and supabaseSync.js for the
+        // tracking this relies on. ===
+        await waitForPendingSyncs();
         const serverState = await loadStateFromSupabase();
         if (serverState) {
           dispatch({ type: ACTIONS.HYDRATE, payload: serverState });

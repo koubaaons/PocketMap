@@ -47,6 +47,30 @@ export function dataUrlToBlob(dataUrl) {
 }
 
 /**
+ * Converts a public URL (as returned by uploadImageToStorage) back into
+ * its storage path, so it can be passed to Storage's remove(). Returns
+ * null if the URL doesn't match this bucket's base URL at all (e.g. an
+ * external image someone pasted in some other way) — callers should
+ * skip deletion rather than attempt to remove something that was never
+ * actually in this bucket to begin with.
+ */
+export function getStoragePathFromUrl(url) {
+  if (!url || !url.startsWith(storageBaseUrl)) return null;
+  return url.slice(storageBaseUrl.length + 1); // +1 for the joining '/'
+}
+
+/**
+ * Deletes a single object from the card-images bucket by its storage
+ * path. Safe to call with a null path (no-ops) — callers don't need to
+ * separately guard every call site with their own null check.
+ */
+export async function deleteImageFromStorage(path) {
+  if (!path) return;
+  const { error } = await supabase.storage.from(CARD_IMAGES_BUCKET).remove([path]);
+  if (error) console.error('[Pinder] Failed to delete storage object:', path, error);
+}
+
+/**
  * Uploads an image (base64 data URL or a Blob/File) to the card-images
  * bucket at the given path and returns its public URL. upsert:true so
  * re-uploading the same path (e.g. re-running the migration on a card
@@ -62,7 +86,17 @@ export async function uploadImageToStorage(image, path) {
 
   const { error } = await supabase.storage
     .from(CARD_IMAGES_BUCKET)
-    .upload(path, blob, { contentType: blob.type, upsert: true });
+    .upload(path, blob, {
+      contentType: blob.type,
+      upsert: true,
+      // One year — card images never change once uploaded (a new
+      // upload gets a new random path, see CardDefinitionForm.jsx/
+      // useBinderCoverEditor.js, rather than overwriting an existing
+      // one), so there's no staleness risk in caching this long.
+      // Directly reduces egress: the browser only downloads each
+      // image once, ever, instead of on every page load.
+      cacheControl: '31536000',
+    });
 
   if (error) throw error;
 

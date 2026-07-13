@@ -15,6 +15,18 @@ import { syncToSupabase } from './supabaseSync.js';
 
 const DEBUG = import.meta.env.DEV;
 
+// === FIX (realtime re-fetch racing ahead of a local write — see
+// supabaseSync.js's file header for the full explanation): every
+// syncToSupabase call's returned promise gets tracked here so
+// useSupabaseSync.js's realtime handler can wait for all currently
+// in-flight writes to actually finish before re-fetching and
+// overwriting local state with what might otherwise be stale data. ===
+const pendingSyncs = new Set();
+
+export function waitForPendingSyncs() {
+  return Promise.allSettled([...pendingSyncs]);
+}
+
 function buildInitialState() {
   const persisted = loadState();
   return {
@@ -76,8 +88,13 @@ function createStore(reducerFn, initialState) {
           return;
         }
 
-        // 2. Sync to Supabase (fire-and-forget, non-blocking)
-        syncToSupabase(action, nextState, prevState);
+        // 2. Sync to Supabase (fire-and-forget as far as the UI is
+        // concerned — not awaited here, so nothing blocks). Its
+        // returned promise IS tracked, though, so realtime can wait
+        // for it — see waitForPendingSyncs above.
+        const syncPromise = syncToSupabase(action, nextState, prevState);
+        pendingSyncs.add(syncPromise);
+        syncPromise.finally(() => pendingSyncs.delete(syncPromise));
       }
 
       listeners.forEach(fn => fn(state));
