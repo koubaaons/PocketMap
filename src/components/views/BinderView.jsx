@@ -476,7 +476,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           what fullscreen's width-cap measurement targets (see
           bookFlipWrapperRef above), since BinderBookFlip itself takes no
           ref/maxWidth prop. */}
-      <div className={`binder-book-wrapper ${isCover ? 'binder-book-wrapper-closed' : ''}`}>
+      <div className="binder-book-wrapper">
         <button
           className="binder-nav-arrow binder-nav-arrow-side binder-nav-arrow-left"
           onClick={() => view.goToPage(spread - 1)}
@@ -506,13 +506,15 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
             ...(fullscreenMaxBookWidth ? { maxWidth: `${fullscreenMaxBookWidth}px` } : {}),
           }}
         >
-          {/* Pulsing glow behind the closed cover's own footprint (the
-              right half) — a separate element, not on .binder-book
-              itself, since that element has boxShadow:'none' set
-              inline above and inline styles always beat a stylesheet
-              animation targeting the same property on the same
-              element. Colored from --cover-color (set above). */}
-          {isCover && <div className="binder-cover-glow-pulse" />}
+          {/* Pulsing glow behind the binder — a separate element, not
+              on .binder-book itself, since that element has
+              boxShadow:'none' set inline above and inline styles
+              always beat a stylesheet animation targeting the same
+              property on the same element. Colored from --cover-color
+              (set above). Matches the cover's own extended footprint
+              (right half) while closed, or the full book width while
+              open — see the two size variants in animations.css. */}
+          <div className={`binder-cover-glow-pulse ${isCover ? '' : 'binder-cover-glow-pulse-open'}`} />
 
           {/* Customize button/panel — absolutely positioned within the
               binder's OWN box (which is already sized for a full
@@ -522,7 +524,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
               reserving separate flex space outside the binder, which
               was forcing the whole row wider and shrinking the binder
               itself to compensate. */}
-          {isCover && <BinderCustomizePanel isCover={isCover} {...coverEditor} />}
+          {isCover && !isAnimatingCoverFlip && <BinderCustomizePanel isCover={isCover} {...coverEditor} />}
           <BinderBookFlip
             binder={binder}
             binderSlots={displaySlots}

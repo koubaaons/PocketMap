@@ -251,31 +251,16 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  overflow-y: auto;
-  /* Native scrollbar arrows flashed briefly during the cover's
-     transition as content height changed. Hidden visually only —
-     scroll behavior itself still works. */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  /* Was overflow-y:auto (a scroll safety-net for an unusually tall
+     binder) — switched to visible so the pulsing cover glow (see
+     .binder-cover-glow-pulse in animations.css) never gets clipped,
+     with no padding workaround needed at all. Trade-off: a binder
+     tall enough to exceed the viewport would no longer scroll inside
+     this wrapper specifically; .binder-view-root's own scroll
+     handling still applies to the page as a whole. */
+  overflow: visible;
   padding-top: 28px;
   padding-bottom: 28px;
-}
-
-/* Extra padding only while closed — this is specifically to give the
-   pulsing cover glow (see .binder-cover-glow-pulse in animations.css)
-   room to bleed without overflow-y:auto clipping it. Applying this at
-   all times (even while open, when the glow doesn't exist) was adding
-   unnecessary space around the book permanently, pushing it down and
-   eating into the room fullscreen needs. */
-.binder-book-wrapper-closed {
-  padding-top: 80px;
-  padding-bottom: 80px;
-}
-
-/* WebKit (Chrome/Safari) doesn't respect scrollbar-width — needs its
-   own pseudo-element rule to actually hide the scrollbar there. */
-.binder-book-wrapper::-webkit-scrollbar {
-  display: none;
 }
 
 /* ── Book — #4 cover thickness ────────────────────────────────────────────── */
