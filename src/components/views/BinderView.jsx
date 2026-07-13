@@ -30,7 +30,9 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Button, ConfirmModal, useCountUp } from '../ui/index.jsx';
+import { ConfirmModal } from '../ui/index.jsx';
+import { BinderTopbar } from './BinderTopbar.jsx';
+import { BinderPageNav } from './BinderPageNav.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { SlotActionModal } from '../modals/SlotActionModal.jsx';
@@ -169,14 +171,6 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
   const filled   = getFilledSlotCount(binderSlots, binder.id);
   const capacity = binder.rows * binder.cols * binder.pages;
-  const percentComplete = capacity > 0 ? Math.round((filled / capacity) * 100) : 0;
-
-  // Count-up for the title area's stat chips — same technique as the
-  // Home dashboard's stat cards, so numbers animate in on mount
-  // instead of just appearing.
-  const displayedFilled  = useCountUp(filled);
-  const displayedPages   = useCountUp(binder.pages);
-  const displayedPercent = useCountUp(percentComplete);
 
   const { handleAddToSlot, handleRemoveFromSlot, handleAddPage } =
     useBinderSlotActions(toast, {
@@ -405,84 +399,34 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       {/* Topbar — always visible now, greyed out while closed except the
           fullscreen toggle, so fullscreen works even on the closed
           cover. Opens fully interactive once the binder opens. */}
-      <div className={`binder-topbar ${isClosed ? 'binder-topbar-disabled' : ''}`}>
-        <div className="binder-topbar-left">
-          <div className="binder-title-accent-bar" style={{ background: color, '--accent-bar-color': color }} />
-          <div>
-            <span className="binder-title" style={{ color }}>{binder.name}</span>
-            <div className="binder-stat-chips">
-              <span className="binder-stat-chip">{displayedFilled}/{capacity} cards</span>
-              <span className="binder-stat-chip">{displayedPages} pages</span>
-              <span className="binder-stat-chip binder-stat-chip-pct">{displayedPercent}% complete</span>
-            </div>
-          </div>
-        </div>
-        <div className="binder-topbar-right">
-          <div className="binder-mode-toggle">
-            <button
-              className={`mode-btn ${!view.isPreviewMode ? 'mode-btn-active' : ''}`}
-              onClick={view.exitPreviewMode}
-              disabled={isClosed}
-            >
-              Edit Mode
-            </button>
-            <button
-              className={`mode-btn ${view.isPreviewMode ? 'mode-btn-active' : ''}`}
-              onClick={view.enterPreviewMode}
-              disabled={isClosed}
-            >
-              Preview Mode
-            </button>
-          </div>
-
-          {view.isPreviewMode && (
-            <Button variant="primary" size="sm" onClick={handleSaveLayout} disabled={isClosed}>
-              Save Layout
-            </Button>
-          )}
-
-          {!view.isPreviewMode && (
-            <Button variant="ghost" size="sm" onClick={() => handleAddPage(binder.id)} disabled={isClosed}>+ Page</Button>
-          )}
-
-          {/* Fullscreen — the one control that stays live while closed,
-              deliberately outside the greyed-out treatment above. */}
-          <Button variant="ghost" size="sm" onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} className="binder-topbar-always-live">
-            {isFullscreen ? '✕' : '⛶'}
-          </Button>
-
-          <Button variant="ghost" size="sm" onClick={handleCloseBinder} disabled={isClosed}>
-            Close Binder
-          </Button>
-
-          <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)} disabled={isClosed}>Delete</Button>
-        </div>
-      </div>
+      <BinderTopbar
+        binder={binder}
+        color={color}
+        isClosed={isClosed}
+        filled={filled}
+        capacity={capacity}
+        isPreviewMode={view.isPreviewMode}
+        onExitPreviewMode={view.exitPreviewMode}
+        onEnterPreviewMode={view.enterPreviewMode}
+        onSaveLayout={handleSaveLayout}
+        onAddPage={() => handleAddPage(binder.id)}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        onCloseBinder={handleCloseBinder}
+        onDeleteRequest={() => setConfirmDelete(true)}
+      />
 
       {/* Page navigation — greyed out while closed, same as topbar. */}
-      <div className={`binder-page-nav ${isClosed ? 'binder-topbar-disabled' : ''}`}>
-        <input
-          type="number"
-          className="binder-page-input"
-          value={pageInputValue}
-          min={1}
-          max={binder.pages}
-          disabled={isClosed}
-          onFocus={() => setIsEditingPageInput(true)}
-          onChange={(e) => setPageInputValue(e.target.value)}
-          onBlur={commitPageInput}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.currentTarget.blur();
-            } else if (e.key === 'Escape') {
-              setPageInputValue(String(currentDisplayPage));
-              e.currentTarget.blur();
-            }
-          }}
-          aria-label="Jump to page"
-        />
-        <span className="binder-page-indicator-suffix">/ {binder.pages} pages</span>
-      </div>
+      <BinderPageNav
+        isClosed={isClosed}
+        pageInputValue={pageInputValue}
+        totalPages={binder.pages}
+        currentDisplayPage={currentDisplayPage}
+        onFocusInput={() => setIsEditingPageInput(true)}
+        onChangeInput={setPageInputValue}
+        onCommitInput={commitPageInput}
+        onResetInput={setPageInputValue}
+      />
 
       {/* Book — BinderBookFlip is now the only book. The wrapper div is
           what fullscreen's width-cap measurement targets (see
