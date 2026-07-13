@@ -461,10 +461,13 @@
 /* Horizontal again, centered in the empty space to the left of the
    binder — wider than the original horizontal version, keeping the
    translucent glass look from the vertical experiment. */
+/* left moved from 25% toward the binder to compensate for
+   .binder-book's own -25% resting offset (see .binder-book-centered)
+   — 34% keeps it clear of the cover without overlapping onto it. */
 .binder-customize-float-wrap {
   position: absolute;
   top: 50%;
-  left: 25%;
+  left: 34%;
   transform: translate(-50%, -50%);
   z-index: 50;
 }
@@ -474,8 +477,8 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-6);
-  min-width: 220px;
+  padding: var(--space-3) var(--space-5);
+  min-width: 160px;
   border-radius: var(--radius-full);
   /* Translucent fill + blur + glowing border, rather than a solid
      gradient — reads as the binder's own light spilling into a
@@ -511,6 +514,10 @@
 
 /* Same exact position as .binder-customize-float-wrap — the panel
    takes the button's place rather than appearing below it. */
+/* Stays at 25% (unlike the button above) — the panel only shows once
+   isEditingCover is true, which is exactly when .binder-book-centered
+   is removed and the box sits at its normal, unshifted position, so
+   no compensation is needed here. */
 .binder-customize-panel-wrap {
   position: absolute;
   top: 50%;

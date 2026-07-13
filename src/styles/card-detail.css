@@ -1,10 +1,112 @@
 /* ── Card detail ──────────────────────────────────────────────────────────── */
 
+/* Group containing just the card (and the close/show-details buttons
+   attached to it) — this is what slides left via translateX when the
+   panel opens, since the panel itself is absolutely positioned
+   relative to this group rather than being a normal flex sibling
+   (a plain flex reflow doesn't animate on its own; this does). */
+.card-detail-group {
+  position: relative;
+  display: inline-flex;
+  transition: transform 0.4s ease-out;
+}
+
+.card-detail-group-open {
+  transform: translateX(-160px);
+}
+
+.card-detail-close-btn {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  z-index: 2;
+}
+
+/* "Show details" — sits just off the card's left edge, same glass-pill
+   look as the binder's Customize button. */
+.card-detail-show-btn {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  margin-right: var(--space-4);
+  transform: translateY(-50%);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-full);
+  background: rgba(255, 107, 157, 0.18);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1.5px solid rgba(255, 107, 157, 0.5);
+  color: #ff9ec4;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold, 700);
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow:
+    0 0 24px 4px rgba(255, 107, 157, 0.25),
+    inset 0 0 20px rgba(255, 107, 157, 0.1);
+}
+
+.card-detail-show-btn:hover {
+  background: rgba(255, 107, 157, 0.28);
+}
+
+/* The boxed panel — reveals on the card's RIGHT once open, absolutely
+   positioned relative to .card-detail-group so its appearance doesn't
+   also shift .card-detail-group's own transition target. Same visual
+   language as the shared .modal (background/border/radius tokens). */
+.card-detail-panel {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: var(--space-5);
+  width: 320px;
+  background: var(--bg-primary);
+  border: 0.5px solid var(--border-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.card-detail-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.card-detail-panel-title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  margin: 0;
+}
+
 .card-detail-status {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: var(--space-2) 0;
+}
+
+@media (max-width: 768px) {
+  .card-detail-group-open {
+    transform: none;
+  }
+
+  .card-detail-panel {
+    position: static;
+    margin-left: 0;
+    margin-top: var(--space-4);
+    width: 100%;
+  }
+
+  .card-detail-show-btn {
+    position: static;
+    margin: 0 0 var(--space-4);
+    transform: none;
+  }
 }
 
 .card-detail-attrs {

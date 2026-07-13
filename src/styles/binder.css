@@ -277,6 +277,20 @@
   padding: 10px;
   gap: 0;
   position: relative;
+  /* Only actually matters while .binder-book-centered toggles on/off
+     (customize/pre-open sliding) — harmless the rest of the time. */
+  transition: transform 0.4s ease-out;
+}
+
+/* Resting offset while closed and not interacting — the cover
+   occupies this box's own right half, so shifting the whole box left
+   by a quarter of its width brings the cover's own center to the
+   wrapper's true center. Removed (transform: none, via the base
+   .binder-book rule with no override) the instant Customize opens or
+   the pre-open slide starts, which visually reads as the cover
+   sliding right into its normal position. */
+.binder-book-centered {
+  transform: translateX(-25%);
 }
 
 /* #4 Raised inner edge — disabled for now, see comment above. */

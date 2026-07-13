@@ -88,12 +88,10 @@
 .card-detail-image-wrapper {
   display: flex;
   justify-content: center;
-  /* === FIX: margin-bottom removed — .modal already applies
-     gap: var(--space-4) (16px) between EVERY flex child, so this
-     12px margin-bottom was stacking on top of that gap rather than
-     being the only source of spacing, contributing to a larger-than-
-     intended empty gap between the card image and the status row
-     below it. The modal's own gap is sufficient on its own. === */
+  /* Floats freely now (no boxed modal panel behind it), so it needs
+     its own drop shadow to read as a real object rather than a flat
+     image sitting on the backdrop. */
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
 }
 
 .card-detail-image {

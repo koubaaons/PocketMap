@@ -115,10 +115,22 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   // whole reason for being (keeping a second book's cosmetic state in
   // sync with this one) no longer applies now that there's only one
   // book. ===
+  // === Pre-open slide: when clicking the closed cover to open it, the
+  // binder first slides right (same direction/distance as opening the
+  // Customize panel), THEN the actual open animation (unchanged, still
+  // just view.goToPage(1) triggering BinderBookFlip's own flip) fires
+  // once the slide has visually finished. isPreOpenSliding only
+  // controls this pre-step; it has no effect on the flip itself. ===
+  const PRE_OPEN_SLIDE_MS = 400;
+  const [isPreOpenSliding, setIsPreOpenSliding] = useState(false);
+
   const handleOpenBinder = () => {
-    if (view.page === 0) {
+    if (view.page !== 0 || isPreOpenSliding) return;
+    setIsPreOpenSliding(true);
+    setTimeout(() => {
       view.goToPage(1);
-    }
+      setIsPreOpenSliding(false);
+    }, PRE_OPEN_SLIDE_MS);
   };
 
   const handleCloseBinder = () => {
@@ -488,7 +500,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
         <div
           ref={bookFlipWrapperRef}
-          className={`binder-book ${(isCover || isAnimatingCoverFlip) ? 'binder-book-closed' : ''}`}
+          className={`binder-book ${(isCover || isAnimatingCoverFlip) ? 'binder-book-closed' : ''} ${(isCover && !coverEditor.isEditingCover && !isPreOpenSliding) ? 'binder-book-centered' : ''}`}
           style={{
             position: 'relative',
             aspectRatio: effectiveBookAspectRatio,
@@ -514,7 +526,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
               (set above). Matches the cover's own extended footprint
               (right half) while closed, or the full book width while
               open — see the two size variants in animations.css. */}
-          <div className={`binder-cover-glow-pulse ${isCover ? '' : 'binder-cover-glow-pulse-open'}`} />
+          {isCover && <div className="binder-cover-glow-pulse" />}
 
           {/* Customize button/panel — absolutely positioned within the
               binder's OWN box (which is already sized for a full
@@ -524,7 +536,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
               reserving separate flex space outside the binder, which
               was forcing the whole row wider and shrinking the binder
               itself to compensate. */}
-          {isCover && !isAnimatingCoverFlip && <BinderCustomizePanel isCover={isCover} {...coverEditor} />}
+          {isCover && !isAnimatingCoverFlip && !isPreOpenSliding && <BinderCustomizePanel isCover={isCover} {...coverEditor} />}
           <BinderBookFlip
             binder={binder}
             binderSlots={displaySlots}

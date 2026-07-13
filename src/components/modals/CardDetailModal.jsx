@@ -1,13 +1,20 @@
 /**
  * @fileoverview CardDetailModal — shows a card definition with ownership info.
- * === ISSUE #80: card image displayed prominently at top ===
+ *
+ * Two-part layout: the card image floats freely on its own (no box or
+ * background behind it, just its own shadow, like a real card sitting
+ * on a table), with a separate boxed panel beside it holding the
+ * name, favorite star, ownership status, attributes, and actions.
+ *
+ * Doesn't use the shared Modal component, since Modal wraps everything
+ * in a single boxed panel with a header — this needs two independent
+ * visual pieces instead. Replicates Modal's own overlay/escape-key/
+ * focus-trap/click-outside behavior directly so it still behaves like
+ * every other modal in the app.
  */
 
-// === ISSUE #36 START: Mark Card As Owned — CardDetailModal ===
-// === ISSUE #80 START: Card Images ===
-
-import { useState } from 'react';
-import { Button, Modal, ModalActions, ConfirmModal } from '../ui/index.jsx';
+import { useEffect, useRef, useState } from 'react';
+import { Button, ConfirmModal } from '../ui/index.jsx';
 import { AcquisitionForm } from '../collections/AcquisitionForm.jsx';
 import { AcquisitionSummary } from '../collections/AcquisitionSummary.jsx';
 import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
@@ -27,15 +34,10 @@ export function CardDetailModal({
   const [showAcquisition, setShowAcquisition] = useState(false);
   const [confirmUnown, setConfirmUnown]       = useState(false);
   const [confirmDelete, setConfirmDelete]     = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen]     = useState(false);
 
   const isOwned = inventoryItem !== null;
 
-  // === HOLO: no ownership gate here — unlike BinderSlot, this modal
-  // never greys out card.image_url based on ownership in the first
-  // place (ownership only changes the status badge below), so the
-  // effect just follows card.holoType directly. Only 'off' disables
-  // it now — 'none' is Regular Holo, the active default (see
-  // collection.types.js for the semantic change). ===
   const holoType = card.holoType ?? 'none';
   const activeHolo = holoType !== 'off' ? holoType : null;
   const { holoRef, handlePointerMoveWithTilt, handlePointerLeaveWithTilt } = useCardHoloPointer();
@@ -43,6 +45,21 @@ export function CardDetailModal({
   const sortedFields = [...templateFields]
     .filter(f => f.collectionId === card.collectionId)
     .sort((a, b) => a.order - b.order);
+
+  // Same overlay/escape-key/focus-trap behavior as the shared Modal
+  // component (see ui/index.jsx) — replicated here since this needs
+  // a custom two-part layout instead of Modal's single boxed panel.
+  const firstFocusRef = useRef(null);
+  useEffect(() => {
+    const prev = document.activeElement;
+    firstFocusRef.current?.focus();
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      prev?.focus();
+    };
+  }, [onClose]);
 
   if (showAcquisition && inventoryItem) {
     return (
@@ -80,113 +97,132 @@ export function CardDetailModal({
   }
 
   return (
-    <Modal title={card.name} onClose={onClose}>
+    <div
+      className="modal-overlay"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="card-detail-title"
+    >
+      <div className={`card-detail-group ${isDetailsOpen ? 'card-detail-group-open' : ''}`} ref={firstFocusRef} tabIndex={-1}>
 
-      {/* === ISSUE #80: Card image displayed prominently === */}
-      {/* === ROTATION: outer wrapper stays static (provides
-          perspective + is what pointer math measures against via
-          getBoundingClientRect); inner .card-rotator is the element
-          that actually tilts. Binder slots never get this — only the
-          form preview and this detail modal do, per explicit
-          decision (no flip-to-back anywhere, just a pointer-following
-          3D lean, and only outside binders). === */}
-      {card.image_url && (
-        <div
-          ref={activeHolo ? holoRef : undefined}
-          className="card-detail-image-wrapper card-rotate-wrapper"
-          data-holo={activeHolo ?? undefined}
-          onPointerMove={activeHolo ? handlePointerMoveWithTilt : undefined}
-          onPointerLeave={activeHolo ? handlePointerLeaveWithTilt : undefined}
-        >
-          <div className="card-rotator">
-            <img
-              src={card.image_url}
-              alt={card.name}
-              className="card-detail-image"
-            />
-            {/* === HOLO: same two-element structure as BinderSlot — see
-                card-holo.css for why this is two real elements, not one
-                implicit ::after. === */}
-            {activeHolo && (
-              <>
-                <span className="card-holo-shine" aria-hidden="true" />
-                <span className="card-holo-glare" aria-hidden="true" />
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Ownership status + favorite toggle */}
-      <div className="card-detail-status">
-        {isOwned ? (
-          <span className="status-badge status-owned">✓ Owned</span>
-        ) : (
-          <span className="status-badge status-not-owned">Not owned</span>
-        )}
-        {isOwned && (
-          <button
-            className={`fav-toggle ${inventoryItem.is_favorite ? 'fav-active' : ''}`}
-            onClick={() => onToggleFavorite(inventoryItem)}
-            aria-label={inventoryItem.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+        {/* Card image — floats freely, no box or background behind
+            it at all, just its own drop shadow. */}
+        {card.image_url && (
+          <div
+            ref={activeHolo ? holoRef : undefined}
+            className="card-detail-image-wrapper card-rotate-wrapper"
+            data-holo={activeHolo ?? undefined}
+            onPointerMove={activeHolo ? handlePointerMoveWithTilt : undefined}
+            onPointerLeave={activeHolo ? handlePointerLeaveWithTilt : undefined}
           >
-            {inventoryItem.is_favorite ? '★' : '☆'}
+            <div className="card-rotator">
+              <img
+                src={card.image_url}
+                alt={card.name}
+                className="card-detail-image"
+              />
+              {activeHolo && (
+                <>
+                  <span className="card-holo-shine" aria-hidden="true" />
+                  <span className="card-holo-glare" aria-hidden="true" />
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Close button — always visible regardless of details state,
+            floating just above the card. */}
+        <Button variant="icon" size="sm" onClick={onClose} title="Close" className="card-detail-close-btn">✕</Button>
+
+        {/* "Show details" — sits to the card's LEFT while closed,
+            same glass-pill style as the binder's Customize button. */}
+        {!isDetailsOpen && (
+          <button
+            className="card-detail-show-btn"
+            onClick={() => setIsDetailsOpen(true)}
+          >
+            Show details
           </button>
         )}
-      </div>
 
-      {/* Card attributes from template */}
-      {sortedFields.length > 0 && (
-        <div className="card-detail-attrs">
-          {sortedFields.map(f => {
-            const val = card.attributes?.[f.field_name];
-            if (val === undefined || val === null || val === '') return null;
-            return (
-              <div key={f.id} className="detail-field">
-                <span className="detail-label">{f.field_name}</span>
-                <span className="detail-value">
-                  {typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val)}
-                </span>
+        {/* Panel reveals on the card's RIGHT once open — the card
+            group above slides left (via .card-detail-group-open) to
+            make room, so this appears in the space that opens up. */}
+        {isDetailsOpen && (
+          <div className="card-detail-panel animate-slide-up-fade-in">
+            <div className="card-detail-panel-header">
+              <h2 id="card-detail-title" className="card-detail-panel-title">{card.name}</h2>
+              {isOwned && (
+                <button
+                  className={`fav-toggle ${inventoryItem.is_favorite ? 'fav-active' : ''}`}
+                  onClick={() => onToggleFavorite(inventoryItem)}
+                  aria-label={inventoryItem.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  {inventoryItem.is_favorite ? '★' : '☆'}
+                </button>
+              )}
+            </div>
+
+            <div className="card-detail-status">
+              {isOwned ? (
+                <span className="status-badge status-owned">✓ Owned</span>
+              ) : (
+                <span className="status-badge status-not-owned">Not owned</span>
+              )}
+            </div>
+
+            {sortedFields.length > 0 && (
+              <div className="card-detail-attrs">
+                {sortedFields.map(f => {
+                  const val = card.attributes?.[f.field_name];
+                  if (val === undefined || val === null || val === '') return null;
+                  return (
+                    <div key={f.id} className="detail-field">
+                      <span className="detail-label">{f.field_name}</span>
+                      <span className="detail-value">
+                        {typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val)}
+                      </span>
+                    </div>
+                  );
+                }).filter(Boolean)}
               </div>
-            );
-          }).filter(Boolean)}
-        </div>
-      )}
+            )}
 
-      {isOwned && <AcquisitionSummary inventoryItem={inventoryItem} />}
+            {isOwned && <AcquisitionSummary inventoryItem={inventoryItem} />}
 
-      <hr className="modal-divider" />
+            <hr className="modal-divider" />
 
-      {/* Actions */}
-      <div className="card-detail-actions">
-        <div className="card-detail-actions-left">
-          {!isOwned && (
-            <Button variant="primary" size="sm" onClick={onOwn}>✓ I own it</Button>
-          )}
-          {isOwned && (
-            <Button variant="ghost" size="sm" onClick={() => setShowAcquisition(true)}>
-              Edit Details
-            </Button>
-          )}
-        </div>
-        <div className="card-detail-actions-right">
-          {onEdit && (
-            <Button variant="ghost" size="sm" onClick={onEdit}>Edit Card</Button>
-          )}
-          {isOwned && (
-            <Button variant="ghost" size="sm" onClick={() => setConfirmUnown(true)}>
-              Remove Ownership
-            </Button>
-          )}
-          <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
-        </div>
+            <div className="card-detail-actions">
+              <div className="card-detail-actions-left">
+                {!isOwned && (
+                  <Button variant="primary" size="sm" onClick={onOwn}>✓ I own it</Button>
+                )}
+                {isOwned && (
+                  <Button variant="ghost" size="sm" onClick={() => setShowAcquisition(true)}>
+                    Edit Details
+                  </Button>
+                )}
+              </div>
+              <div className="card-detail-actions-right">
+                {onEdit && (
+                  <Button variant="ghost" size="sm" onClick={onEdit}>Edit Card</Button>
+                )}
+                {isOwned && (
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmUnown(true)}>
+                    Remove Ownership
+                  </Button>
+                )}
+                <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
-
-    </Modal>
+    </div>
   );
 }
-
-// === ISSUE #80 END: Card Images ===
-// === ISSUE #36 END: Mark Card As Owned ===

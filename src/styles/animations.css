@@ -94,15 +94,3 @@
   z-index: 0;
   animation: cover-glow-pulse 3.5s ease-in-out infinite;
 }
-
-/* Open-state variant — content pages don't extend beyond .binder-book
-   the way the cover does, so this just spans the book's own full,
-   un-extended box (both pages) instead of the cover's right-half
-   extended footprint. */
-.binder-cover-glow-pulse-open {
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  border-radius: 20px;
-}
