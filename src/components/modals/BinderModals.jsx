@@ -16,6 +16,8 @@ import { Modal, ModalActions, Button, Input } from '../ui/index.jsx';
 import { createBinder, createSticker, BINDER_COLORS, DEFAULT_BINDER_COLOR } from '../../types/index.js';
 import { CustomizerSticker } from './CustomizerSticker.jsx';
 import { compressStickerImage } from '../../utils/index.js';
+import { uploadImageToStorage } from '../../utils/supabaseImageUpload.js';
+import { useAuth } from '../../hooks/useAuth.js';
 
 const GRID_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const PAGE_OPTIONS = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200];
@@ -23,6 +25,8 @@ const MAX_STICKERS = 10;
 const STICKER_MAX_WIDTH = 400;
 
 export function CreateBinderModal({ onSubmit, onClose }) {
+  const { user } = useAuth();
+
   // ── Step state ────────────────────────────────────────────────────────────
   const [step, setStep] = useState(1); // 1 = configure, 2 = customise
 
@@ -90,7 +94,11 @@ export function CreateBinderModal({ onSubmit, onClose }) {
     setIsUploadingSticker(true);
     setStickerUploadError('');
     try {
-      const image_url = await compressStickerImage(file, STICKER_MAX_WIDTH);
+      const compressed = await compressStickerImage(file, STICKER_MAX_WIDTH);
+      // Same fix as useBinderCoverEditor.js's sticker handler — see
+      // that file's comment for the full reasoning.
+      const path = `${user.id}/stickers/${crypto.randomUUID()}.png`;
+      const image_url = await uploadImageToStorage(compressed, path);
       const offsetX = 50 + (Math.random() * 20 - 10);
       const offsetY = 50 + (Math.random() * 20 - 10);
       const { sticker, errors: sErrs } = createSticker({ image_url, x: offsetX, y: offsetY, rotation: 0 });

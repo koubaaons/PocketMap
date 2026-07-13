@@ -9,6 +9,8 @@ import { useState, useRef } from 'react';
 import { Button, Modal, ModalActions } from '../ui/index.jsx';
 import { useCardDefinitionForm } from '../../hooks/useCardDefinitionForm.js';
 import { compressImage } from '../../utils/index.js';
+import { uploadImageToStorage } from '../../utils/supabaseImageUpload.js';
+import { useAuth } from '../../hooks/useAuth.js';
 import { HOLO_TYPES, HOLO_LABELS } from '../../types/index.js';
 import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
 
@@ -39,8 +41,14 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
   // === ISSUE #80: image preview syncs from values.image_url ===
   // === ISSUE #88: isCompressing replaces imageSizeWarning — compression
   //     happens automatically, no size warning needed anymore ===
+  // === ISSUE #125: compressImage still resolves to a base64 data URL
+  //     locally (cheap, synchronous-feeling preview) — but that base64
+  //     is now uploaded to Storage immediately after, and it's the
+  //     returned public URL, not the base64 itself, that ends up in
+  //     values.image_url and eventually the database. ===
   const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef(null);
+  const { user } = useAuth();
 
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
@@ -48,9 +56,15 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
     setIsCompressing(true);
     try {
       const compressed = await compressImage(file);
-      set('image_url', compressed);
+      // Card definitions don't have a real id yet in create mode, so
+      // the storage path uses a fresh random id rather than the
+      // eventual card def id — nothing downstream depends on the two
+      // matching, this just needs to be a unique path in the bucket.
+      const path = `${user.id}/${crypto.randomUUID()}.jpg`;
+      const publicUrl = await uploadImageToStorage(compressed, path);
+      set('image_url', publicUrl);
     } catch (err) {
-      console.error('Image compression failed:', err);
+      console.error('Image upload failed:', err);
     } finally {
       setIsCompressing(false);
     }

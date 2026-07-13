@@ -241,6 +241,18 @@ export function templateFieldToRow(field) {
 }
 
 export function cardDefinitionToRow(cd) {
+  // === ISSUE #125: never write raw base64 to image_url again. The
+  // real fix is the upload flow itself (CardDefinitionForm.jsx uploads
+  // to Storage and stores the returned URL) — this is just a loud,
+  // fail-fast safety net in case some future code path regresses back
+  // to setting image_url directly from compressImage()'s base64 output. ===
+  if (cd.image_url && cd.image_url.startsWith('data:')) {
+    console.error(
+      '[Pinder] cardDefinitionToRow received a base64 image_url — this should never happen after Issue #125. ' +
+      'Upload the image to Storage first and pass its public URL instead.'
+    );
+  }
+
   return {
     id:            cd.id,
     user_id:       cd.userId,

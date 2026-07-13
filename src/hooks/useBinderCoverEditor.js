@@ -23,6 +23,8 @@ import { useDispatch } from './useStore.js';
 import { ACTIONS } from '../store/index.js';
 import { createSticker } from '../types/index.js';
 import { compressStickerImage } from '../utils/index.js';
+import { uploadImageToStorage } from '../utils/supabaseImageUpload.js';
+import { useAuth } from './useAuth.js';
 
 const STICKER_MAX_WIDTH = 400;
 const MAX_STICKERS = 10;
@@ -32,6 +34,7 @@ const MAX_STICKERS = 10;
  */
 export function useBinderCoverEditor({ binder, toast }) {
   const dispatch = useDispatch();
+  const { user } = useAuth();
 
   const [isEditingCover, setIsEditingCover]     = useState(false);
   const [draftStickers, setDraftStickers]        = useState(binder.stickers ?? []);
@@ -90,7 +93,17 @@ export function useBinderCoverEditor({ binder, toast }) {
     setIsUploadingSticker(true);
     setStickerUploadError('');
     try {
-      const image_url = await compressStickerImage(file, STICKER_MAX_WIDTH);
+      const compressed = await compressStickerImage(file, STICKER_MAX_WIDTH);
+      // === ISSUE #125 (extended to stickers): compressStickerImage
+      // still resolves to a base64 PNG locally, but that's uploaded
+      // to Storage immediately after — it's the returned public URL,
+      // not the base64 itself, that ends up on the sticker object and
+      // eventually in binders.stickers (jsonb) in the database.
+      // Stored under a stickers/ subfolder in the same card-images
+      // bucket, keeping them separate from card images without
+      // needing a second bucket.
+      const path = `${user.id}/stickers/${crypto.randomUUID()}.png`;
+      const image_url = await uploadImageToStorage(compressed, path);
       // Slight random offset around center so multiple stickers don't
       // land exactly on top of each other — still fully draggable
       // anywhere on the cover afterward.
