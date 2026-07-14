@@ -44,6 +44,29 @@ export function getFilledSlotCount(binderSlots, binderId) {
   return binderSlots.filter(s => s.binderId === binderId).length;
 }
 
+/**
+ * Same as getFilledSlotCount, but only counts slots whose card is
+ * actually OWNED — getFilledSlotCount counts every slot with a card
+ * placed regardless of ownership, including greyed-out "not owned"
+ * placeholders, which made progress percentages count cards that
+ * hadn't actually been acquired yet.
+ *
+ * Also counts card-type combined-slot panels (Michi Method) whose
+ * card is owned — a panel holding a real card is still a real, owned
+ * card taking up a spot, same as a normal slot. Insert-type panels
+ * (decorative art, not a card at all) never count here.
+ */
+export function getOwnedFilledSlotCount(binderSlots, binderId, inventory, binderPanels = []) {
+  const ownedCardDefIds = new Set(inventory.map(inv => inv.cardDefId));
+  const normalSlotCount = binderSlots.filter(
+    s => s.binderId === binderId && ownedCardDefIds.has(s.cardDefId)
+  ).length;
+  const panelCardCount = binderPanels.filter(
+    p => p.binderId === binderId && p.panelType === 'card' && ownedCardDefIds.has(p.cardDefId)
+  ).length;
+  return normalSlotCount + panelCardCount;
+}
+
 export function filterCardsForBinder(cardDefinitions, placedCardIds, query, collectionMap, limit = 50) {
   const q = query.trim().toLowerCase();
   return cardDefinitions

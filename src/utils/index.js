@@ -45,10 +45,28 @@ export function searchCards(cards, query) {
 /**
  * Returns total slot capacity for a binder.
  * @param {{ rows: number, cols: number, pages: number }} binder
+ * @param {Array} [binderPanels] - this binder's combined-slot panels
+ *   (Michi Method). Each panel absorbs (spanCols * spanRows) individual
+ *   slot positions into ONE combined space — the raw rows*cols*pages
+ *   count would overstate real capacity if panels existed and weren't
+ *   accounted for, since those absorbed positions are no longer
+ *   available as separate slots at all.
  * @returns {number}
  */
-export function binderCapacity(binder) {
-  return binder.rows * binder.cols * binder.pages;
+export function binderCapacity(binder, binderPanels = []) {
+  const rawCapacity = binder.rows * binder.cols * binder.pages;
+  const thisBindersPanels = binderPanels.filter(p => p.binderId === binder.id);
+  const absorbedExtra = thisBindersPanels.reduce((sum, p) => {
+    const span = p.spanCols * p.spanRows;
+    // Card-type panels still hold one real, ownable card — that
+    // combined space still counts as ONE card slot, just a bigger
+    // one, so only the extra absorbed positions (span - 1) are
+    // removed. Insert-type panels are decorative, not a card at
+    // all — the whole combined space is removed from capacity,
+    // not counted as one card slot.
+    return sum + (p.panelType === 'card' ? span - 1 : span);
+  }, 0);
+  return rawCapacity - absorbedExtra;
 }
 
 /**

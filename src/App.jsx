@@ -54,7 +54,7 @@ export default function App() {
   const inventory       = useStore(s => s.inventory);
   const binderSlots     = useStore(s => s.binderSlots ?? []);
 
-  const navigate = useCallback((view, id = null, page = null) => {
+  const navigate = useCallback((view, id = null, page = null, autoOpenCustomize = false) => {
     dispatch({
       type: ACTIONS.NAV_SET,
       payload: {
@@ -62,6 +62,12 @@ export default function App() {
         currentBinderId:     view === 'binder'     ? id : null,
         currentCollectionId: view === 'collection' ? id : null,
         currentPage: page ?? 1,
+        // === Home's "Customize" shortcut on a binder card should land
+        // on the binder closed with Customize already active, not
+        // require a separate click once there. BinderView checks this
+        // once on mount and clears it immediately after, so it never
+        // re-triggers on a later, ordinary visit to the same binder. ===
+        autoOpenCustomize,
       },
     });
   }, [dispatch]);

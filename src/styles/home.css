@@ -80,17 +80,14 @@
 /* ── Recently Added strip ──────────────────────────────────────────────── */
 
 .recently-added-strip {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--space-2);
-  overflow-x: auto;
-  padding-bottom: var(--space-1);
-  scrollbar-width: thin;
 }
 
 .recently-added-thumb {
-  flex-shrink: 0;
-  width: 64px;
-  height: 90px;
+  width: 100%;
+  aspect-ratio: 2.5 / 3.5;
   border-radius: var(--radius-sm);
   overflow: hidden;
   border: 0.5px solid var(--border-primary);

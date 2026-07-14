@@ -41,7 +41,8 @@ import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.j
 import { useBinderCoverEditor } from '../../hooks/useBinderCoverEditor.js';
 import { BinderCoverStickers } from './BinderCover.jsx';
 import { BinderCustomizePanel } from './BinderCustomizePanel.jsx';
-import { getFilledSlotCount } from '../../selectors/binderSelectors.js';
+import { getOwnedFilledSlotCount } from '../../selectors/binderSelectors.js';
+import { binderCapacity } from '../../utils/index.js';
 import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
@@ -72,11 +73,18 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   // pageNumber from slot is 1-based; spread = Math.ceil(pageNumber / 2).
   // Run only once on mount (empty deps) — user controls page after that.
   useEffect(() => {
-    if (initialPage && initialPage > 0) {
-      const spread = Math.ceil(initialPage / 2);
-      view.goToPage(spread);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Skip jumping to an initial page if this navigation was
+  // specifically the Home "Customize" shortcut — that case wants the
+  // binder to stay closed (spread 0) so customize mode can actually
+  // show, regardless of whatever initialPage/nav.currentPage happens
+  // to be set to.
+  if (nav.autoOpenCustomize) return;
+  if (initialPage && initialPage > 0) {
+    const spread = Math.ceil(initialPage / 2);
+    view.goToPage(spread);
+  }
+}, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [confirmDelete, setConfirmDelete] = useState(false);
   // === Michi Method support: combine mode — holds the computed
   // rectangle {pageNumber, startSlotIndex, spanCols, spanRows} once
@@ -91,6 +99,21 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const isClosed = view.page === 0;
 
   const coverEditor = useBinderCoverEditor({ binder, toast });
+
+  // === Home's "Customize" shortcut sets nav.autoOpenCustomize so the
+  // binder opens straight into customize mode instead of requiring a
+  // separate click once there. Only meant to fire once, right after
+  // that specific navigation — cleared immediately after use so
+  // navigating here normally afterward (sidebar, back button, etc.)
+  // doesn't keep re-triggering it. ===
+useEffect(() => {
+  console.log('[DEBUG] effect fired. autoOpenCustomize:', nav.autoOpenCustomize, 'isCover:', view.page === 0, 'isEditingCover before:', coverEditor.isEditingCover);
+  if (nav.autoOpenCustomize) {
+    coverEditor.handleEnterCoverEdit();
+    dispatch({ type: ACTIONS.NAV_SET, payload: { ...nav, autoOpenCustomize: false } });
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [nav.autoOpenCustomize]);
 
   // === Card editing from within a binder now happens inline inside
   // CardDetailModal itself (see that file) — this just needs the
@@ -190,8 +213,8 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const spread       = view.page;
   const totalSpreads = Math.ceil(binder.pages / 2) + 1;
 
-  const filled   = getFilledSlotCount(binderSlots, binder.id);
-  const capacity = binder.rows * binder.cols * binder.pages;
+  const filled   = getOwnedFilledSlotCount(binderSlots, binder.id, inventory, binderPanels);
+  const capacity = binderCapacity(binder, binderPanels);
 
   const { handleAddToSlot, handleRemoveFromSlot, handleAddPage } =
     useBinderSlotActions(toast, {

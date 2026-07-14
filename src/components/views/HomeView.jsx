@@ -14,7 +14,7 @@ import { CreateBinderModal } from '../modals/index.js';
 import { ACTIONS } from '../../store/index.js';
 import { useStore, useDispatch } from '../../hooks/useStore.js';
 import { binderCapacity, relativeDate } from '../../utils/index.js';
-import { getFilledSlotCount } from '../../selectors/binderSelectors.js';
+import { getFilledSlotCount, getOwnedFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { buildHomeStats, getRecentlyAddedCards, getRecentActivity } from '../../selectors/homeStats.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 
@@ -29,6 +29,7 @@ const MAX_BINDERS_SHOWN = 4;
 export function HomeView({ toast, onNavigate, mode = 'dashboard' }) {
   const binders         = useStore(s => s.binders);
   const binderSlots     = useStore(s => s.binderSlots ?? []);
+  const binderPanels    = useStore(s => s.binderPanels ?? []);
   const inventory       = useStore(s => s.inventory);
   const cardDefinitions = useStore(s => s.cardDefinitions);
   const collections     = useStore(s => s.collections);
@@ -50,7 +51,7 @@ export function HomeView({ toast, onNavigate, mode = 'dashboard' }) {
   );
 
   const recentlyAddedCards = useMemo(
-    () => getRecentlyAddedCards(inventory, cardDefinitions, 5),
+    () => getRecentlyAddedCards(inventory, cardDefinitions, 12),
     [inventory, cardDefinitions]
   );
 
@@ -103,10 +104,10 @@ export function HomeView({ toast, onNavigate, mode = 'dashboard' }) {
               <BinderCard
                 key={b.id}
                 binder={b}
-                cardCount={getFilledSlotCount(binderSlots, b.id)}
-                capacity={binderCapacity(b)}
+                cardCount={getOwnedFilledSlotCount(binderSlots, b.id, inventory, binderPanels)}
+                capacity={binderCapacity(b, binderPanels)}
                 onClick={() => onNavigate('binder', b.id)}
-                onCustomizeCover={() => onNavigate('binder', b.id)}
+                onCustomizeCover={() => onNavigate('binder', b.id, null, true)}
               />
             ))}
           </div>
@@ -165,10 +166,32 @@ export function HomeView({ toast, onNavigate, mode = 'dashboard' }) {
 
 function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) {
   const pct   = capacity > 0 ? Math.round((cardCount / capacity) * 100) : 0;
+  // === ISSUE #81: use cover_color, fall back to default for old binders ===
   const color = binder.cover_color ?? DEFAULT_BINDER_COLOR;
+
+  // === FIX (progress animation wasn't actually visible): the badge
+  // number was static ({pct}% never changed), and the only thing that
+  // ever animated was the 3px bar's width via a CSS transition — with
+  // typical low percentages that's a 1-2px change, imperceptible in
+  // practice. Reusing the same useCountUp hook the stat cards already
+  // use makes BOTH the number and the bar animate together, driven by
+  // the same live-counting value, over the same ~900ms window.
   const animatedPct = useCountUp(pct);
 
-
+  // Mini-cover mirrors the real cover's stickers (actual saved
+  // positions/rotations/scale) at a smaller size, so Home genuinely
+  // previews the real cover instead of a simplified stand-in.
+  //
+  // === FIX (reference-image redesign): percent badge + progress bar
+  // moved OFF the cover entirely and into the label area below,
+  // alongside a real "X / Y cards" fraction — matching the reference's
+  // layout, and simply more informative than a bare percentage. The
+  // cover itself now carries two thin spine-ridge lines (suggesting
+  // binder rings) and a few sparkle accents — a light decorative touch
+  // in place of the reference's floral/vine illustration, per request
+  // to skip the flowers specifically. Both are pure decoration
+  // (aria-hidden), so a customized cover's own stickers still read as
+  // the primary content — these sit behind/around them, not over. ===
   return (
     <div className="binder-card-wrapper">
       {/* style={{ color }} is needed here — the mini-cover's
@@ -220,7 +243,7 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
             title="Customize cover"
             aria-label="Customize cover"
           >
-            <i className="ti ti-dots" aria-hidden="true"></i>
+            <i className="ti ti-brush" aria-hidden="true"></i>
           </button>
         </div>
       </div>
@@ -242,6 +265,18 @@ function BinderCard({ binder, cardCount, capacity, onClick, onCustomizeCover }) 
   );
 }
 
+// === FIX: a tall/narrow source image (e.g. a standing character with
+// most of its width unused) inside a forced aspectRatio:'1' box gets
+// shrunk dramatically by object-fit:contain to fit the box's narrower
+// dimension — leaving visible empty space above/below and making it
+// look much smaller than a squarer image at the IDENTICAL stored
+// scale, even though the math/data was never wrong. Rather than special
+// -case any specific image, this component measures whatever image is
+// actually uploaded (via the img's own onLoad — naturalWidth/
+// naturalHeight, the same technique already used on the real cover's
+// CustomizerSticker) and sizes the box to match THAT image's real
+// shape automatically. Works the same way for every future upload —
+// tall, wide, or square — with no per-image logic at all. ===
 function MiniCoverSticker({ sticker }) {
   const [aspectRatio, setAspectRatio] = useState(1);
 
@@ -265,3 +300,8 @@ function MiniCoverSticker({ sticker }) {
     </div>
   );
 }
+
+// === ISSUE #92 END: Customize Cover ===
+// === ISSUE #83 END: Home Dashboard ===
+// === ISSUE #81 END: Binder Color Picker ===
+// === ISSUE #1 END: Split Views — HomeView ===
