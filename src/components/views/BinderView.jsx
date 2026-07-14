@@ -30,12 +30,13 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ConfirmModal } from '../ui/index.jsx';
+import { ConfirmModal, Button } from '../ui/index.jsx';
 import { BinderTopbar } from './BinderTopbar.jsx';
 import { BinderPageNav } from './BinderPageNav.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
+import { CombineSlotsModal } from '../modals/CombineSlotsModal.jsx';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useBinderCoverEditor } from '../../hooks/useBinderCoverEditor.js';
 import { BinderCoverStickers } from './BinderCover.jsx';
@@ -49,18 +50,21 @@ import { useBinderFullscreen } from '../../hooks/useBinderFullscreen.js';
 import { useStore, useDispatch } from '../../hooks/useStore.js';
 import { ACTIONS } from '../../store/index.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
-import { createBinderSlot } from '../../types/index.js';
+import { createBinderSlot, createBinderPanel } from '../../types/index.js';
 
 export function BinderView({ toast, onNavigate, initialPage = null }) {
   const nav             = useStore(s => s.nav);
   const binders         = useStore(s => s.binders);
   const allBinderSlots  = useStore(s => s.binderSlots ?? []);
+  const allBinderPanels = useStore(s => s.binderPanels ?? []);
+  const binderInserts   = useStore(s => s.binderInserts ?? []);
   const cardDefinitions = useStore(s => s.cardDefinitions);
   const collections     = useStore(s => s.collections);
   const templateFields  = useStore(s => s.templateFields);
   const inventory       = useStore(s => s.inventory);
   const binder          = binders.find(b => b.id === nav.currentBinderId) ?? null;
   const binderSlots     = allBinderSlots.filter(s => s.binderId === binder?.id);
+  const binderPanels    = allBinderPanels.filter(p => p.binderId === binder?.id);
   const dispatch   = useDispatch();
   const view       = useBinderView(binder, binderSlots);
 
@@ -74,6 +78,11 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // === Michi Method support: combine mode — holds the computed
+  // rectangle {pageNumber, startSlotIndex, spanCols, spanRows} once
+  // "Combine" is clicked, until the confirmation modal resolves it
+  // into an actual panel (or is cancelled). ===
+  const [showCombineConfirm, setShowCombineConfirm] = useState(null);
 
   // === MIGRATION: "closed" is now purely spread === 0. BinderBookFlip's
   // cover pair flips off `spread` directly (isFlipped(0) = 0 < spread),
@@ -164,6 +173,12 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     cardDefinitions.forEach(cd => { map[cd.id] = cd; });
     return map;
   }, [cardDefinitions]);
+
+  const binderInsertMap = useMemo(() => {
+    const map = {};
+    binderInserts.forEach(i => { map[i.id] = i; });
+    return map;
+  }, [binderInserts]);
 
   // Use preview slots when in preview mode, real slots otherwise.
   // === MIGRATION: leftSlotMap/rightSlotMap are gone — BinderBookFlip
@@ -386,23 +401,56 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     setPageInputValue(String(clamped));
   };
 
+  // === Michi Method support: combine mode ===
+  const handleUncombinePanel = (panel) => {
+    dispatch({ type: ACTIONS.BINDER_PANEL_REMOVE, payload: { panelId: panel.id } });
+    toast('Slots uncombined');
+  };
+
+  const handleUpdatePanel = (panelId, patch) => {
+    dispatch({ type: ACTIONS.BINDER_PANEL_UPDATE, payload: { id: panelId, ...patch } });
+  };
+
+  const handleClickPanel = (panel) => {
+    if (panel.panelType === 'card') {
+      const cardDef = cardDefMap[panel.cardDefId];
+      if (cardDef) view.openCardDetail(cardDef);
+    }
+    // Insert-type panels don't have a card-detail equivalent to open —
+    // editing/replacing the insert image happens via the panel's own
+    // uncombine + re-add flow for now, not a separate detail view.
+  };
+
   const makePageHandlers = (pageNumber) => ({
-    onClickEmpty: (slotIndex) =>
-      view.isPreviewMode
+    onClickEmpty: (slotIndex) => {
+      if (view.isCombineMode) { view.toggleSlotForCombine(pageNumber, slotIndex); return; }
+      return view.isPreviewMode
         ? handleEmptyClickInPreview(slotIndex, pageNumber)
-        : view.openAddToSlot(slotIndex, pageNumber),
+        : view.openAddToSlot(slotIndex, pageNumber);
+    },
     // === Clicking a card in a binder now goes straight to the same
     // card-detail experience Collections uses (card floats, details
     // slide out beside it) instead of first opening SlotActionModal
     // and requiring an extra "View Card Details" click. Preview mode
     // keeps its own separate click behavior — that's for selecting
     // slots to move cards between, a different workflow entirely. ===
-    onClickSlot: (slot, cardDef) =>
-      view.isPreviewMode
+    onClickSlot: (slot, cardDef) => {
+      if (view.isCombineMode) { view.toggleSlotForCombine(pageNumber, slot.slotIndex); return; }
+      return view.isPreviewMode
         ? handleSlotClickInPreview(slot, cardDef)
-        : view.openCardDetail(cardDef),
+        : view.openCardDetail(cardDef);
+    },
     onToggleOwned: handleToggleOwnedInSlot,
     onRemove: (slot) => handleRemoveFromSlot(slot.id),
+    pagePanels: binderPanels.filter(p => p.pageNumber === pageNumber),
+    binderInsertMap,
+    onClickPanel: handleClickPanel,
+    onUncombinePanel: handleUncombinePanel,
+    onUpdatePanel: handleUpdatePanel,
+    isCombineMode: view.isCombineMode,
+    combineSelection: view.combineSelection.filter(s => s.pageNumber === pageNumber).map(s => s.slotIndex),
+    getCombineRectangle: view.getCombineRectangle,
+    onConfirmCombine: (rect) => setShowCombineConfirm(rect),
   });
 
   // Cover content passed into BinderBookFlip's cover pair. "Not yet
@@ -428,6 +476,9 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         onToggleFullscreen={toggleFullscreen}
         onCloseBinder={handleCloseBinder}
         onDeleteRequest={() => setConfirmDelete(true)}
+        isCombineMode={view.isCombineMode}
+        onEnterCombineMode={view.enterCombineMode}
+        onExitCombineMode={view.exitCombineMode}
       />
 
       {/* Page navigation — greyed out while closed, same as topbar. */}
@@ -563,6 +614,39 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         />
       )}
 
+
+      {showCombineConfirm && (
+        <CombineSlotsModal
+          rectangle={showCombineConfirm}
+          binderId={binder.id}
+          cardDefinitions={cardDefinitions}
+          binderSlots={allBinderSlots}
+          binderPanels={allBinderPanels}
+          binderInserts={binderInserts}
+          onConfirm={({ newInsert, panelType, cardDefId, insertId }) => {
+            if (newInsert) dispatch({ type: ACTIONS.BINDER_INSERT_ADD, payload: newInsert });
+
+            const { panel, errors } = createBinderPanel({
+              binderId: binder.id,
+              pageNumber: showCombineConfirm.pageNumber,
+              startSlotIndex: showCombineConfirm.startSlotIndex,
+              spanCols: showCombineConfirm.spanCols,
+              spanRows: showCombineConfirm.spanRows,
+              panelType,
+              cardDefId,
+              insertId,
+              userId: binder.userId,
+            });
+            if (!panel) { console.error('Panel creation failed:', errors); return; }
+
+            dispatch({ type: ACTIONS.BINDER_PANEL_ADD, payload: panel });
+            toast('Slots combined');
+            setShowCombineConfirm(null);
+            view.exitCombineMode();
+          }}
+          onClose={() => setShowCombineConfirm(null)}
+        />
+      )}
 
       {confirmDelete && (
         <ConfirmModal

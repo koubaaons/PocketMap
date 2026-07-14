@@ -12,6 +12,7 @@ import {
   validateBinder,
   validateCollection, validateTemplateField, validateCardDefinition,
   validateInventoryItem, validateBinderSlot,
+  validateBinderInsert, validateBinderPanel,
 } from '../types/index.js';
 
 const DEBUG = import.meta.env.DEV;
@@ -29,6 +30,8 @@ export const DEFAULT_STATE = {
   cardDefinitions: [],
   inventory: [],
   binderSlots: [],
+  binderInserts: [],
+  binderPanels: [],
 };
 
 const MIGRATIONS = {
@@ -112,6 +115,24 @@ function sanitizeState(raw) {
     return true;
   });
 
+  // === Michi Method support: combined slots ===
+  const binderInserts = (raw.binderInserts ?? []).filter(i => {
+    const { valid, errors } = validateBinderInsert(i);
+    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt binder insert:', errors, i); return false; }
+    return true;
+  });
+
+  const binderInsertIds = new Set(binderInserts.map(i => i.id));
+
+  const binderPanels = (raw.binderPanels ?? []).filter(p => {
+    const { valid, errors } = validateBinderPanel(p);
+    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt binder panel:', errors, p); return false; }
+    if (!binderIds.has(p.binderId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder panel (no binder):', p.id); return false; }
+    if (p.panelType === 'card' && !cardDefIds.has(p.cardDefId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder panel (no card def):', p.id); return false; }
+    if (p.panelType === 'insert' && !binderInsertIds.has(p.insertId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder panel (no insert):', p.id); return false; }
+    return true;
+  });
+
   const bin = (raw.bin ?? []).filter(item => {
     if (!item || typeof item !== 'object') return false;
     if (!item.id || typeof item.id !== 'string') return false;
@@ -130,6 +151,8 @@ function sanitizeState(raw) {
     cardDefinitions,
     inventory,
     binderSlots,
+    binderInserts,
+    binderPanels,
     // nav is never restored from localStorage — always reset to home on load
     nav: undefined,
   };

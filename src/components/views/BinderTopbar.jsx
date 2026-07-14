@@ -24,6 +24,9 @@ export function BinderTopbar({
   onToggleFullscreen,
   onCloseBinder,
   onDeleteRequest,
+  isCombineMode,
+  onEnterCombineMode,
+  onExitCombineMode,
 }) {
   const percentComplete = capacity > 0 ? Math.round((filled / capacity) * 100) : 0;
 
@@ -71,6 +74,17 @@ export function BinderTopbar({
 
         {!isPreviewMode && (
           <Button variant="ghost" size="sm" onClick={onAddPage} disabled={isClosed}>+ Page</Button>
+        )}
+
+        {!isPreviewMode && !isCombineMode && (
+          <Button variant="ghost" size="sm" onClick={onEnterCombineMode} disabled={isClosed}>
+            Combine Slots
+          </Button>
+        )}
+        {isCombineMode && (
+          <Button variant="ghost" size="sm" onClick={onExitCombineMode}>
+            Exit Combine Mode
+          </Button>
         )}
 
         {/* Fullscreen — the one control that stays live while closed,

@@ -50,6 +50,8 @@ const PERSISTED_ACTIONS = new Set([
   ACTIONS.CARD_DEFINITION_UPDATE, ACTIONS.CARD_DEFINITION_DELETE,
   ACTIONS.INVENTORY_ADD, ACTIONS.INVENTORY_UPDATE, ACTIONS.INVENTORY_DELETE,
   ACTIONS.BINDER_SLOT_ADD, ACTIONS.BINDER_SLOT_REMOVE, ACTIONS.BINDER_SLOT_MOVE,
+  ACTIONS.BINDER_INSERT_ADD, ACTIONS.BINDER_INSERT_DELETE,
+  ACTIONS.BINDER_PANEL_ADD, ACTIONS.BINDER_PANEL_UPDATE, ACTIONS.BINDER_PANEL_REMOVE,
   ACTIONS.BIN_RESTORE_BINDER, ACTIONS.BIN_RESTORE_COLLECTION,
   ACTIONS.BIN_RESTORE_CARD, ACTIONS.BIN_DELETE_ITEM, ACTIONS.BIN_EMPTY,
   ACTIONS.AUTH_SET,
@@ -82,6 +84,8 @@ function createStore(reducerFn, initialState) {
           cardDefinitions: state.cardDefinitions,
           inventory:       state.inventory,
           binderSlots:     state.binderSlots,
+          binderInserts:   state.binderInserts,
+          binderPanels:    state.binderPanels,
         });
         if (!success) {
           listeners.forEach(fn => fn(state, { saveError: true }));

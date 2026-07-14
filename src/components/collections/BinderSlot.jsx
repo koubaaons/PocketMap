@@ -21,6 +21,10 @@ export function BinderSlot({
   isPreviewMode = false,
   isSelected = false,
   isMoveTarget = false,
+  isCombineMode = false,
+  isCombineSelected = false,
+  gridColumnStart,
+  gridRowStart,
   onClickEmpty,
   onClickSlot,
   onToggleOwned,
@@ -97,7 +101,8 @@ export function BinderSlot({
   if (!hasCard) {
     return (
       <button
-        className={`binder-slot binder-slot-empty ${isMoveTarget ? 'binder-slot-move-target' : ''}`}
+        className={`binder-slot binder-slot-empty ${isMoveTarget ? 'binder-slot-move-target' : ''} ${isCombineSelected ? 'binder-slot-combine-selected' : ''}`}
+        style={{ gridColumnStart, gridRowStart }}
         onClick={onClickEmpty}
         aria-label={`Add card to slot ${slotIndex + 1}`}
       >
@@ -108,13 +113,17 @@ export function BinderSlot({
   }
 
   return (
-    <button
+    <div
       ref={activeHolo ? holoRef : undefined}
-      className={`binder-slot ${showGrey ? 'binder-slot-placeholder' : 'binder-slot-filled'} ${isSelected ? 'binder-slot-selected' : ''} ${justFilled ? 'binder-slot-reveal' : ''}`}
+      className={`binder-slot ${showGrey ? 'binder-slot-placeholder' : 'binder-slot-filled'} ${isSelected ? 'binder-slot-selected' : ''} ${justFilled ? 'binder-slot-reveal' : ''} ${isCombineSelected ? 'binder-slot-combine-selected' : ''}`}
+      style={{ gridColumnStart, gridRowStart, cursor: 'pointer' }}
       data-holo={activeHolo ?? undefined}
       onClick={() => onClickSlot(slot)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClickSlot(slot); } }}
       onPointerMove={activeHolo ? handlePointerMove : undefined}
       onPointerLeave={activeHolo ? handlePointerLeave : undefined}
+      role="button"
+      tabIndex={0}
       aria-label={cardDef.name}
       aria-pressed={isSelected}
     >
@@ -128,7 +137,7 @@ export function BinderSlot({
           permanent overlay would compete with it visually. Same
           underlying toggle logic either way, just reachable directly
           from the slot. === */}
-      {onToggleOwned && !isPreviewMode && (
+      {onToggleOwned && !isPreviewMode && !isCombineMode && (
         <button
           className={`binder-slot-status ${isOwned ? 'binder-slot-status-owned' : 'binder-slot-status-missing'}`}
           onClick={(e) => { e.stopPropagation(); onToggleOwned(); }}
@@ -145,7 +154,7 @@ export function BinderSlot({
           different toggle above). Only in normal mode — preview mode
           has its own slot-selection workflow, removing here would
           conflict with it. === */}
-      {onRemove && !isPreviewMode && (
+      {onRemove && !isPreviewMode && !isCombineMode && (
         <button
           className="binder-slot-remove"
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
@@ -183,7 +192,7 @@ export function BinderSlot({
           actually playing, same convention as CardGridItem.jsx's
           own reveal-shine. */}
       {justOwned && <span className="card-grid-item-reveal-shine" aria-hidden="true" />}
-    </button>
+    </div>
   );
 }
 

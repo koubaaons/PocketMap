@@ -49,6 +49,36 @@ function rowToBinderSlot(row) {
   };
 }
 
+// === Michi Method support: combined slots ===
+function rowToBinderInsert(row) {
+  return {
+    id:        row.id,
+    userId:    row.user_id,
+    name:      row.name,
+    image_url: row.image_url,
+    createdAt: new Date(row.created_at).getTime(),
+  };
+}
+
+function rowToBinderPanel(row) {
+  return {
+    id:             row.id,
+    userId:         row.user_id,
+    binderId:       row.binder_id,
+    pageNumber:     row.page_number,
+    startSlotIndex: row.start_slot_index,
+    spanCols:       row.span_cols,
+    spanRows:       row.span_rows,
+    panelType:      row.panel_type,
+    cardDefId:      row.card_def_id,
+    insertId:       row.insert_id,
+    imageX:         row.image_x,
+    imageY:         row.image_y,
+    imageScale:     row.image_scale,
+    createdAt:      new Date(row.created_at).getTime(),
+  };
+}
+
 function rowToCollection(row) {
   return {
     id:              row.id,
@@ -140,6 +170,8 @@ export async function loadStateFromSupabase() {
     const [
       bindersRes,
       slotsRes,
+      insertsRes,
+      panelsRes,
       collectionsRes,
       fieldsRes,
       cardsRes,
@@ -148,6 +180,8 @@ export async function loadStateFromSupabase() {
     ] = await Promise.all([
       supabase.from('binders').select('*').is('deleted_at', null),
       supabase.from('binder_slots').select('*'),
+      supabase.from('binder_inserts').select('*'),
+      supabase.from('binder_panels').select('*'),
       supabase.from('collections').select('*').is('deleted_at', null),
       supabase.from('template_fields').select('*'),
       supabase.from('card_definitions').select('*').is('deleted_at', null),
@@ -155,7 +189,7 @@ export async function loadStateFromSupabase() {
       supabase.from('bin').select('*'),
     ]);
 
-    const errors = [bindersRes, slotsRes, collectionsRes, fieldsRes, cardsRes, inventoryRes, binRes]
+    const errors = [bindersRes, slotsRes, insertsRes, panelsRes, collectionsRes, fieldsRes, cardsRes, inventoryRes, binRes]
       .filter(r => r.error)
       .map(r => r.error);
 
@@ -168,6 +202,8 @@ export async function loadStateFromSupabase() {
       version:         SCHEMA_VERSION,
       binders:         (bindersRes.data ?? []).map(rowToBinder),
       binderSlots:     (slotsRes.data ?? []).map(rowToBinderSlot),
+      binderInserts:   (insertsRes.data ?? []).map(rowToBinderInsert),
+      binderPanels:    (panelsRes.data ?? []).map(rowToBinderPanel),
       collections:     (collectionsRes.data ?? []).map(rowToCollection),
       templateFields:  (fieldsRes.data ?? []).map(rowToTemplateField),
       cardDefinitions: (cardsRes.data ?? []).map(rowToCardDefinition),
@@ -210,6 +246,34 @@ export function binderSlotToRow(slot) {
     page_number:   slot.pageNumber,
     slot_index:    slot.slotIndex,
     updated_at:    new Date().toISOString(),
+  };
+}
+
+// === Michi Method support: combined slots ===
+export function binderInsertToRow(insert) {
+  return {
+    id:        insert.id,
+    user_id:   insert.userId,
+    name:      insert.name,
+    image_url: insert.image_url,
+  };
+}
+
+export function binderPanelToRow(panel) {
+  return {
+    id:               panel.id,
+    user_id:          panel.userId,
+    binder_id:        panel.binderId,
+    page_number:      panel.pageNumber,
+    start_slot_index: panel.startSlotIndex,
+    span_cols:        panel.spanCols,
+    span_rows:        panel.spanRows,
+    panel_type:       panel.panelType,
+    card_def_id:      panel.cardDefId,
+    insert_id:        panel.insertId,
+    image_x:          panel.imageX,
+    image_y:          panel.imageY,
+    image_scale:      panel.imageScale,
   };
 }
 

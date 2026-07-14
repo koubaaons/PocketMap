@@ -40,4 +40,8 @@ export {
 export { validateBinderSlot, createBinderSlot } from './binderSlot.types.js';
 // === ISSUE #53 END ===
 
+// === Michi Method support: combined slots ===
+export { validateBinderInsert, createBinderInsert } from './binderInsert.types.js';
+export { validateBinderPanel, createBinderPanel } from './binderPanel.types.js';
+
 export { generateId, sanitize } from './utils.js';

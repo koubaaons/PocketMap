@@ -22,6 +22,8 @@ import { ACTIONS } from './reducer.js';
 import {
   binderToRow,
   binderSlotToRow,
+  binderInsertToRow,
+  binderPanelToRow,
   collectionToRow,
   templateFieldToRow,
   cardDefinitionToRow,
@@ -118,6 +120,25 @@ function upsertBinderSlot(slot) {
   });
 }
 
+// === Michi Method support: combined slots ===
+function upsertBinderInsert(insert) {
+  return getRealUserId().then(userId => {
+    if (!userId) return;
+    return supabase.from('binder_inserts').upsert({ ...binderInsertToRow(insert), user_id: userId })
+      .then(({ error }) => { if (error) console.error('[Sync] binder insert upsert failed:', error); })
+      .catch(err => console.error('[Sync] binder insert upsert error:', err));
+  });
+}
+
+function upsertBinderPanel(panel) {
+  return getRealUserId().then(userId => {
+    if (!userId) return;
+    return supabase.from('binder_panels').upsert({ ...binderPanelToRow(panel), user_id: userId })
+      .then(({ error }) => { if (error) console.error('[Sync] binder panel upsert failed:', error); })
+      .catch(err => console.error('[Sync] binder panel upsert error:', err));
+  });
+}
+
 function upsertBinItem(item, entityType) {
   return getRealUserId().then(userId => {
     if (!userId) return;
@@ -163,6 +184,19 @@ function deleteBinderSlot(slotId) {
   return supabase.from('binder_slots').delete().eq('id', slotId)
     .then(({ error }) => { if (error) console.error('[Sync] binder slot delete failed:', error); })
     .catch(err => console.error('[Sync] binder slot delete error:', err));
+}
+
+// === Michi Method support: combined slots ===
+function deleteBinderInsert(insertId) {
+  return supabase.from('binder_inserts').delete().eq('id', insertId)
+    .then(({ error }) => { if (error) console.error('[Sync] binder insert delete failed:', error); })
+    .catch(err => console.error('[Sync] binder insert delete error:', err));
+}
+
+function deleteBinderPanel(panelId) {
+  return supabase.from('binder_panels').delete().eq('id', panelId)
+    .then(({ error }) => { if (error) console.error('[Sync] binder panel delete failed:', error); })
+    .catch(err => console.error('[Sync] binder panel delete error:', err));
 }
 
 function deleteBinItem(itemId) {
@@ -377,6 +411,31 @@ export function syncToSupabase(action, nextState, prevState) {
     }
     case ACTIONS.BINDER_SLOT_REMOVE: {
       if (action.payload?.slotId) pending.push(deleteBinderSlot(action.payload.slotId));
+      break;
+    }
+
+    // ── Michi Method support: combined slots ──────────────────────────────────
+    case ACTIONS.BINDER_INSERT_ADD: {
+      const insert = nextState.binderInserts.find(i => i.id === action.payload.id);
+      if (insert) pending.push(upsertBinderInsert(insert));
+      break;
+    }
+    case ACTIONS.BINDER_INSERT_DELETE: {
+      if (action.payload?.insertId) pending.push(deleteBinderInsert(action.payload.insertId));
+      break;
+    }
+    case ACTIONS.BINDER_PANEL_ADD: {
+      const panel = nextState.binderPanels.find(p => p.id === action.payload.id);
+      if (panel) pending.push(upsertBinderPanel(panel));
+      break;
+    }
+    case ACTIONS.BINDER_PANEL_UPDATE: {
+      const panel = nextState.binderPanels.find(p => p.id === action.payload.id);
+      if (panel) pending.push(upsertBinderPanel(panel));
+      break;
+    }
+    case ACTIONS.BINDER_PANEL_REMOVE: {
+      if (action.payload?.panelId) pending.push(deleteBinderPanel(action.payload.panelId));
       break;
     }
 

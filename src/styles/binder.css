@@ -627,6 +627,45 @@
   flex-shrink: 0;
 }
 
+/* === Michi Method support: combine mode === */
+.binder-combine-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+}
+
+.binder-slot-combine-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.binder-panel-slot {
+  position: relative;
+  /* aspect-ratio is set inline per-panel in BinderPanelSlot.jsx,
+     scaled by its own span — see that file for why removing it
+     entirely (rather than scaling it) was the actual bug here. */
+}
+
+.binder-panel-slot-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  z-index: 2;
+}
+
+.binder-panel-uncombine {
+  bottom: 5px;
+  right: 5px;
+}
+
 /* ── Cover page ───────────────────────────────────────────────────────────── */
 
 .binder-cover-page {
