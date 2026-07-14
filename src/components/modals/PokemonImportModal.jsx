@@ -14,40 +14,82 @@
  * fetchAllSets) and calls onSubmit({ collection, templateFields,
  * cardDefinitions }) — the exact same shape useCollectionActions'
  * handleCreate already expects, so no new dispatch logic was needed.
+ *
+ * === PERFORMANCE FIX: only fetches a small preview batch upfront,
+ * not the entire set === The preview grid only ever shows the first
+ * 24 cards, but this used to call fetchAllCardsForSet on mount —
+ * fetching every card in the set (100-250+, full objects) before
+ * showing anything at all, even though 24 thumbnails is all the user
+ * would ever see on this screen. Now fetches just enough for the
+ * preview (24 cards + the real totalCount, both from one lightweight
+ * request), and only fetches everything else at the moment the user
+ * actually clicks Import — the point where the full list is actually
+ * needed.
  */
 
 import { useState, useEffect } from 'react';
 import { Modal, ModalActions, Button } from '../ui/index.jsx';
 import { createCollection, createTemplateField, createCardDefinition } from '../../types/index.js';
-import { fetchAllCardsForSet, mapPokemonCardToDraft, POKEMON_TEMPLATE_FIELDS } from '../../services/pokemonApi.js';
+import { fetchCardsForSet, fetchAllCardsForSet, mapPokemonCardToDraft, POKEMON_TEMPLATE_FIELDS } from '../../services/pokemonApi.js';
 import { uploadSharedImageIfMissing } from '../../utils/supabaseImageUpload.js';
 import { useAuth } from '../../hooks/useAuth.js';
 
+const PREVIEW_COUNT = 24;
+
 export function PokemonImportModal({ set, onSubmit, onClose }) {
   const { user } = useAuth();
-  const [cards, setCards] = useState([]);
-  const [isLoadingCards, setIsLoadingCards] = useState(true);
+  const [previewCards, setPreviewCards] = useState([]);
+  const [totalCount, setTotalCount] = useState(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [isFetchingFullList, setIsFetchingFullList] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState(null); // { done, total }
   const [importError, setImportError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoadingCards(true);
+    setIsLoadingPreview(true);
     setLoadError('');
-    fetchAllCardsForSet(set.id)
-      .then(result => { if (!cancelled) setCards(result); })
+    // Small, fast request — just enough for the preview grid, not
+    // the whole set. totalCount comes back regardless of how many
+    // were actually requested, so this still tells the user the real
+    // total without needing to fetch every card to know it.
+    fetchCardsForSet(set.id, 1, PREVIEW_COUNT)
+      .then(result => {
+        if (cancelled) return;
+        setPreviewCards(result.cards);
+        setTotalCount(result.totalCount);
+      })
       .catch(err => {
-        console.error('[Pokemon import] card fetch failed:', err);
+        console.error('[Pokemon import] preview fetch failed:', err);
         if (!cancelled) setLoadError('Could not load cards for this set. Check your connection and try again.');
       })
-      .finally(() => { if (!cancelled) setIsLoadingCards(false); });
+      .finally(() => { if (!cancelled) setIsLoadingPreview(false); });
     return () => { cancelled = true; };
   }, [set.id]);
 
   const handleConfirm = async () => {
     if (!user) return;
+
+    // The full list is only actually needed now — at the moment of
+    // import, not for showing the preview. If the set is small
+    // enough that the preview fetch above already got everything
+    // (previewCards.length === totalCount), this reuses that instead
+    // of re-fetching pointlessly.
+    let cards = previewCards;
+    if (previewCards.length < totalCount) {
+      setIsFetchingFullList(true);
+      try {
+        cards = await fetchAllCardsForSet(set.id);
+      } catch (err) {
+        console.error('[Pokemon import] full card list fetch failed:', err);
+        setLoadError('Could not load the full card list. Check your connection and try again.');
+        setIsFetchingFullList(false);
+        return;
+      }
+      setIsFetchingFullList(false);
+    }
 
     const { collection, errors: cErrors } = createCollection({
       name: set.name,
@@ -153,32 +195,36 @@ export function PokemonImportModal({ set, onSubmit, onClose }) {
 
   return (
     <Modal title={`Preview: ${set.name}`} onClose={onClose}>
-      {isLoadingCards && <p className="modal-step-intro">Loading cards…</p>}
+      {isLoadingPreview && <p className="modal-step-intro">Loading cards…</p>}
       {loadError && <p className="modal-step-error">{loadError}</p>}
-      {!isLoadingCards && !loadError && (
+      {!isLoadingPreview && !loadError && (
         <>
           <p className="modal-step-intro">
-            {cards.length} card(s) will be imported into a new collection.
+            {totalCount} card(s) will be imported into a new collection.
             Each card's image will be uploaded to your own Storage bucket during import.
           </p>
           {importError && <p className="modal-step-error">{importError}</p>}
           <div className="pokemon-card-preview-grid">
-            {cards.slice(0, 24).map(card => (
+            {previewCards.map(card => (
               <div key={card.id} className="pokemon-card-preview-item">
                 {card.images?.small && <img src={card.images.small} alt={card.name} />}
                 <span>{card.name}</span>
               </div>
             ))}
           </div>
-          {cards.length > 24 && (
-            <p className="modal-step-note">…and {cards.length - 24} more.</p>
+          {totalCount > previewCards.length && (
+            <p className="modal-step-note">…and {totalCount - previewCards.length} more.</p>
           )}
         </>
       )}
       <ModalActions>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" onClick={handleConfirm} disabled={isLoadingCards || !!loadError}>
-          Import {cards.length} Card(s)
+        <Button
+          variant="primary"
+          onClick={handleConfirm}
+          disabled={isLoadingPreview || !!loadError || isFetchingFullList}
+        >
+          {isFetchingFullList ? 'Loading full list…' : `Import ${totalCount ?? '...'} Card(s)`}
         </Button>
       </ModalActions>
     </Modal>

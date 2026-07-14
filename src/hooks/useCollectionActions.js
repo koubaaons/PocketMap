@@ -25,8 +25,19 @@ export function useCollectionActions(toast, callbacks = {}) {
    * All three are dispatched atomically — if any part is missing it's skipped.
    * @param {{ collection: object, templateFields: object[], cardDefinitions: object[] }} payload
    */
-  const handleCreate = useCallback((payload) => {
-    dispatch({ type: ACTIONS.COLLECTION_ADD, payload: payload.collection });
+  const handleCreate = useCallback(async (payload) => {
+    // === FIX (real bug: bulk imports always losing exactly one
+    // card, consistently the first one processed): these three
+    // dispatches used to fire back-to-back with zero waiting between
+    // them. card_definitions.collection_id has a foreign key
+    // constraint referencing collections(id) — if the very first
+    // card's write reached the database before the collection's own
+    // insert had actually committed, it failed with a transient
+    // foreign key violation, while every card after it succeeded
+    // (by then the collection was definitely already there). Now
+    // awaits the collection's own dispatch/sync before writing
+    // anything that depends on it existing first.
+    await dispatch({ type: ACTIONS.COLLECTION_ADD, payload: payload.collection });
 
     if (payload.templateFields?.length) {
       dispatch({ type: ACTIONS.TEMPLATE_FIELD_BULK_ADD, payload: payload.templateFields });

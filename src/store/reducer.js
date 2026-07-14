@@ -120,8 +120,56 @@ export function reducer(state, action) {
       };
     }
 
-    case ACTIONS.BIN_DELETE_ITEM:
-      return { ...state, bin: state.bin.filter(b => b.id !== action.payload.itemId) };
+    case ACTIONS.BIN_DELETE_ITEM: {
+      // === FIX (real gap): this used to only clear state.bin itself,
+      // leaving cardDefinitions/binderSlots/binders/collections
+      // completely untouched locally — the server-side cascade (see
+      // supabaseSync.js) is correct, but local state relied entirely
+      // on an eventual realtime-triggered hydrate to catch up. Any
+      // gap in that timing left orphaned binderSlots in memory,
+      // referencing a card that's already gone — rendering blank but
+      // still "occupying" that position (see the orphan-aware fix on
+      // BINDER_SLOT_ADD above, which is the defensive half of this
+      // same fix). This is the proactive half: mirror what
+      // CARD_DEFINITION_DELETE already does correctly, immediately,
+      // rather than waiting on a network round-trip to fix it.
+      const { itemId } = action.payload;
+      const binItem = state.bin.find(b => b.id === itemId);
+      if (!binItem) return { ...state, bin: state.bin.filter(b => b.id !== itemId) };
+
+      if (binItem._type === 'cardDef') {
+        return {
+          ...state,
+          inventory:       state.inventory.filter(inv => inv.cardDefId !== itemId),
+          binderSlots:     state.binderSlots.filter(s => s.cardDefId !== itemId),
+          cardDefinitions: state.cardDefinitions.filter(cd => cd.id !== itemId),
+          bin:             state.bin.filter(b => b.id !== itemId),
+        };
+      }
+      if (binItem._type === 'binder') {
+        return {
+          ...state,
+          binderSlots: state.binderSlots.filter(s => s.binderId !== itemId),
+          binders:     state.binders.filter(b => b.id !== itemId),
+          bin:         state.bin.filter(b => b.id !== itemId),
+        };
+      }
+      if (binItem._type === 'collection') {
+        const cardIdsInCollection = state.cardDefinitions
+          .filter(cd => cd.collectionId === itemId)
+          .map(cd => cd.id);
+        return {
+          ...state,
+          inventory:       state.inventory.filter(inv => !cardIdsInCollection.includes(inv.cardDefId)),
+          binderSlots:     state.binderSlots.filter(s => !cardIdsInCollection.includes(s.cardDefId)),
+          cardDefinitions: state.cardDefinitions.filter(cd => cd.collectionId !== itemId),
+          templateFields:  state.templateFields.filter(f => f.collectionId !== itemId),
+          collections:     state.collections.filter(c => c.id !== itemId),
+          bin:             state.bin.filter(b => b.id !== itemId),
+        };
+      }
+      return { ...state, bin: state.bin.filter(b => b.id !== itemId) };
+    }
 
     case ACTIONS.BIN_EMPTY:
       return { ...state, bin: [] };
@@ -288,15 +336,40 @@ export function reducer(state, action) {
 
     case ACTIONS.BINDER_SLOT_ADD: {
       const { slot } = action.payload;
-      const duplicate = state.binderSlots.some(
+      // === FIX (real bug: slots that render blank but still say
+      // "already occupied"): the old check only asked "does ANY slot
+      // record exist at this position" — it never verified that
+      // record's card still actually exists. If a card gets deleted
+      // while a binder_slots row still references it (a genuine
+      // possibility given sync-timing edge cases elsewhere in this
+      // app), that row becomes an orphan: it renders blank (no card
+      // data to show) but still counted as "occupied" here, blocking
+      // any new card from ever being placed there again — the only
+      // previous workaround was deleting the whole binder. Now,
+      // finding an existing slot whose card no longer exists doesn't
+      // block the new placement — it gets replaced instead.
+      const existingAtPosition = state.binderSlots.find(
         s => s.binderId === slot.binderId && s.pageNumber === slot.pageNumber && s.slotIndex === slot.slotIndex
       );
-      if (duplicate) { console.warn('[BinderVault] BINDER_SLOT_ADD: slot already occupied', slot); return state; }
+      if (existingAtPosition) {
+        const cardStillExists = state.cardDefinitions.some(cd => cd.id === existingAtPosition.cardDefId);
+        if (cardStillExists) {
+          console.warn('[BinderVault] BINDER_SLOT_ADD: slot already occupied', slot);
+          return state;
+        }
+        console.warn('[BinderVault] BINDER_SLOT_ADD: replacing orphaned slot (card no longer exists)', existingAtPosition.id);
+      }
       const alreadyPlaced = state.binderSlots.some(
         s => s.binderId === slot.binderId && s.cardDefId === slot.cardDefId
       );
       if (alreadyPlaced) { console.warn('[BinderVault] BINDER_SLOT_ADD: card already in binder', slot.cardDefId); return state; }
-      return { ...state, binderSlots: [...state.binderSlots, slot] };
+      return {
+        ...state,
+        binderSlots: [
+          ...state.binderSlots.filter(s => s.id !== existingAtPosition?.id),
+          slot,
+        ],
+      };
     }
 
     case ACTIONS.BINDER_SLOT_REMOVE:

@@ -311,10 +311,29 @@ export function syncToSupabase(action, nextState, prevState) {
       break;
     }
     case ACTIONS.CARD_DEFINITION_BULK_ADD: {
-      (action.payload ?? []).forEach(c => {
-        const cd = nextState.cardDefinitions.find(d => d.id === c.id);
-        if (cd) pending.push(upsertCardDefinition(cd));
-      });
+      // === FIX (real bug: bulk imports silently losing roughly half
+      // their cards): this used to fire every card's upsert via
+      // .forEach with no sequencing at all — a burst of 30+ writes
+      // hitting Supabase essentially simultaneously. That's exactly
+      // the kind of load that can silently drop some writes (a
+      // connection-pool limit, a rate limit, a timeout under
+      // concurrent load) — and there was no way to notice, since
+      // local state already shows all the cards regardless of
+      // whether their individual database write actually landed.
+      // Sequential writes (one at a time, not fire-and-forget in a
+      // loop) are slower for a large import but far more reliable —
+      // matches the same reasoning already used for the Pokémon API's
+      // own fetch pagination (sequential, not parallel, to respect
+      // its rate limit). Wrapped in an IIFE so this case can await
+      // inside a switch without restructuring the whole function.
+      const cardsToUpsert = (action.payload ?? [])
+        .map(c => nextState.cardDefinitions.find(d => d.id === c.id))
+        .filter(Boolean);
+      pending.push((async () => {
+        for (const cd of cardsToUpsert) {
+          await upsertCardDefinition(cd);
+        }
+      })());
       break;
     }
     case ACTIONS.CARD_DEFINITION_DELETE: {
@@ -438,25 +457,28 @@ export function syncToSupabase(action, nextState, prevState) {
         } else if (binItem._type === 'collection') {
           pending.push(getRealUserId().then(async userId => {
             if (!userId) return;
-            const { data: cds } = await supabase.from('card_definitions').select('id').eq('collection_id', itemId).eq('user_id', userId);
+            const { data: cds } = await supabase.from('card_definitions').select('id, image_url').eq('collection_id', itemId).eq('user_id', userId);
             if (cds?.length) {
               const cdIds = cds.map(c => c.id);
-              await supabase.from('user_inventory').delete().in('card_def_id', cdIds).eq('user_id', userId);
-              await supabase.from('binder_slots').delete().in('card_def_id', cdIds).eq('user_id', userId);
+              await logIfError(supabase.from('user_inventory').delete().in('card_def_id', cdIds).eq('user_id', userId), `permanent delete: inventory for collection ${itemId}`);
+              await logIfError(supabase.from('binder_slots').delete().in('card_def_id', cdIds).eq('user_id', userId), `permanent delete: binder_slots for collection ${itemId}`);
+              for (const cd of cds) {
+                await deleteImageFromStorage(getStoragePathFromUrl(cd.image_url));
+              }
             }
-            await supabase.from('card_definitions').delete().eq('collection_id', itemId).eq('user_id', userId);
-            await supabase.from('template_fields').delete().eq('collection_id', itemId).eq('user_id', userId);
-            await supabase.from('collections').delete().eq('id', itemId).eq('user_id', userId);
-            await supabase.from('bin').delete().eq('id', itemId).eq('user_id', userId);
+            await logIfError(supabase.from('card_definitions').delete().eq('collection_id', itemId).eq('user_id', userId), `permanent delete: card_definitions for collection ${itemId}`);
+            await logIfError(supabase.from('template_fields').delete().eq('collection_id', itemId).eq('user_id', userId), `permanent delete: template_fields for collection ${itemId}`);
+            await logIfError(supabase.from('collections').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: collection ${itemId}`);
+            await logIfError(supabase.from('bin').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: bin row for collection ${itemId}`);
           }));
           break;
         } else if (binItem._type === 'cardDef') {
           pending.push(getRealUserId().then(async userId => {
             if (!userId) return;
-            await supabase.from('user_inventory').delete().eq('card_def_id', itemId).eq('user_id', userId);
-            await supabase.from('binder_slots').delete().eq('card_def_id', itemId).eq('user_id', userId);
-            await supabase.from('card_definitions').delete().eq('id', itemId).eq('user_id', userId);
-            await supabase.from('bin').delete().eq('id', itemId).eq('user_id', userId);
+            await logIfError(supabase.from('user_inventory').delete().eq('card_def_id', itemId).eq('user_id', userId), `permanent delete: inventory for card ${itemId}`);
+            await logIfError(supabase.from('binder_slots').delete().eq('card_def_id', itemId).eq('user_id', userId), `permanent delete: binder_slots for card ${itemId}`);
+            await logIfError(supabase.from('card_definitions').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: card_definitions ${itemId}`);
+            await logIfError(supabase.from('bin').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: bin row for card ${itemId}`);
             await deleteImageFromStorage(getStoragePathFromUrl(binItem.image_url));
           }));
           break;

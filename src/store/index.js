@@ -67,7 +67,7 @@ function createStore(reducerFn, initialState) {
 
       const prevState = state; // capture BEFORE reducer runs
       const nextState = reducerFn(state, action);
-      if (nextState === state) return;
+      if (nextState === state) return Promise.resolve();
       state = nextState;
 
       if (PERSISTED_ACTIONS.has(action.type)) {
@@ -85,19 +85,28 @@ function createStore(reducerFn, initialState) {
         });
         if (!success) {
           listeners.forEach(fn => fn(state, { saveError: true }));
-          return;
+          return Promise.resolve();
         }
 
         // 2. Sync to Supabase (fire-and-forget as far as the UI is
-        // concerned — not awaited here, so nothing blocks). Its
-        // returned promise IS tracked, though, so realtime can wait
-        // for it — see waitForPendingSyncs above.
+        // concerned — not awaited here by default, so nothing blocks.
+        // Its returned promise IS tracked, so realtime can wait for
+        // it (see waitForPendingSyncs above), AND now also returned
+        // from dispatch itself, so a caller that genuinely needs
+        // ordering (e.g. a collection must exist before any card
+        // referencing it via a foreign key is written) can explicitly
+        // await dispatch(...) for just that one call, without forcing
+        // every other dispatch call site to change at all.
         const syncPromise = syncToSupabase(action, nextState, prevState);
         pendingSyncs.add(syncPromise);
         syncPromise.finally(() => pendingSyncs.delete(syncPromise));
+
+        listeners.forEach(fn => fn(state));
+        return syncPromise;
       }
 
       listeners.forEach(fn => fn(state));
+      return Promise.resolve();
     },
 
     subscribe(listener) {

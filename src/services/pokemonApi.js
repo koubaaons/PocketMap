@@ -71,6 +71,14 @@ function getHeaders() {
   return apiKey ? { 'X-Api-Key': apiKey } : {};
 }
 
+// === Session cache for fetchAllSets — the full set list doesn't
+// change often enough to justify re-fetching it every single time
+// the sets browser is opened. Cached in memory for the life of the
+// page (cleared on a real page reload), not persisted anywhere more
+// durable, since staleness beyond one session isn't a real concern
+// here. ===
+let cachedAllSets = null;
+
 /**
  * Fetches every set in one request, for the full-page set browser
  * (not the old modal search flow). Total set count across Pokémon
@@ -80,11 +88,24 @@ function getHeaders() {
  * (a plain array filter, not a network round-trip per keystroke,
  * which is what made the old modal's "live" search still feel
  * laggy — it was re-hitting the API on every debounce tick).
+ *
+ * Cached after the first successful fetch — opening the browser
+ * again in the same session reuses it instantly instead of hitting
+ * the network again.
  */
+// Only these fields are ever actually displayed for a set tile
+// (name, series, card count, logo image) — trims out legalities,
+// ptcgoCode, releaseDate, updatedAt, none of which the UI shows.
+// === REVERTED: select appears to trigger a CORS failure on this
+// API for at least some requests — reliability over payload size,
+// see fetchCardsForSet below for the same reversion and reasoning. ===
+
 export async function fetchAllSets() {
+  if (cachedAllSets) return cachedAllSets;
   const res = await fetch(`${API_BASE}/sets?orderBy=-releaseDate&pageSize=250`, { headers: getHeaders() });
   if (!res.ok) throw new Error(`Pokemon TCG API: fetch all sets failed (${res.status})`);
   const { data } = await res.json();
+  cachedAllSets = data;
   return data;
 }
 
@@ -123,6 +144,15 @@ export async function browseSets() {
  * Fetches one page of cards for a given set id. Pagination is
  * required, not optional — a full base set can be 100-250+ cards,
  * and the API caps pageSize (250 max) regardless of what's asked for.
+ *
+ * === REVERTED select parameter: adding it (to trim the response to
+ * only used fields) appeared to trigger a CORS failure on this API —
+ * "No 'Access-Control-Allow-Origin' header is present" — for at
+ * least some requests, confirmed via a real browser console error,
+ * not assumed. A slower request that actually loads beats a faster
+ * one that sometimes doesn't load at all. If field-trimming is worth
+ * revisiting later, verify CORS behavior with select present in an
+ * actual browser first, on its own, before adding it back here. ===
  * @param {string} setId - e.g. "sv1"
  * @param {number} page - 1-indexed
  * @param {number} pageSize
@@ -144,14 +174,22 @@ export async function fetchCardsForSet(setId, page = 1, pageSize = 250) {
   };
 }
 
+// Cached per set id, same reasoning as cachedAllSets above.
+const cachedCardsBySetId = new Map();
+
 /**
  * Fetches every card in a set across all pages. For a spike-sized
  * test this is fine as one function; for very large sets (rare, but
  * some promo/reprint "sets" span thousands of cards across formats)
  * this makes multiple sequential requests — sequential, not
  * parallel, to stay well under the rate limit rather than bursting.
+ *
+ * Cached per set id after the first successful fetch — previewing
+ * the same set again in the same session reuses it instantly.
  */
 export async function fetchAllCardsForSet(setId, onProgress) {
+  if (cachedCardsBySetId.has(setId)) return cachedCardsBySetId.get(setId);
+
   const allCards = [];
   let page = 1;
   let totalCount = Infinity;
@@ -164,6 +202,7 @@ export async function fetchAllCardsForSet(setId, onProgress) {
     page++;
   }
 
+  cachedCardsBySetId.set(setId, allCards);
   return allCards;
 }
 
