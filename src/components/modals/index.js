@@ -13,6 +13,4 @@ export { PokemonImportModal } from './PokemonImportModal.jsx';
 export { AddCardToBinderModal } from './AddCardToBinderModal.jsx';
 // === ISSUE #54 END ===
 
-// === ISSUE #56 START: Slot action modal ===
-export { SlotActionModal } from './SlotActionModal.jsx';
 // === ISSUE #56 END ===

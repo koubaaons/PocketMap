@@ -69,7 +69,14 @@ export function validateBinder(data) {
   if (!Number.isInteger(data.rows) || data.rows < 1 || data.rows > 10) errors.push('rows must be integer 1–10');
   if (!Number.isInteger(data.pages) || data.pages < 1 || data.pages > 500) errors.push('pages must be integer 1–500');
   if (typeof data.cover_color !== 'string' || !data.cover_color.startsWith('#')) errors.push('cover_color must be a hex string');
-  if (!['dark', 'light'].includes(data.page_color)) errors.push('page_color must be dark or light');
+  // Accepts either the old fixed 'dark'/'light' preset strings
+  // (existing binders in the database already have these — this
+  // isn't a migration, just backward-compatible validation) or any
+  // hex color (new binders, and anyone who picks a custom page color
+  // going forward).
+  const isLegacyPreset = data.page_color === 'dark' || data.page_color === 'light';
+  const isHexColor = typeof data.page_color === 'string' && data.page_color.startsWith('#');
+  if (!isLegacyPreset && !isHexColor) errors.push('page_color must be a hex string (or legacy dark/light)');
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
 
   // === ISSUE #92: stickers must be an array; each entry validated ===
@@ -87,7 +94,11 @@ export function validateBinder(data) {
 export function createBinder({
   name, cols, rows, pages,
   cover_color = DEFAULT_BINDER_COLOR,
-  page_color = 'dark',
+  // Was 'dark' (a fixed preset string) — now any hex color, matching
+  // cover_color's own pattern. Default hex matches the OLD 'dark'
+  // preset's actual color (#1e1e1e) so nothing visually shifts for
+  // anyone who hasn't touched this setting.
+  page_color = '#1e1e1e',
   stickers = [],
   userId = 'local-user-1',
 }) {
@@ -99,7 +110,7 @@ export function createBinder({
     rows:        Number(rows),
     pages:       Number(pages),
     cover_color: cover_color ?? DEFAULT_BINDER_COLOR,
-    page_color:  page_color ?? 'dark',
+    page_color:  page_color ?? '#1e1e1e',
     stickers:    Array.isArray(stickers) ? stickers : [],
     createdAt:   Date.now(),
   };

@@ -7,6 +7,7 @@
 import { useMemo } from 'react';
 import { useTransitioningPairs, getEffectiveZIndex } from './useTransitioningPairs.js';
 import { BinderPage } from '../collections/BinderPage.jsx';
+import { resolvePageColor, getContrastTextColor } from '../../utils/colorUtils.js';
 
 const RENDER_RADIUS = 3;
 
@@ -22,7 +23,8 @@ export function BinderBookFlip({
   coverFrontContent,
   coverBackContent = null,
   coverColor,
-  pageColor = 'dark',
+  pageColor = '#1e1e1e',
+  isFrontCoverTransparent = false,
   onCoverClick,
   isClickable = true,
 }) {
@@ -65,10 +67,27 @@ export function BinderBookFlip({
 
   const coverFlipped = isFlipped(0);
 
+  // page_color used to be a fixed 'dark'/'light' preset string, now
+  // any hex color — resolvePageColor handles existing binders that
+  // still have the old preset strings stored, getContrastTextColor
+  // picks a readable text color for whatever custom color is chosen.
+  // isDarkPage still branches the overlay STYLE (light-mode overlays
+  // are white-based, dark-mode are black-based — these wouldn't look
+  // right blindly swapped for an arbitrary custom color), while the
+  // actual base tone itself is now fully custom via --page-color.
+  const resolvedPageColor = resolvePageColor(pageColor);
+  const pageTextColor = getContrastTextColor(resolvedPageColor);
+  const isDarkPage = getContrastTextColor(resolvedPageColor).includes('255,255,255');
+
   return (
     <div
-      className={`book-flip-container binder-pages-${pageColor}`}
-      style={{ '--cover-color': coverColor }}
+      className="book-flip-container"
+      data-page-mode={isDarkPage ? 'dark' : 'light'}
+      style={{
+        '--cover-color': coverColor,
+        '--page-color': resolvedPageColor,
+        '--page-text-color': pageTextColor,
+      }}
     >
 
       {/* Static back-cover placeholder */}
@@ -91,9 +110,19 @@ export function BinderBookFlip({
           className={`book-page-pair-cover-right-rotating ${coverFlipped ? 'is-flipped' : ''}`}
           style={{ ...getTransitionStyleFor(0) }}
         >
-          {/* Front face — visible when closed */}
+          {/* Front face — visible when closed. Fades to reveal the
+              real first page pair already mounted behind it (thanks
+              to virtualization keeping nearby pairs in the DOM even
+              while closed) while actively previewing a page color —
+              see BinderCustomizePanel.jsx's file header for the full
+              reasoning. */}
           <div
             className="book-page-pair-cover-right-front"
+            style={{
+              opacity: isFrontCoverTransparent ? 0 : 1,
+              transition: 'opacity 0.3s ease',
+              pointerEvents: isFrontCoverTransparent ? 'none' : undefined,
+            }}
             onClick={!coverFlipped && isClickable && onCoverClick ? onCoverClick : undefined}
             onKeyDown={(e) => {
               if ((e.key === 'Enter' || e.key === ' ') && !coverFlipped && isClickable && onCoverClick) {

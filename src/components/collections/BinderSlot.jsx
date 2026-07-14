@@ -23,6 +23,8 @@ export function BinderSlot({
   isMoveTarget = false,
   onClickEmpty,
   onClickSlot,
+  onToggleOwned,
+  onRemove,
 }) {
   const hasCard = !!(slot && cardDef);
 
@@ -52,6 +54,27 @@ export function BinderSlot({
     }
     hadCardRef.current = hasCard;
   }, [hasCard]);
+
+  // === Own-toggle reveal — the same flip+shine moment CardGridItem.jsx
+  // plays in the Collection grid when a card transitions from
+  // not-owned to owned, now also reused here for the same transition
+  // happening directly from a binder slot's hover toggle. Distinct
+  // from justFilled above (that's about the SLOT becoming filled;
+  // this is about OWNERSHIP changing on a slot that was already
+  // filled with an unowned placeholder card) — both can fire
+  // independently, so they're tracked separately. ===
+  const hadOwnedRef = useRef(isOwned);
+  const [justOwned, setJustOwned] = useState(false);
+
+  useEffect(() => {
+    if (isOwned && !hadOwnedRef.current) {
+      setJustOwned(true);
+      const t = setTimeout(() => setJustOwned(false), 500);
+      hadOwnedRef.current = true;
+      return () => clearTimeout(t);
+    }
+    hadOwnedRef.current = isOwned;
+  }, [isOwned]);
 
   // In preview mode all cards show in full color regardless of ownership
   const showGrey = hasCard && !isOwned && !isPreviewMode;
@@ -97,6 +120,41 @@ export function BinderSlot({
     >
       <span className="slot-index">{slotIndex + 1}</span>
       {isFavorite && <span className="slot-fav-star" aria-label="Favorite">★</span>}
+
+      {/* === Hover-only ownership toggle — mirrors CardGridItem.jsx's
+          always-visible ✓/○ circle in the Collection grid, but only
+          appears on hover here (binder-slot-status CSS), since a
+          slot's own card image is already the primary focus and a
+          permanent overlay would compete with it visually. Same
+          underlying toggle logic either way, just reachable directly
+          from the slot. === */}
+      {onToggleOwned && !isPreviewMode && (
+        <button
+          className={`binder-slot-status ${isOwned ? 'binder-slot-status-owned' : 'binder-slot-status-missing'}`}
+          onClick={(e) => { e.stopPropagation(); onToggleOwned(); }}
+          aria-label={isOwned ? `Remove ${cardDef.name} from your collection` : `Mark ${cardDef.name} as owned`}
+          aria-pressed={isOwned}
+        >
+          {isOwned ? '✓' : '○'}
+        </button>
+      )}
+
+      {/* === Hover-only remove-from-binder — a direct action on the
+          slot itself, separate from card ownership entirely (removing
+          a card from this binder doesn't un-own it; that's a
+          different toggle above). Only in normal mode — preview mode
+          has its own slot-selection workflow, removing here would
+          conflict with it. === */}
+      {onRemove && !isPreviewMode && (
+        <button
+          className="binder-slot-remove"
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          aria-label={`Remove ${cardDef.name} from this binder`}
+        >
+          ✕
+        </button>
+      )}
+
       {cardDef.image_url ? (
         <img
           src={cardDef.image_url}
@@ -119,12 +177,12 @@ export function BinderSlot({
           <span className="card-holo-glare" aria-hidden="true" />
         </>
       )}
-      {/* === FIX (new card reveal animation): a slide-in, not a flip —
-          placing a card in a binder is a physical insertion, distinct
-          from the flip+shine "you now got this card" moment used in
-          the collection view (see CardGridItem.jsx). justFilled
-          controls the animation class only; no extra overlay element
-          needed for a slide. === */}
+      {/* justFilled controls the slide-in animation class only (card
+          placed into an empty slot); justOwned below is the separate
+          flip+shine overlay, only rendered for the ~0.5s it's
+          actually playing, same convention as CardGridItem.jsx's
+          own reveal-shine. */}
+      {justOwned && <span className="card-grid-item-reveal-shine" aria-hidden="true" />}
     </button>
   );
 }

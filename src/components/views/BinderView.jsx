@@ -35,8 +35,10 @@ import { BinderTopbar } from './BinderTopbar.jsx';
 import { BinderPageNav } from './BinderPageNav.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
-import { SlotActionModal } from '../modals/SlotActionModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
+import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
+import { useCardEditor } from '../../hooks/useCardEditor.js';
+import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useBinderCoverEditor } from '../../hooks/useBinderCoverEditor.js';
 import { BinderCoverStickers } from './BinderCover.jsx';
 import { BinderCustomizePanel } from './BinderCustomizePanel.jsx';
@@ -82,6 +84,14 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const isClosed = view.page === 0;
 
   const coverEditor = useBinderCoverEditor({ binder, toast });
+
+  // === Real in-place card editing from within a binder (was
+  // previously just a redirect to the Collection view — see
+  // handleEditCardFromBinder below for the full reasoning) ===
+  const cardEditor = useCardEditor();
+  const { handleUpdate: handleUpdateCard } = useCardDefinitionActions(toast, {
+    onUpdateSuccess: cardEditor.closeEdit,
+  });
 
   // === FIX: this was a useEffect, which runs AFTER the browser has
   // already painted the render that triggered it — leaving a real,
@@ -211,9 +221,17 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     }
   };
 
-  const handleOwnFromSlot = () => {
-    if (!view.activeSlot) return;
-    handleOwn({ cardDefId: view.activeSlot.cardDef.id, collectionId: view.activeSlot.slot.collectionId });
+  // === New: hover-triggered ✓/○ toggle directly on a filled slot,
+  // mirroring CardGridItem.jsx's own toggle circle in the Collection
+  // grid — same underlying handleOwn/handleUnown, just reachable
+  // without opening the full SlotActionModal first. ===
+  const handleToggleOwnedInSlot = (cardDef) => {
+    const inventoryItem = ownershipMap[cardDef.id];
+    if (inventoryItem) {
+      handleUnown(inventoryItem.id);
+    } else {
+      handleOwn({ cardDefId: cardDef.id, collectionId: cardDef.collectionId });
+    }
   };
 
   const handleDeleteBinder = () => {
@@ -223,12 +241,14 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     onNavigate('home'); // navigate away immediately, don't wait for App.jsx guard
   };
 
+  // === FIX (real gap): this used to just navigate away to the
+  // Collection view and make the user find + click Edit again
+  // there — not actually editing "from the binder" at all, just a
+  // redirect. Now opens the real edit form in place, without ever
+  // leaving the binder. ===
   const handleEditCardFromBinder = (cardDef) => {
     view.closeCardDetail();
-    if (onNavigate && cardDef?.collectionId) {
-      onNavigate('collection', cardDef.collectionId);
-      toast(`Opening ${cardDef.name}`);
-    }
+    cardEditor.openEdit(cardDef);
   };
 
   // ── Keyboard navigation ──────────────────────────────────────────────────
@@ -385,10 +405,18 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       view.isPreviewMode
         ? handleEmptyClickInPreview(slotIndex, pageNumber)
         : view.openAddToSlot(slotIndex, pageNumber),
+    // === Clicking a card in a binder now goes straight to the same
+    // card-detail experience Collections uses (card floats, details
+    // slide out beside it) instead of first opening SlotActionModal
+    // and requiring an extra "View Card Details" click. Preview mode
+    // keeps its own separate click behavior — that's for selecting
+    // slots to move cards between, a different workflow entirely. ===
     onClickSlot: (slot, cardDef) =>
       view.isPreviewMode
         ? handleSlotClickInPreview(slot, cardDef)
-        : view.openSlotAction(slot, cardDef),
+        : view.openCardDetail(cardDef),
+    onToggleOwned: handleToggleOwnedInSlot,
+    onRemove: (slot) => handleRemoveFromSlot(slot.id),
   });
 
   // Cover content passed into BinderBookFlip's cover pair. "Not yet
@@ -491,7 +519,8 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
             selectedSlot={view.selectedSlot}
             makePageHandlers={makePageHandlers}
             coverColor={coverEditor.isEditingCover ? coverEditor.draftColor : color}
-            pageColor={binder.page_color ?? 'dark'}
+            pageColor={coverEditor.isEditingCover ? coverEditor.draftPageColor : (binder.page_color ?? '#1e1e1e')}
+            isFrontCoverTransparent={coverEditor.isPreviewingPageColor}
             coverFrontContent={<BinderCoverStickers binder={binder} {...coverEditor} />}
             onCoverClick={handleOpenBinder}
             isClickable={isCover && !coverEditor.isEditingCover}
@@ -533,18 +562,6 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         />
       )}
 
-      {view.activeSlot && (
-        <SlotActionModal
-          slot={view.activeSlot.slot}
-          cardDef={view.activeSlot.cardDef}
-          inventoryItem={ownershipMap[view.activeSlot.cardDef.id] ?? null}
-          onOwn={handleOwnFromSlot}
-          onRemove={() => handleRemoveFromSlot(view.activeSlot.slot.id)}
-          onViewDetail={() => view.openCardDetail(view.activeSlot.cardDef)}
-          onClose={view.closeSlotAction}
-        />
-      )}
-
       {view.viewingCardDef && (
         <CardDetailModal
           card={view.viewingCardDef}
@@ -559,6 +576,32 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           onClose={view.closeCardDetail}
         />
       )}
+
+      {cardEditor.editingCard && (() => {
+        // A binder can hold cards from more than one collection —
+        // unlike CollectionDetailView (which always has exactly one
+        // collection in scope), this has to look up the right one
+        // per-card, dynamically, based on whichever card is actually
+        // being edited right now.
+        const editingCollection = collections.find(
+          c => c.id === cardEditor.editingCard.collectionId
+        );
+        const editingTemplateFields = templateFields.filter(
+          f => f.collectionId === cardEditor.editingCard.collectionId
+        );
+        if (!editingCollection) return null; // shouldn't happen, but don't crash if it somehow does
+        return (
+          <CardDefinitionForm
+            collection={editingCollection}
+            templateFields={editingTemplateFields}
+            initialCard={cardEditor.editingCard}
+            mode="edit"
+            onSubmit={handleUpdateCard}
+            onClose={cardEditor.closeEdit}
+          />
+        );
+      })()}
+
 
       {confirmDelete && (
         <ConfirmModal

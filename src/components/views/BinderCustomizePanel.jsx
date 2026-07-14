@@ -5,11 +5,23 @@
  *
  * Shown only while the binder is closed (isCover). The button toggles
  * to the panel via isEditingCover (from useBinderCoverEditor); the
- * panel edits name, cover color, and stickers together, saved as one
- * BINDER_UPDATE via handleSaveCoverEdit.
+ * panel edits name, cover color, page color, and a sticker together,
+ * saved as one BINDER_UPDATE via handleSaveCoverEdit.
+ *
+ * === Page color preview === Pages are only visible once the binder
+ * is open, but Customize only exists while it's closed — so there's
+ * no page to preview against normally. Rather than fake it with a
+ * mock rectangle, hovering the page-color field sets
+ * isPreviewingPageColor, which BinderView.jsx uses to make the front
+ * cover's face transparent — revealing the REAL first page
+ * underneath (already mounted in the DOM behind the cover thanks to
+ * the binder's own virtualization, just normally hidden by the
+ * opaque cover on top of it). This shows the actual rendering, not
+ * an approximation of it.
  */
 
-import { BINDER_COLORS } from '../../types/index.js';
+import { ColorWheelPicker } from '../ui/ColorWheelPicker.jsx';
+import { resolvePageColor } from '../../utils/colorUtils.js';
 
 export function BinderCustomizePanel({
   isCover,
@@ -20,8 +32,11 @@ export function BinderCustomizePanel({
   stickerUploadError,
   draftName,
   draftColor,
+  draftPageColor,
   setDraftName,
   setDraftColor,
+  setDraftPageColor,
+  setIsPreviewingPageColor,
   handleEnterCoverEdit,
   handleCancelCoverEdit,
   handleSaveCoverEdit,
@@ -61,23 +76,24 @@ export function BinderCustomizePanel({
         </label>
 
         <div className="binder-customize-field">
-          <span>Color</span>
-          <div className="binder-customize-swatches">
-            {BINDER_COLORS.map(color => (
-              <button
-                key={color}
-                type="button"
-                className={`binder-customize-swatch ${draftColor === color ? 'binder-customize-swatch-selected' : ''}`}
-                style={{ backgroundColor: color }}
-                onClick={() => setDraftColor(color)}
-                aria-label={`Set cover color to ${color}`}
-              />
-            ))}
-          </div>
+          <span>Cover Color</span>
+          <ColorWheelPicker value={draftColor} onChange={setDraftColor} />
+        </div>
+
+        <div
+          className="binder-customize-field"
+          onMouseEnter={() => setIsPreviewingPageColor(true)}
+          onMouseLeave={() => setIsPreviewingPageColor(false)}
+        >
+          <span>Page Color</span>
+          <p className="binder-customize-field-hint">
+            Hover here to see the front cover fade so you can preview your actual first page.
+          </p>
+          <ColorWheelPicker value={resolvePageColor(draftPageColor)} onChange={setDraftPageColor} />
         </div>
 
         <div className="binder-customize-field">
-          <span>Stickers</span>
+          <span>Sticker</span>
           <button
             type="button"
             className="binder-cover-edit-btn"

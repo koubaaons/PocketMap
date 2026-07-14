@@ -17,6 +17,8 @@ export function BinderPage({
   selectedSlot = null,
   onClickEmpty,
   onClickSlot,
+  onToggleOwned,
+  onRemove,
 }) {
   const totalSlots = binder.rows * binder.cols;
 
@@ -50,6 +52,8 @@ export function BinderPage({
               isMoveTarget={isMoveTarget}
               onClickEmpty={() => onClickEmpty(slotIndex)}
               onClickSlot={(s) => onClickSlot(s, cardDef)}
+              onToggleOwned={cardDef ? () => onToggleOwned(cardDef) : undefined}
+              onRemove={slot ? () => onRemove(slot) : undefined}
             />
           );
         })}

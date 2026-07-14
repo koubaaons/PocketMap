@@ -49,7 +49,22 @@
  * actually serves the built app.
  */
 
-const API_BASE = 'https://api.pokemontcg.io/v2';
+// === ISSUE #130: CORS on this API is genuinely intermittent —
+// confirmed via repeated real browser CORS failures on the exact
+// same request shape that worked moments earlier, not a one-time
+// fluke or something tied to a specific query parameter. In dev,
+// route through Vite's own proxy (see vite.config.js) instead of
+// hitting the API directly — same-origin from the browser's
+// perspective, so no CORS check ever happens; Vite forwards the
+// request server-to-server, which browser CORS doesn't apply to.
+//
+// NOT yet solved for a production build: import.meta.env.DEV is
+// false once built/deployed, and Vite's dev proxy doesn't exist
+// outside `npm run dev`. Before deploying, this needs an equivalent
+// server-side proxy (a small serverless function that fetches this
+// API and returns the JSON) — the direct URL below will hit the same
+// CORS unreliability in production that dev just worked around.
+const API_BASE = import.meta.env.DEV ? '/api/pokemontcg' : 'https://api.pokemontcg.io/v2';
 
 /**
  * Template fields for a Pokémon-imported collection. Used to live in
@@ -102,7 +117,7 @@ let cachedAllSets = null;
 
 export async function fetchAllSets() {
   if (cachedAllSets) return cachedAllSets;
-  const res = await fetch(`${API_BASE}/sets?orderBy=-releaseDate&pageSize=250`, { headers: getHeaders() });
+  const res = await fetchWithRetry(`${API_BASE}/sets?orderBy=-releaseDate&pageSize=250`, { headers: getHeaders() });
   if (!res.ok) throw new Error(`Pokemon TCG API: fetch all sets failed (${res.status})`);
   const { data } = await res.json();
   cachedAllSets = data;
@@ -122,7 +137,7 @@ export async function fetchAllSets() {
  */
 export async function searchSets(query) {
   const q = encodeURIComponent(`name:*${query}*`);
-  const res = await fetch(`${API_BASE}/sets?q=${q}&orderBy=-releaseDate`, { headers: getHeaders() });
+  const res = await fetchWithRetry(`${API_BASE}/sets?q=${q}&orderBy=-releaseDate`, { headers: getHeaders() });
   if (!res.ok) throw new Error(`Pokemon TCG API: set search failed (${res.status})`);
   const { data } = await res.json();
   return data;
@@ -134,7 +149,7 @@ export async function searchSets(query) {
  * an exact or partial set name.
  */
 export async function browseSets() {
-  const res = await fetch(`${API_BASE}/sets?orderBy=-releaseDate&pageSize=50`, { headers: getHeaders() });
+  const res = await fetchWithRetry(`${API_BASE}/sets?orderBy=-releaseDate&pageSize=50`, { headers: getHeaders() });
   if (!res.ok) throw new Error(`Pokemon TCG API: browse sets failed (${res.status})`);
   const { data } = await res.json();
   return data;
@@ -158,9 +173,41 @@ export async function browseSets() {
  * @param {number} pageSize
  * @returns {{ cards: object[], page: number, pageSize: number, totalCount: number }}
  */
-export async function fetchCardsForSet(setId, page = 1, pageSize = 250) {
+/**
+ * Retries a fetch a few times with increasing delay, but only for
+ * server-side errors (5xx — the server's own problem, worth retrying)
+ * — never for 4xx (a client mistake like a bad query, which retrying
+ * would just repeat identically). A 504 specifically means the API's
+ * own server took too long to respond; this is a genuine reliability
+ * gap in a free third-party API, not something fixable by changing
+ * our own request — retrying is the standard, correct response to it.
+ */
+async function fetchWithRetry(url, options, retries = 3, delayMs = 1000) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(url, options);
+    if (res.ok) return res;
+    if (res.status < 500 || attempt === retries) return res; // don't retry 4xx, or out of attempts
+    await new Promise(r => setTimeout(r, delayMs * (attempt + 1))); // 1s, 2s, 3s...
+  }
+}
+
+/**
+ * Fetches one page of cards for a given set id. Pagination is
+ * required, not optional — a full base set can be 100-250+ cards,
+ * and the API caps pageSize (250 max) regardless of what's asked for.
+ *
+ * Default pageSize lowered from 250 to 100 — a smaller request is
+ * less likely to hit the API's own server-side timeout (the actual
+ * cause of a 504) than one giant 250-card request, at the cost of
+ * needing more pages for very large sets.
+ * @param {string} setId - e.g. "sv1"
+ * @param {number} page - 1-indexed
+ * @param {number} pageSize
+ * @returns {{ cards: object[], page: number, pageSize: number, totalCount: number }}
+ */
+export async function fetchCardsForSet(setId, page = 1, pageSize = 100) {
   const q = encodeURIComponent(`set.id:${setId}`);
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `${API_BASE}/cards?q=${q}&page=${page}&pageSize=${pageSize}`,
     { headers: getHeaders() }
   );
@@ -195,7 +242,7 @@ export async function fetchAllCardsForSet(setId, onProgress) {
   let totalCount = Infinity;
 
   while (allCards.length < totalCount) {
-    const result = await fetchCardsForSet(setId, page, 250);
+    const result = await fetchCardsForSet(setId, page, 100);
     allCards.push(...result.cards);
     totalCount = result.totalCount;
     onProgress?.(allCards.length, totalCount);
@@ -210,61 +257,73 @@ export async function fetchAllCardsForSet(setId, onProgress) {
 // Pinder's holoType enum (see src/types/holoTypes.js) has 8 values:
 // off, none (= subtle default sheen, NOT "no effect" — see that
 // file's own note on this), holo, galaxy, rainbow, gold, v, vstar.
-// The API's rarity strings don't map 1:1 — some mappings below are
-// confident, some are best-guess approximations, marked as such.
-// Anything not in this table falls through to 'none' (the safe,
-// default-sheen option) with a console.warn so genuinely new/unseen
-// rarity strings surface instead of silently guessing forever.
+//
+// Reviewed and finalized directly with the user against a reference
+// project (simeydotme/pokemon-cards-css) that recreates real Pokémon
+// TCG holo effects in CSS, confirming rarity strings this table's
+// first version had missed entirely — most notably "Rare Holo Galaxy"
+// (a real, standalone rarity, not an empty/unused category as
+// originally assumed) and several newer Scarlet & Violet / Mega
+// Evolution era terms (Double Rare, Illustration Rare, Special
+// Illustration Rare, Hyper Rare, Mega Hyper Rare, Mega Attack Rare)
+// that didn't exist when this table was first built. This is why a
+// Mega Hyper Rare card was showing up as "Regular" before this
+// revision — it simply wasn't in the table at all, so it silently
+// fell through to the 'none' default.
+//
+// Anything still not in this table falls through to 'none' with a
+// console.warn, so genuinely new/unseen rarity strings surface
+// instead of silently defaulting forever.
 const RARITY_TO_HOLO_TYPE = {
-  // Confident — plain, non-holo rarities
+  // Regular — no special foil/holo treatment
   'Common':   'none',
   'Uncommon': 'none',
   'Rare':     'none',
   'Promo':    'none',
 
-  // Confident — direct holo
-  'Rare Holo': 'holo',
+  // Holo — textured/premium but not the top gold/rainbow tier
+  'Rare Holo':                 'holo',
+  'Rare Holo EX':               'holo',
+  'Rare Holo GX':               'holo',
+  'Rare Holo LV.X':             'holo',
+  'Rare Holo Star':             'holo',
+  'Rare Prime':                 'holo',
+  'Rare Prism Star':            'holo',
+  'Rare ACE':                   'holo',
+  'Rare BREAK':                 'holo',
+  'LEGEND':                     'holo',
+  'Rare Shining':               'holo',
+  'Rare Shiny':                 'holo',
+  'Rare Shiny GX':              'holo',
+  'Illustration Rare':          'holo',
+  'Mega Attack Rare':           'holo',
+  'ACE SPEC Rare':              'holo',
+  'Black White Rare':           'holo',
+  'Special Illustration Rare':  'holo',
 
-  // Confident — V-line cards have their own type
-  'Rare Holo V': 'v',
+  // Galaxy — confirmed real (not an empty category), a specific
+  // cosmos/galaxy-textured holo pattern
+  'Rare Holo Galaxy': 'galaxy',
 
-  // Approximation — no VMAX-specific type exists in Pinder's 8; V is
-  // the closest existing category rather than adding a 9th type for
-  // one card line.
-  'Rare Holo VMAX': 'v',
+  // Rainbow — vibrant, scene-breaking full-art foil
+  'Rare Rainbow':  'rainbow',
+  'Amazing Rare':  'rainbow',
 
-  // Confident — VSTAR has its own type, unlike VMAX
+  // Gold — all-gold foil/border treatment
+  'Rare Secret':     'gold',
+  'Rare Ultra':       'gold',
+  'Ultra Rare':       'gold',
+  'Hyper Rare':       'gold',
+  'Mega Hyper Rare':  'gold',
+
+  // V — modern "ex" cards (Double Rare) structurally replaced V as
+  // the mid-premium tier in current sets, so grouped together
+  'Rare Holo V':     'v',
+  'Rare Holo VMAX':  'v',
+  'Double Rare':     'v',
+
+  // VSTAR — has its own dedicated type, unlike VMAX
   'Rare Holo VSTAR': 'vstar',
-
-  // Confident — visually rainbow-foil
-  'Rare Rainbow': 'rainbow',
-
-  // Approximation — secret rares are usually gold-bordered/gold-text,
-  // closest existing category
-  'Rare Secret': 'gold',
-  'Rare Ultra':  'gold',
-
-  // Approximation — shining/shiny Pokémon cards have a distinct look
-  // that doesn't map cleanly onto any of the 8; 'holo' is the least-
-  // wrong fallback rather than a dedicated type
-  'Rare Shining':   'holo',
-  'Rare Shiny':     'holo',
-  'Rare Shiny GX':  'holo',
-
-  // Approximation — Amazing Rares have a rainbow-adjacent foil pattern
-  'Amazing Rare': 'rainbow',
-
-  // Approximation — older/rarer special mechanics, all holo-textured,
-  // 'holo' as the safe default rather than inventing per-mechanic types
-  'Rare Holo EX':     'holo',
-  'Rare Holo GX':     'holo',
-  'Rare Holo LV.X':   'holo',
-  'Rare Holo Star':   'holo',
-  'Rare Prime':       'holo',
-  'Rare Prism Star':  'holo',
-  'Rare ACE':         'holo',
-  'Rare BREAK':       'holo',
-  'LEGEND':           'holo',
 };
 
 /**

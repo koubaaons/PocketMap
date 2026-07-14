@@ -27,7 +27,7 @@ import { uploadImageToStorage } from '../utils/supabaseImageUpload.js';
 import { useAuth } from './useAuth.js';
 
 const STICKER_MAX_WIDTH = 400;
-const MAX_STICKERS = 10;
+const MAX_STICKERS = 1;
 
 /**
  * @param {{ binder: object, toast: function }} options
@@ -43,6 +43,15 @@ export function useBinderCoverEditor({ binder, toast }) {
   const [stickerUploadError, setStickerUploadError] = useState('');
   const [draftName, setDraftName]   = useState(binder.name);
   const [draftColor, setDraftColor] = useState(binder.cover_color);
+  const [draftPageColor, setDraftPageColor] = useState(binder.page_color);
+  // === Whether the front cover should go transparent to reveal the
+  // real first page underneath (already mounted behind it thanks to
+  // the binder's own virtualization keeping nearby pairs in the DOM
+  // even while closed) — only true while actively interacting with
+  // the page-color picker specifically, not for the whole time the
+  // panel is open, since the cover also needs to stay opaque the
+  // rest of the time to show its OWN live-previewed cover color. ===
+  const [isPreviewingPageColor, setIsPreviewingPageColor] = useState(false);
 
   const coverRef            = useRef(null);
   const stickerFileInputRef = useRef(null);
@@ -53,6 +62,8 @@ export function useBinderCoverEditor({ binder, toast }) {
     setSelectedStickerId(null);
     setDraftName(binder.name);
     setDraftColor(binder.cover_color);
+    setDraftPageColor(binder.page_color);
+    setIsPreviewingPageColor(false);
     setIsEditingCover(true);
   };
 
@@ -61,13 +72,15 @@ export function useBinderCoverEditor({ binder, toast }) {
     setSelectedStickerId(null);
     setDraftName(binder.name);
     setDraftColor(binder.cover_color);
+    setDraftPageColor(binder.page_color);
+    setIsPreviewingPageColor(false);
     setIsEditingCover(false);
   };
 
   const handleSaveCoverEdit = () => {
     dispatch({
       type: ACTIONS.BINDER_UPDATE,
-      payload: { ...binder, stickers: draftStickers, name: draftName.trim() || binder.name, cover_color: draftColor, updatedAt: Date.now() },
+      payload: { ...binder, stickers: draftStickers, name: draftName.trim() || binder.name, cover_color: draftColor, page_color: draftPageColor, updatedAt: Date.now() },
     });
     toast?.('Cover updated');
     setSelectedStickerId(null);
@@ -145,9 +158,13 @@ export function useBinderCoverEditor({ binder, toast }) {
     stickerUploadError,
     draftName,
     draftColor,
+    draftPageColor,
+    isPreviewingPageColor,
     setSelectedStickerId,
     setDraftName,
     setDraftColor,
+    setDraftPageColor,
+    setIsPreviewingPageColor,
     // handlers
     handleEnterCoverEdit,
     handleCancelCoverEdit,
