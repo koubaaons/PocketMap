@@ -68,7 +68,14 @@ export function CollectionDetailView({ toast, onBack }) {
 
   const { handleCreate, handleUpdate, handleDelete } = useCardDefinitionActions(toast, {
     onCreateSuccess: editor.closeCreate,
-    onUpdateSuccess: () => { editor.closeEdit(); ownership.closeDetail(); },
+    // === CHANGED: editing now happens inline inside CardDetailModal
+    // itself (see that file), which already transitions back to its
+    // own view mode after a successful save. This used to also close
+    // the whole detail modal (ownership.closeDetail()) — that made
+    // sense when editing opened a completely separate modal on top,
+    // but now it would yank the user back to the grid the instant
+    // they save, rather than letting them see the updated card. ===
+    onUpdateSuccess: () => {},
     onDeleteSuccess: () => { editor.closeDelete(); ownership.closeDetail(); },
   });
 
@@ -99,7 +106,7 @@ export function CollectionDetailView({ toast, onBack }) {
     ownershipMap,
     summary,
     onView:   ownership.openDetail,
-    onEdit:   editor.openEdit,
+    onEdit:   handleUpdate,
     onDelete: editor.openDelete,
     onToggleFavorite: handleToggleFavorite,
     onToggleOwned: handleToggleOwned,
@@ -173,7 +180,7 @@ export function CollectionDetailView({ toast, onBack }) {
             ownershipMap={ownershipMap}
             totalCount={collectionCards.length}
             onView={ownership.openDetail}
-            onEdit={editor.openEdit}
+            onEdit={handleUpdate}
             onDelete={editor.openDelete}
             onToggleFavorite={handleToggleFavorite}
             onToggleOwned={handleToggleOwned}
@@ -200,7 +207,7 @@ export function CollectionDetailView({ toast, onBack }) {
           onUnown={handleUnown}
           onUpdateAcquisition={handleUpdateAcquisition}
           onToggleFavorite={handleToggleFavorite}
-          onEdit={() => { ownership.closeDetail(); editor.openEdit(ownership.viewingCard); }}
+          onEdit={handleUpdate}
           onDelete={() => handleDelete(ownership.viewingCard.id, ownership.viewingCard.name)}
           onClose={ownership.closeDetail}
         />
@@ -209,11 +216,6 @@ export function CollectionDetailView({ toast, onBack }) {
       {editor.showCreate && (
         <CardDefinitionForm collection={collection} templateFields={collectionTemplateFields}
           mode="create" onSubmit={handleCreate} onClose={editor.closeCreate} />
-      )}
-      {editor.editingCard && (
-        <CardDefinitionForm collection={collection} templateFields={collectionTemplateFields}
-          initialCard={editor.editingCard} mode="edit"
-          onSubmit={handleUpdate} onClose={editor.closeEdit} />
       )}
 
       {editor.confirmDelete && (

@@ -178,7 +178,7 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
   );
 }
 
-function HolographicPicker({ value, onChange }) {
+export function HolographicPicker({ value, onChange }) {
   const current = value ?? 'none';
   return (
     <div className="holo-picker" role="radiogroup" aria-label="Holographic effect">
@@ -198,7 +198,7 @@ function HolographicPicker({ value, onChange }) {
   );
 }
 
-function DynamicField({ field, value, error, onChange }) {
+export function DynamicField({ field, value, error, onChange }) {
   const id = `field-${field.id}`;
   const label = field.field_name + (field.is_required ? ' *' : '');
 

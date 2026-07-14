@@ -36,8 +36,6 @@ import { BinderPageNav } from './BinderPageNav.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
-import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
-import { useCardEditor } from '../../hooks/useCardEditor.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useBinderCoverEditor } from '../../hooks/useBinderCoverEditor.js';
 import { BinderCoverStickers } from './BinderCover.jsx';
@@ -85,13 +83,11 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
   const coverEditor = useBinderCoverEditor({ binder, toast });
 
-  // === Real in-place card editing from within a binder (was
-  // previously just a redirect to the Collection view — see
-  // handleEditCardFromBinder below for the full reasoning) ===
-  const cardEditor = useCardEditor();
-  const { handleUpdate: handleUpdateCard } = useCardDefinitionActions(toast, {
-    onUpdateSuccess: cardEditor.closeEdit,
-  });
+  // === Card editing from within a binder now happens inline inside
+  // CardDetailModal itself (see that file) — this just needs the
+  // save function to pass through as its onEdit prop, no separate
+  // edit-state tracking needed here anymore. ===
+  const { handleUpdate: handleUpdateCard } = useCardDefinitionActions(toast, {});
 
   // === FIX: this was a useEffect, which runs AFTER the browser has
   // already painted the render that triggered it — leaving a real,
@@ -239,16 +235,6 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     toast(`"${binder.name}" moved to trash`);
     setConfirmDelete(false);
     onNavigate('home'); // navigate away immediately, don't wait for App.jsx guard
-  };
-
-  // === FIX (real gap): this used to just navigate away to the
-  // Collection view and make the user find + click Edit again
-  // there — not actually editing "from the binder" at all, just a
-  // redirect. Now opens the real edit form in place, without ever
-  // leaving the binder. ===
-  const handleEditCardFromBinder = (cardDef) => {
-    view.closeCardDetail();
-    cardEditor.openEdit(cardDef);
   };
 
   // ── Keyboard navigation ──────────────────────────────────────────────────
@@ -571,36 +557,11 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           onUnown={(inventoryId) => handleUnown(inventoryId)}
           onUpdateAcquisition={handleUpdateAcquisition}
           onToggleFavorite={handleToggleFavorite}
-          onEdit={() => handleEditCardFromBinder(view.viewingCardDef)}
+          onEdit={handleUpdateCard}
           onDelete={() => view.closeCardDetail()}
           onClose={view.closeCardDetail}
         />
       )}
-
-      {cardEditor.editingCard && (() => {
-        // A binder can hold cards from more than one collection —
-        // unlike CollectionDetailView (which always has exactly one
-        // collection in scope), this has to look up the right one
-        // per-card, dynamically, based on whichever card is actually
-        // being edited right now.
-        const editingCollection = collections.find(
-          c => c.id === cardEditor.editingCard.collectionId
-        );
-        const editingTemplateFields = templateFields.filter(
-          f => f.collectionId === cardEditor.editingCard.collectionId
-        );
-        if (!editingCollection) return null; // shouldn't happen, but don't crash if it somehow does
-        return (
-          <CardDefinitionForm
-            collection={editingCollection}
-            templateFields={editingTemplateFields}
-            initialCard={cardEditor.editingCard}
-            mode="edit"
-            onSubmit={handleUpdateCard}
-            onClose={cardEditor.closeEdit}
-          />
-        );
-      })()}
 
 
       {confirmDelete && (

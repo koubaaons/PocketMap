@@ -1,56 +1,20 @@
 /**
  * @fileoverview AcquisitionForm — edit acquisition details for an owned card.
+ * === ISSUE #37 START: Acquisition Information — AcquisitionForm ===
+ *
+ * AcquisitionFields is exported separately so CardDetailModal.jsx can
+ * render the same fields inline (as a sub-page of its details panel)
+ * instead of this whole thing opening as a separate modal — state
+ * management itself lives in useAcquisitionForm.js, shared by both.
  */
 
-// === ISSUE #37 START: Acquisition Information — AcquisitionForm ===
-
-import { useState } from 'react';
 import { Button, Modal, ModalActions } from '../ui/index.jsx';
-
-// === REFACTOR5c START: import CONDITION_LABELS from types ===
 import { CONDITION_RATINGS, CONDITION_LABELS } from '../../types/index.js';
-// === REFACTOR5c END ===
+import { useAcquisitionForm } from '../../hooks/useAcquisitionForm.js';
 
-export function AcquisitionForm({ inventoryItem, cardName, onSubmit, onClose }) {
-  const [fields, setFields] = useState({
-    condition_rating: inventoryItem.condition_rating ?? '',
-    personal_notes:   inventoryItem.personal_notes ?? '',
-    is_tradeable:     inventoryItem.is_tradeable ?? false,
-    is_sellable:      inventoryItem.is_sellable ?? false,
-    // === REFACTOR5f START: safe date initialisation ===
-    acquired_at: (() => {
-      if (!inventoryItem.acquired_at) return '';
-      const d = new Date(inventoryItem.acquired_at);
-      return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
-    })(),
-    // === REFACTOR5f END ===
-  });
-
-  const set = (key, val) => setFields(prev => ({ ...prev, [key]: val }));
-
-  const handleSubmit = () => {
-    // === REFACTOR5f START: safe date conversion ===
-    let acquired_at = null;
-    if (fields.acquired_at) {
-      const parsed = new Date(fields.acquired_at).getTime();
-      acquired_at = isNaN(parsed) ? null : parsed;
-    }
-    // === REFACTOR5f END ===
-
-    onSubmit({
-      ...inventoryItem,
-      condition_rating: fields.condition_rating || null,
-      personal_notes:   fields.personal_notes.trim() || null,
-      is_tradeable:     fields.is_tradeable,
-      is_sellable:      fields.is_sellable,
-      acquired_at,
-      updatedAt: Date.now(),
-    });
-  };
-
+export function AcquisitionFields({ fields, set }) {
   return (
-    <Modal title={`Details — ${cardName}`} onClose={onClose}>
-
+    <>
       <div className="form-group">
         <label htmlFor="acq-condition">Condition</label>
         <select id="acq-condition" className="form-input"
@@ -92,7 +56,21 @@ export function AcquisitionForm({ inventoryItem, cardName, onSubmit, onClose }) 
           Available for sale
         </label>
       </div>
+    </>
+  );
+}
 
+// Kept as a standalone modal too — not currently used anywhere
+// (CardDetailModal is the only caller, and it now uses
+// AcquisitionFields + useAcquisitionForm inline instead), but left
+// intact rather than deleted in case a future standalone use case
+// needs it.
+export function AcquisitionForm({ inventoryItem, cardName, onSubmit, onClose }) {
+  const { fields, set, handleSubmit } = useAcquisitionForm({ inventoryItem, onSubmit });
+
+  return (
+    <Modal title={`Details — ${cardName}`} onClose={onClose}>
+      <AcquisitionFields fields={fields} set={set} />
       <ModalActions>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={handleSubmit}>Save Details</Button>

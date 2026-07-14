@@ -39,6 +39,17 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
   const [values, setValues] = useState(buildInitialValues);
   const [errors, setErrors] = useState({});
 
+  // === Needed for reusing this hook in an always-mounted context
+  // (CardDetailModal's inline editor toggles edit mode on/off without
+  // ever unmounting) — buildInitialValues only runs once on mount via
+  // useState's lazy initializer, so without an explicit reset,
+  // re-entering edit mode after a cancelled edit would show the
+  // discarded draft instead of the card's real current values. ===
+  const reset = () => {
+    setValues(buildInitialValues());
+    setErrors({});
+  };
+
   const set = (key, val) => {
     setValues(prev => ({ ...prev, [key]: val }));
     if (errors[key]) {
@@ -96,7 +107,7 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
     }
   };
 
-  return { values, errors, set, handleSubmit };
+  return { values, errors, set, handleSubmit, reset };
 }
 
 // === REFACTOR4b END ===

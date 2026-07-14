@@ -84,6 +84,24 @@
   margin: 0;
 }
 
+/* === Edit-mode header back button — the edit form is a sub-page of
+   the same details panel, not a separate modal, so this reads as
+   "go back" rather than "close". === */
+.card-detail-back-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.card-detail-back-btn:hover {
+  color: var(--accent);
+}
+
 .card-detail-status {
   display: flex;
   align-items: center;
