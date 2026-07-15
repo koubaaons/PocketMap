@@ -44,6 +44,7 @@ function rowToBinderSlot(row) {
     collectionId: row.collection_id,
     pageNumber:   row.page_number,
     slotIndex:    row.slot_index,
+    inventoryItemId: row.inventory_item_id,
     createdAt:    new Date(row.created_at).getTime(),
     updatedAt:    new Date(row.updated_at).getTime(),
   };
@@ -72,6 +73,7 @@ function rowToBinderPanel(row) {
     panelType:      row.panel_type,
     cardDefId:      row.card_def_id,
     insertId:       row.insert_id,
+    inventoryItemId: row.inventory_item_id,
     imageX:         row.image_x,
     imageY:         row.image_y,
     imageScale:     row.image_scale,
@@ -245,6 +247,7 @@ export function binderSlotToRow(slot) {
     collection_id: slot.collectionId,
     page_number:   slot.pageNumber,
     slot_index:    slot.slotIndex,
+    inventory_item_id: slot.inventoryItemId ?? null,
     updated_at:    new Date().toISOString(),
   };
 }
@@ -271,6 +274,7 @@ export function binderPanelToRow(panel) {
     panel_type:       panel.panelType,
     card_def_id:      panel.cardDefId,
     insert_id:        panel.insertId,
+    inventory_item_id: panel.inventoryItemId ?? null,
     image_x:          panel.imageX,
     image_y:          panel.imageY,
     image_scale:      panel.imageScale,

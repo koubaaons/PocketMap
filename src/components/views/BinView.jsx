@@ -12,7 +12,7 @@ import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
 import { useBinActions } from '../../hooks/useBinActions.js';
 // === REFACTOR7d END ===
 
-const SECTIONS = ['Binders', 'Collections', 'Cards'];
+const SECTIONS = ['Binders', 'Collections', 'Cards', 'Copies'];
 
 export function BinView({ toast }) {
   const bin = useStore(s => s.bin);
@@ -27,14 +27,15 @@ export function BinView({ toast }) {
   const binders     = useMemo(() => bin.filter(i => i._type === 'binder'),     [bin]);
   const collections = useMemo(() => bin.filter(i => i._type === 'collection'), [bin]);
   const cards       = useMemo(() => bin.filter(i => i._type === 'cardDef'),    [bin]);
+  const copies      = useMemo(() => bin.filter(i => i._type === 'inventoryItem'), [bin]);
 
-  const sectionItems = { Binders: binders, Collections: collections, Cards: cards };
+  const sectionItems = { Binders: binders, Collections: collections, Cards: cards, Copies: copies };
 
   if (bin.length === 0) {
     return (
       <div className="view">
         <EmptyState icon="🗑" title="Trash is empty"
-          subtitle="Deleted binders, collections, and cards appear here." />
+          subtitle="Deleted binders, collections, cards, and removed copies appear here." />
       </div>
     );
   }
@@ -68,8 +69,11 @@ export function BinView({ toast }) {
           {currentItems.map(item => (
             <div key={item.id} className="bin-row">
               <div className="bin-info">
-                <span className="bin-name">{item.name}</span>
-                <span className="bin-meta">Deleted {new Date(item.deletedAt).toLocaleDateString()}</span>
+                <span className="bin-name">{item.name ?? item.cardName}</span>
+                <span className="bin-meta">
+                  Deleted {new Date(item.deletedAt).toLocaleDateString()}
+                  {item._type === 'inventoryItem' && item.hadPlacementRemoved && ' · was placed in a binder when removed'}
+                </span>
               </div>
               <div className="bin-actions">
                 <Button variant="ghost" size="sm" onClick={() => handleRestore(item)}>Restore</Button>
@@ -82,7 +86,7 @@ export function BinView({ toast }) {
 
       {confirmDelete && (
         <ConfirmModal
-          title={`Permanently delete "${confirmDelete.name}"?`}
+          title={`Permanently delete "${confirmDelete.name ?? confirmDelete.cardName}"?`}
           message="This cannot be undone. The item will be gone forever."
           confirmLabel="Delete Forever"
           onConfirm={() => { handlePermDelete(confirmDelete); setConfirmDelete(null); }}

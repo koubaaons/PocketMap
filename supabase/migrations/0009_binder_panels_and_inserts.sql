@@ -64,3 +64,12 @@ alter table public.binder_panels
   add column image_x     numeric not null default 50,
   add column image_y     numeric not null default 50,
   add column image_scale numeric not null default 1;
+
+  alter table public.binder_slots
+  add column inventory_item_id text references public.user_inventory(id) on delete set null;
+ 
+-- Same link for card-type combined-slot panels (Michi Method) — a
+-- panel holding a real card is still a specific physical copy placed
+-- somewhere, same reasoning as binder_slots above.
+alter table public.binder_panels
+  add column inventory_item_id text references public.user_inventory(id) on delete set null;

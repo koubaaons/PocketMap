@@ -19,7 +19,7 @@ import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
 import { CollectionSummary } from '../collections/CollectionSummary.jsx';
 import { TabToolbar } from '../collections/TabToolbar.jsx';
 import { applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
-import { buildOwnershipMap, buildCollectionSummary } from '../../selectors/inventorySelectors.js';
+import { buildOwnershipMap, buildInventoryGroupMap, buildCollectionSummary } from '../../selectors/inventorySelectors.js';
 import { getOrganisedCardDefIds } from '../../selectors/binderSelectors.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useCardEditor } from '../../hooks/useCardEditor.js';
@@ -43,6 +43,7 @@ export function CollectionDetailView({ toast, onBack }) {
   const templateFields  = useStore(s => s.templateFields);
   const inventory       = useStore(s => s.inventory);
   const binderSlots     = useStore(s => s.binderSlots ?? []);
+  const binderPanels    = useStore(s => s.binderPanels ?? []);
   const collection      = collections.find(c => c.id === nav.currentCollectionId) ?? null;
   const [activeTab, setActiveTab] = useState('Cards');
 
@@ -55,6 +56,7 @@ export function CollectionDetailView({ toast, onBack }) {
   );
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
+  const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
 
   const summary = useMemo(
     () => buildCollectionSummary(collectionCards, ownershipMap, getOrganisedCardDefIds(binderSlots)),
@@ -82,7 +84,10 @@ export function CollectionDetailView({ toast, onBack }) {
   const { handleOwn, handleUnown, handleUpdateAcquisition, handleToggleFavorite } =
     useInventoryActions(toast, {
       onOwnSuccess:   () => {},
-      onUnownSuccess: ownership.closeDetail,
+      // === CHANGED (quantity tracking): see BinderView.jsx's
+      // identical fix - removing one of several copies shouldn't
+      // close the whole modal, and CardDetailModal now decides that
+      // itself based on remaining quantity. ===
     });
 
   const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection?.id);
@@ -104,6 +109,9 @@ export function CollectionDetailView({ toast, onBack }) {
     collectionCards,
     collectionTemplateFields,
     ownershipMap,
+    inventory,
+    allBinderSlots: binderSlots,
+    allBinderPanels: binderPanels,
     summary,
     onView:   ownership.openDetail,
     onEdit:   handleUpdate,
@@ -201,7 +209,7 @@ export function CollectionDetailView({ toast, onBack }) {
       {ownership.viewingCard && (
         <CardDetailModal
           card={ownership.viewingCard}
-          inventoryItem={ownershipMap[ownership.viewingCard.id] ?? null}
+          inventoryItems={inventoryGroupMap[ownership.viewingCard.id] ?? []}
           templateFields={collectionTemplateFields}
           onOwn={() => handleOwn({ cardDefId: ownership.viewingCard.id, collectionId: collection.id })}
           onUnown={handleUnown}

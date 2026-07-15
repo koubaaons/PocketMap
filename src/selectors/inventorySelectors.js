@@ -19,10 +19,52 @@ export function getInventoryItem(inventory, cardDefId) {
   return inventory.find(inv => inv.cardDefId === cardDefId) ?? null;
 }
 
+/**
+ * === FIX (real bug, found while building quantity tracking): this
+ * used to silently overwrite map[cardDefId] on every matching row,
+ * so with multiple copies of the same card, whichever row happened
+ * to iterate LAST silently won — not the oldest, not any deliberate
+ * choice, just whatever order the array happened to be in. Every
+ * existing single-item consumer of ownershipMap (CardGridItem,
+ * BinderSlot, etc.) still only needs ONE representative item per
+ * card, so the map's shape is unchanged — this just makes which one
+ * gets picked deterministic (earliest acquired) instead of
+ * accidental. For every copy, not just one, see
+ * buildInventoryGroupMap below — that's the one actually used by
+ * quantity-aware UI (the new badge, the card detail copy list, slot
+ * placement limits).
+ */
 export function buildOwnershipMap(inventory) {
   const map = {};
-  inventory.forEach(inv => { map[inv.cardDefId] = inv; });
+  inventory.forEach(inv => {
+    const existing = map[inv.cardDefId];
+    if (!existing || (inv.acquired_at ?? inv.createdAt) < (existing.acquired_at ?? existing.createdAt)) {
+      map[inv.cardDefId] = inv;
+    }
+  });
   return map;
+}
+
+/**
+ * Groups every inventory row by cardDefId — unlike buildOwnershipMap
+ * (one representative item per card), this returns EVERY owned copy,
+ * needed anywhere quantity actually matters: the owned-count badge,
+ * the card detail view's per-copy list, and slot-placement limits.
+ * @returns {Record<string, object[]>}
+ */
+export function buildInventoryGroupMap(inventory) {
+  const map = {};
+  inventory.forEach(inv => {
+    (map[inv.cardDefId] ??= []).push(inv);
+  });
+  return map;
+}
+
+/**
+ * How many copies of this card are owned in total.
+ */
+export function getQuantityOwned(inventoryGroupMap, cardDefId) {
+  return (inventoryGroupMap[cardDefId] ?? []).length;
 }
 
 // === ISSUE #36 END: Mark Card As Owned ===

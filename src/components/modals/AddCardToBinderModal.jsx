@@ -6,19 +6,24 @@
 
 import { useState, useMemo } from 'react';
 import { Modal, ModalActions, Button } from '../ui/index.jsx';
-import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
-import { getPlacedCardDefIds, filterCardsForBinder } from '../../selectors/binderSelectors.js';
+import { buildOwnershipMap, buildInventoryGroupMap, getQuantityOwned } from '../../selectors/inventorySelectors.js';
+import { getFullyPlacedCardDefIds, filterCardsForBinder } from '../../selectors/binderSelectors.js';
 
 export function AddCardToBinderModal({
   binder, pageNumber, slotIndex,
-  cardDefinitions, collections, templateFields, inventory, binderSlots,
+  cardDefinitions, collections, templateFields, inventory,
+  allBinderSlots, allBinderPanels,
   onSubmit, onClose,
 }) {
   const [query, setQuery]               = useState('');
   const [selectedCard, setSelectedCard] = useState(null);
 
-  const ownershipMap  = useMemo(() => buildOwnershipMap(inventory), [inventory]);
-  const placedCardIds = useMemo(() => getPlacedCardDefIds(binderSlots, binder.id), [binderSlots, binder.id]);
+  const ownershipMap      = useMemo(() => buildOwnershipMap(inventory), [inventory]);
+  const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
+  const fullyPlacedIds    = useMemo(
+    () => getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, inventory),
+    [allBinderSlots, allBinderPanels, inventory]
+  );
 
   const collectionMap = useMemo(() => {
     const map = {};
@@ -28,8 +33,8 @@ export function AddCardToBinderModal({
 
   // === REFACTOR7b START: use filterCardsForBinder selector ===
   const results = useMemo(
-    () => filterCardsForBinder(cardDefinitions, placedCardIds, query, collectionMap),
-    [cardDefinitions, placedCardIds, query, collectionMap]
+    () => filterCardsForBinder(cardDefinitions, fullyPlacedIds, query, collectionMap),
+    [cardDefinitions, fullyPlacedIds, query, collectionMap]
   );
   // === REFACTOR7b END ===
 
@@ -59,6 +64,7 @@ export function AddCardToBinderModal({
         {results.length === 0 && !query && <p className="empty-results">Start typing to search your cards</p>}
         {results.map(card => {
           const isOwned    = ownershipMap[card.id] !== undefined;
+          const quantity   = getQuantityOwned(inventoryGroupMap, card.id);
           const collection = collectionMap[card.collectionId];
           const isSelected = selectedCard?.id === card.id;
           return (
@@ -70,7 +76,7 @@ export function AddCardToBinderModal({
                 <span className="atb-card-collection">{collection?.name ?? '—'}</span>
               </div>
               <span className={`atb-owned-badge ${isOwned ? 'owned' : 'not-owned'}`}>
-                {isOwned ? '✓ Owned' : '○ Not owned'}
+                {isOwned ? `✓ Owned${quantity > 1 ? ` ×${quantity}` : ''}` : '○ Not owned'}
               </span>
             </button>
           );

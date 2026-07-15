@@ -12,9 +12,9 @@
 import { formatConditionRating } from '../../types/index.js';
 
 /**
- * @param {{ inventoryItem: object }} props
+ * @param {{ inventoryItem: object, compact?: boolean }} props
  */
-export function AcquisitionSummary({ inventoryItem }) {
+export function AcquisitionSummary({ inventoryItem, compact = false }) {
   const hasAnyDetail =
     inventoryItem.condition_rating ||
     inventoryItem.acquired_at ||
@@ -22,7 +22,21 @@ export function AcquisitionSummary({ inventoryItem }) {
     inventoryItem.is_tradeable ||
     inventoryItem.is_sellable;
 
-  if (!hasAnyDetail) return null;
+  if (!hasAnyDetail) {
+    return compact ? <span className="acquisition-summary-compact-empty">No details yet</span> : null;
+  }
+
+  // === Compact mode — a short one-line summary instead of the full
+  // field-by-field layout below, used when showing multiple copies of
+  // the same card in a list (CardDetailModal's per-copy rows), where
+  // the full layout per copy would take up too much space. ===
+  if (compact) {
+    const parts = [
+      inventoryItem.condition_rating && formatConditionRating(inventoryItem.condition_rating),
+      inventoryItem.acquired_at && new Date(inventoryItem.acquired_at).toLocaleDateString(),
+    ].filter(Boolean);
+    return <span className="acquisition-summary-compact">{parts.join(' · ') || 'No details yet'}</span>;
+  }
 
   return (
     <div className="acquisition-summary">

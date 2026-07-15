@@ -20,7 +20,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-export function CardGridItem({ card, inventoryItem, collectionName, onView, onToggleFavorite, onToggleOwned }) {
+export function CardGridItem({ card, inventoryItem, collectionName, onView, onToggleFavorite, onToggleOwned, quantityOwned = 0, totalPlaced = 0 }) {
   const isOwned    = inventoryItem !== null && inventoryItem !== undefined;
   const isFavorite = inventoryItem?.is_favorite ?? false;
 
@@ -48,12 +48,23 @@ export function CardGridItem({ card, inventoryItem, collectionName, onView, onTo
   };
 
   return (
-    <button
+    <div
       className={`card-grid-item ${isOwned ? 'card-grid-item-owned' : 'card-grid-item-not-owned'} ${justRevealed ? 'card-grid-item-reveal' : ''}`}
       onClick={onView}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView(); } }}
+      role="button"
+      tabIndex={0}
       aria-label={card.name}
     >
       <div className="card-grid-item-image-wrapper">
+        {/* === Quantity tracking: "X of Y placed" badge — only shown
+            once more than one copy is owned; a single owned card
+            doesn't need "1 of 1 placed" cluttering every tile. === */}
+        {quantityOwned > 1 && (
+          <span className="card-grid-item-quantity-badge">
+            {totalPlaced} of {quantityOwned} placed
+          </span>
+        )}
         {card.image_url ? (
           <img
             src={card.image_url}
@@ -110,6 +121,6 @@ export function CardGridItem({ card, inventoryItem, collectionName, onView, onTo
           <span className="card-grid-item-collection">{collectionName}</span>
         )}
       </div>
-    </button>
+    </div>
   );
 }

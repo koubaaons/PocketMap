@@ -6,9 +6,16 @@
  * The slot exists independently of ownership:
  *   - Owned card in slot   = colored card
  *   - Unowned card in slot = grey placeholder
+ *
+ * === Quantity tracking === inventoryItemId links a slot to the exact
+ * physical copy it holds (nullable — slots created before this field
+ * existed have no copy-specific link, and are still valid; treated
+ * as card-level-only). This replaces an earlier, less precise
+ * approach that only tracked total placed count per card, not which
+ * slot held which specific copy — removing/restoring one particular
+ * copy now finds and acts on exactly the right slot instead of "any
+ * slot for this card".
  */
-
-// === ISSUE #53 START: Binder Slot Entity ===
 
 import { generateId } from './utils.js';
 
@@ -22,6 +29,9 @@ export function validateBinderSlot(data) {
   if (!data.collectionId || typeof data.collectionId !== 'string') errors.push('collectionId must be a non-empty string');
   if (!Number.isInteger(data.pageNumber) || data.pageNumber < 1) errors.push('pageNumber must be a positive integer');
   if (!Number.isInteger(data.slotIndex) || data.slotIndex < 0) errors.push('slotIndex must be a non-negative integer');
+  if (data.inventoryItemId !== null && data.inventoryItemId !== undefined && typeof data.inventoryItemId !== 'string') {
+    errors.push('inventoryItemId must be a string or null');
+  }
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   return { valid: errors.length === 0, errors };
 }
@@ -34,6 +44,7 @@ export function validateBinderSlot(data) {
  *   collectionId: string,
  *   pageNumber: number,
  *   slotIndex: number,
+ *   inventoryItemId?: string | null,
  *   userId?: string,
  * }} params
  */
@@ -43,6 +54,7 @@ export function createBinderSlot({
   collectionId,
   pageNumber,
   slotIndex,
+  inventoryItemId = null,
   userId = 'local-user-1',
 }) {
   const slot = {
@@ -53,6 +65,7 @@ export function createBinderSlot({
     collectionId,
     pageNumber: Number(pageNumber),
     slotIndex:  Number(slotIndex),
+    inventoryItemId,
     createdAt:  Date.now(),
   };
   const { valid, errors } = validateBinderSlot(slot);

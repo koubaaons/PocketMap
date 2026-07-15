@@ -174,12 +174,6 @@ function deleteCardDefinition(cardDefId) {
     .catch(err => console.error('[Sync] card definition delete error:', err));
 }
 
-function deleteInventoryItem(itemId) {
-  return supabase.from('user_inventory').delete().eq('id', itemId)
-    .then(({ error }) => { if (error) console.error('[Sync] inventory delete failed:', error); })
-    .catch(err => console.error('[Sync] inventory delete error:', err));
-}
-
 function deleteBinderSlot(slotId) {
   return supabase.from('binder_slots').delete().eq('id', slotId)
     .then(({ error }) => { if (error) console.error('[Sync] binder slot delete failed:', error); })
@@ -242,6 +236,12 @@ async function emptyBin(userId, binItems) {
         await logIfError(supabase.from('binder_slots').delete().eq('card_def_id', binItem.id).eq('user_id', userId), `empty bin: binder_slots for card ${binItem.id}`);
         await logIfError(supabase.from('card_definitions').delete().eq('id', binItem.id).eq('user_id', userId), `empty bin: card_definitions ${binItem.id}`);
         await deleteImageFromStorage(getStoragePathFromUrl(binItem.image_url));
+      } else if (binItem._type === 'inventoryItem') {
+        // === Quantity tracking: same gap as BIN_DELETE_ITEM above —
+        // without this branch, "Empty Trash" would clear the bin
+        // table row but leave the underlying soft-deleted
+        // user_inventory row orphaned in the database forever. ===
+        await logIfError(supabase.from('user_inventory').delete().eq('id', binItem.id).eq('user_id', userId), `empty bin: inventory item ${binItem.id}`);
       } else {
         console.error('[Sync] empty bin: unknown _type for bin item, skipping cascade:', binItem);
       }
@@ -395,7 +395,33 @@ export function syncToSupabase(action, nextState, prevState) {
       break;
     }
     case ACTIONS.INVENTORY_DELETE: {
-      if (action.payload?.inventoryId) pending.push(deleteInventoryItem(action.payload.inventoryId));
+      const { inventoryId } = action.payload ?? {};
+      if (inventoryId) {
+        const now = new Date().toISOString();
+        pending.push(
+          supabase.from('user_inventory').update({ deleted_at: now }).eq('id', inventoryId)
+            .then(({ error }) => { if (error) console.error('[Sync] inventory item soft delete failed:', error); })
+        );
+        const binItem = nextState.bin.find(b => b.id === inventoryId);
+        if (binItem) pending.push(upsertBinItem(binItem, 'inventoryItem'));
+
+        // === Fixes the real "slot persists after copy removed" bug —
+        // the reducer may have auto-removed one excess slot/panel to
+        // keep placed count from exceeding owned count (see
+        // reducer.js's INVENTORY_DELETE case for the full reasoning).
+        // Diffing prevState/nextState here is how the sync layer
+        // finds out WHICH one it picked, since the action payload
+        // itself only ever mentions the inventory item being removed.
+        const removedSlot = prevState.binderSlots.find(
+          s => !nextState.binderSlots.some(ns => ns.id === s.id)
+        );
+        if (removedSlot) pending.push(deleteBinderSlot(removedSlot.id));
+
+        const removedPanel = prevState.binderPanels.find(
+          p => !nextState.binderPanels.some(np => np.id === p.id)
+        );
+        if (removedPanel) pending.push(deleteBinderPanel(removedPanel.id));
+      }
       break;
     }
 
@@ -482,6 +508,19 @@ export function syncToSupabase(action, nextState, prevState) {
       }
       break;
     }
+
+    // === Quantity tracking: restore a single removed copy ===
+    case ACTIONS.BIN_RESTORE_INVENTORY_ITEM: {
+      const { itemId } = action.payload ?? {};
+      if (itemId) {
+        pending.push(
+          supabase.from('user_inventory').update({ deleted_at: null }).eq('id', itemId)
+            .then(({ error }) => { if (error) console.error('[Sync] inventory item restore failed:', error); })
+        );
+        pending.push(deleteBinItem(itemId));
+      }
+      break;
+    }
     case ACTIONS.BIN_DELETE_ITEM: {
       const { itemId } = action.payload ?? {};
       if (!itemId) break;
@@ -539,6 +578,20 @@ export function syncToSupabase(action, nextState, prevState) {
             await logIfError(supabase.from('card_definitions').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: card_definitions ${itemId}`);
             await logIfError(supabase.from('bin').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: bin row for card ${itemId}`);
             await deleteImageFromStorage(getStoragePathFromUrl(binItem.image_url));
+          }));
+          break;
+        } else if (binItem._type === 'inventoryItem') {
+          // === Quantity tracking: without this branch, this fell
+          // through to the generic deleteBinItem(itemId) below, which
+          // only removes the bin table row — the actual soft-deleted
+          // user_inventory row (still sitting there with deleted_at
+          // set) would never actually get cleaned up. No image/
+          // storage cleanup needed here, unlike cardDef — an
+          // inventory row doesn't own any files itself. ===
+          pending.push(getRealUserId().then(async userId => {
+            if (!userId) return;
+            await logIfError(supabase.from('user_inventory').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: inventory item ${itemId}`);
+            await logIfError(supabase.from('bin').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: bin row for inventory item ${itemId}`);
           }));
           break;
         }

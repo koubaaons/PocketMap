@@ -123,6 +123,15 @@
 }
 .search-link:hover { opacity: 0.8; }
 
+/* === Quantity tracking: multiple locations for a multi-copy card,
+   stacked vertically instead of assuming just one. === */
+.search-location-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+
 /* ── Binder colour swatch ────────────────────────────────────────────────── */
 .search-binder-swatch {
   width: 24px;

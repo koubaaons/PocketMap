@@ -23,6 +23,8 @@ export function BinderSlot({
   isMoveTarget = false,
   isCombineMode = false,
   isCombineSelected = false,
+  quantityOwned = 0,
+  totalPlaced = 0,
   gridColumnStart,
   gridRowStart,
   onClickEmpty,
@@ -129,6 +131,14 @@ export function BinderSlot({
     >
       <span className="slot-index">{slotIndex + 1}</span>
       {isFavorite && <span className="slot-fav-star" aria-label="Favorite">★</span>}
+      {/* === Quantity tracking: same badge as CardGridItem.jsx's
+          Collection grid version, only shown once more than one
+          copy is owned. === */}
+      {quantityOwned > 1 && (
+        <span className="card-grid-item-quantity-badge">
+          {totalPlaced} of {quantityOwned} placed
+        </span>
+      )}
 
       {/* === Hover-only ownership toggle — mirrors CardGridItem.jsx's
           always-visible ✓/○ circle in the Collection grid, but only

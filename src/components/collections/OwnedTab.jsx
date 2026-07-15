@@ -3,13 +3,15 @@
  * Extracted from CollectionDetailView in Refactor7e.
  */
 
+// === REFACTOR7e START: Extract OwnedTab component ===
+
 import { useState, useMemo } from 'react';
 import { CardDefinitionList } from './CardDefinitionList.jsx';
 import { CARD_SORT_OPTIONS, applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
 import { getOwnedCards } from '../../selectors/inventorySelectors.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
-export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipMap, summary, onView, onEdit, onDelete, onToggleOwned, onToggleFavorite }) {
+export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipMap, inventory, allBinderSlots, allBinderPanels, summary, onView, onEdit, onDelete, onToggleOwned, onToggleFavorite }) {
   const [query, setQuery] = useState('');
   const [sort,  setSort]  = useState('newest');
 
@@ -25,6 +27,9 @@ export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipM
         cards={cards}
         templateFields={collectionTemplateFields}
         ownershipMap={ownershipMap}
+        inventory={inventory}
+        allBinderSlots={allBinderSlots}
+        allBinderPanels={allBinderPanels}
         totalCount={summary.owned}
         onView={onView}
         onEdit={onEdit}
@@ -37,3 +42,5 @@ export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipM
     </div>
   );
 }
+
+// === REFACTOR7e END ===

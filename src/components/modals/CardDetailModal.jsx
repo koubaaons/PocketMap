@@ -22,6 +22,17 @@
  * reimplemented, so validation and the actual update shape can't
  * drift between the two.
  *
+ * === Quantity tracking === inventoryItem (a single item) is now
+ * inventoryItems (an array) — a card can be owned more than once, and
+ * each physical copy has its own condition/notes/language, tracked as
+ * its own separate inventory row (see inventorySelectors.js's
+ * buildInventoryGroupMap). The view shows "X owned" plus a list of
+ * every individual copy, each independently editable/removable, plus
+ * an "Add Another Copy" action. Editing a specific copy's details
+ * tracks WHICH one via editingItem — useAcquisitionForm's own reset()
+ * re-syncs its draft fields to whichever copy editingItem currently
+ * points at.
+ *
  * Doesn't use the shared Modal component, since Modal wraps everything
  * in a single boxed panel with a header — this needs two independent
  * visual pieces instead. Replicates Modal's own overlay/escape-key/
@@ -43,7 +54,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 
 export function CardDetailModal({
   card,
-  inventoryItem,
+  inventoryItems,
   templateFields,
   onOwn,
   onUnown,
@@ -53,13 +64,17 @@ export function CardDetailModal({
   onDelete,
   onClose,
 }) {
-  const [confirmUnown, setConfirmUnown]       = useState(false);
+  const [confirmUnownId, setConfirmUnownId] = useState(null); // which copy's removal is being confirmed, or null
   const [confirmDelete, setConfirmDelete]     = useState(false);
   const [isDetailsOpen, setIsDetailsOpen]     = useState(false);
   const [isEditingCard, setIsEditingCard]     = useState(false);
   const [isEditingAcquisition, setIsEditingAcquisition] = useState(false);
+  // Which specific copy "Edit Details" is currently open for — null
+  // while not editing any copy's acquisition info.
+  const [editingItem, setEditingItem] = useState(null);
 
-  const isOwned = inventoryItem !== null;
+  const quantityOwned = inventoryItems.length;
+  const isOwned = quantityOwned > 0;
   const { user } = useAuth();
 
   const sortedFields = [...templateFields]
@@ -81,18 +96,28 @@ export function CardDetailModal({
   });
 
   const acquisitionForm = useAcquisitionForm({
-    inventoryItem,
-    onSubmit: (updated) => { onUpdateAcquisition(updated); setIsEditingAcquisition(false); },
+    inventoryItem: editingItem,
+    onSubmit: (updated) => { onUpdateAcquisition(updated); setIsEditingAcquisition(false); setEditingItem(null); },
   });
 
-  const handleStartEditAcquisition = () => {
-    acquisitionForm.reset();
+  // Re-syncs the acquisition form's draft fields whenever WHICH copy
+  // is being edited changes — useAcquisitionForm's own values only
+  // build once on mount (see that file), so switching from editing
+  // copy A to copy B needs an explicit reset to pick up copy B's
+  // actual values instead of still showing copy A's.
+  useEffect(() => {
+    if (editingItem) acquisitionForm.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingItem?.id]);
+
+  const handleStartEditAcquisition = (item) => {
+    setEditingItem(item);
     setIsEditingAcquisition(true);
   };
 
   const handleCancelEditAcquisition = () => {
-    acquisitionForm.reset();
     setIsEditingAcquisition(false);
+    setEditingItem(null);
   };
 
   const handleStartEdit = () => {
@@ -159,14 +184,16 @@ export function CardDetailModal({
     };
   }, [onClose]);
 
-  if (confirmUnown) {
+  const confirmUnownItem = confirmUnownId ? inventoryItems.find(i => i.id === confirmUnownId) : null;
+
+  if (confirmUnownItem) {
     return (
       <ConfirmModal
-        title="Remove Ownership?"
-        message={`Remove ownership of "${card.name}"? Your acquisition details will be lost.`}
+        title="Remove This Copy?"
+        message={`Remove this copy of "${card.name}"? Its acquisition details will be lost. ${quantityOwned > 1 ? `You'll still have ${quantityOwned - 1} other cop${quantityOwned - 1 === 1 ? 'y' : 'ies'}.` : ''}`}
         confirmLabel="Remove"
-        onConfirm={() => { onUnown(inventoryItem.id); setConfirmUnown(false); onClose(); }}
-        onClose={() => setConfirmUnown(false)}
+        onConfirm={() => { onUnown(confirmUnownItem.id); setConfirmUnownId(null); if (quantityOwned <= 1) onClose(); }}
+        onClose={() => setConfirmUnownId(null)}
       />
     );
   }
@@ -314,7 +341,7 @@ export function CardDetailModal({
               <>
                 <div className="card-detail-panel-header">
                   <button className="card-detail-back-btn" onClick={handleCancelEditAcquisition} aria-label="Back to details">
-                    ← Editing details for {card.name}
+                    ← Editing a copy of {card.name}
                   </button>
                 </div>
 
@@ -333,18 +360,19 @@ export function CardDetailModal({
                   <h2 id="card-detail-title" className="card-detail-panel-title">{card.name}</h2>
                   {isOwned && (
                     <button
-                      className={`fav-toggle ${inventoryItem.is_favorite ? 'fav-active' : ''}`}
-                      onClick={() => onToggleFavorite(inventoryItem)}
-                      aria-label={inventoryItem.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+                      className={`fav-toggle ${inventoryItems[0].is_favorite ? 'fav-active' : ''}`}
+                      onClick={() => onToggleFavorite(inventoryItems[0])}
+                      aria-label={inventoryItems[0].is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+                      title={quantityOwned > 1 ? 'Favorites the first copy' : undefined}
                     >
-                      {inventoryItem.is_favorite ? '★' : '☆'}
+                      {inventoryItems[0].is_favorite ? '★' : '☆'}
                     </button>
                   )}
                 </div>
 
                 <div className="card-detail-status">
                   {isOwned ? (
-                    <span className="status-badge status-owned">✓ Owned</span>
+                    <span className="status-badge status-owned">✓ Owned{quantityOwned > 1 ? ` ×${quantityOwned}` : ''}</span>
                   ) : (
                     <span className="status-badge status-not-owned">Not owned</span>
                   )}
@@ -367,29 +395,38 @@ export function CardDetailModal({
                   </div>
                 )}
 
-                {isOwned && <AcquisitionSummary inventoryItem={inventoryItem} />}
+                {/* === Quantity tracking: list every individual copy,
+                    each independently editable/removable — was a
+                    single AcquisitionSummary for the one inventory
+                    item before. === */}
+                {isOwned && (
+                  <div className="card-detail-copies">
+                    {inventoryItems.map((item, idx) => (
+                      <div key={item.id} className="card-detail-copy-row">
+                        <div className="card-detail-copy-summary">
+                          <span className="card-detail-copy-label">Copy {idx + 1}</span>
+                          <AcquisitionSummary inventoryItem={item} compact />
+                        </div>
+                        <div className="card-detail-copy-actions">
+                          <button className="card-detail-copy-edit-btn" onClick={() => handleStartEditAcquisition(item)}>Edit</button>
+                          <button className="card-detail-copy-remove-btn" onClick={() => setConfirmUnownId(item.id)}>Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <hr className="modal-divider" />
 
                 <div className="card-detail-actions">
                   <div className="card-detail-actions-left">
-                    {!isOwned && (
-                      <Button variant="primary" size="sm" onClick={onOwn}>✓ I own it</Button>
-                    )}
-                    {isOwned && (
-                      <Button variant="ghost" size="sm" onClick={handleStartEditAcquisition}>
-                        Edit Details
-                      </Button>
-                    )}
+                    <Button variant={isOwned ? 'ghost' : 'primary'} size="sm" onClick={onOwn}>
+                      {isOwned ? '+ Add Another Copy' : '✓ I own it'}
+                    </Button>
                   </div>
                   <div className="card-detail-actions-right">
                     {onEdit && (
                       <Button variant="ghost" size="sm" onClick={handleStartEdit}>Edit Card</Button>
-                    )}
-                    {isOwned && (
-                      <Button variant="ghost" size="sm" onClick={() => setConfirmUnown(true)}>
-                        Remove Ownership
-                      </Button>
                     )}
                     <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
                       Delete

@@ -43,7 +43,7 @@ import { BinderCoverStickers } from './BinderCover.jsx';
 import { BinderCustomizePanel } from './BinderCustomizePanel.jsx';
 import { getOwnedFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { binderCapacity } from '../../utils/index.js';
-import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
+import { buildOwnershipMap, buildInventoryGroupMap } from '../../selectors/inventorySelectors.js';
 import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 import { useBinderView } from '../../hooks/useBinderView.js';
@@ -73,18 +73,11 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   // pageNumber from slot is 1-based; spread = Math.ceil(pageNumber / 2).
   // Run only once on mount (empty deps) — user controls page after that.
   useEffect(() => {
-  // Skip jumping to an initial page if this navigation was
-  // specifically the Home "Customize" shortcut — that case wants the
-  // binder to stay closed (spread 0) so customize mode can actually
-  // show, regardless of whatever initialPage/nav.currentPage happens
-  // to be set to.
-  if (nav.autoOpenCustomize) return;
-  if (initialPage && initialPage > 0) {
-    const spread = Math.ceil(initialPage / 2);
-    view.goToPage(spread);
-  }
-}, []); // eslint-disable-line react-hooks/exhaustive-deps
-
+    if (initialPage && initialPage > 0) {
+      const spread = Math.ceil(initialPage / 2);
+      view.goToPage(spread);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [confirmDelete, setConfirmDelete] = useState(false);
   // === Michi Method support: combine mode — holds the computed
   // rectangle {pageNumber, startSlotIndex, spanCols, spanRows} once
@@ -106,14 +99,13 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   // that specific navigation — cleared immediately after use so
   // navigating here normally afterward (sidebar, back button, etc.)
   // doesn't keep re-triggering it. ===
-useEffect(() => {
-  console.log('[DEBUG] effect fired. autoOpenCustomize:', nav.autoOpenCustomize, 'isCover:', view.page === 0, 'isEditingCover before:', coverEditor.isEditingCover);
-  if (nav.autoOpenCustomize) {
-    coverEditor.handleEnterCoverEdit();
-    dispatch({ type: ACTIONS.NAV_SET, payload: { ...nav, autoOpenCustomize: false } });
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [nav.autoOpenCustomize]);
+  useEffect(() => {
+    if (nav.autoOpenCustomize) {
+      coverEditor.handleEnterCoverEdit();
+      dispatch({ type: ACTIONS.NAV_SET, payload: { ...nav, autoOpenCustomize: false } });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nav.autoOpenCustomize]);
 
   // === Card editing from within a binder now happens inline inside
   // CardDetailModal itself (see that file) — this just needs the
@@ -190,6 +182,7 @@ useEffect(() => {
   const color = binder.cover_color ?? DEFAULT_BINDER_COLOR;
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
+  const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
 
   const cardDefMap = useMemo(() => {
     const map = {};
@@ -225,7 +218,12 @@ useEffect(() => {
   const { handleOwn, handleUnown, handleUpdateAcquisition, handleToggleFavorite } =
     useInventoryActions(toast, {
       onOwnSuccess:   view.closeSlotAction,
-      onUnownSuccess: view.closeCardDetail,
+      // === CHANGED (quantity tracking): this used to always close
+      // CardDetailModal on any successful unown. With multiple copies
+      // now real, removing ONE copy shouldn't close the whole modal
+      // if others remain — CardDetailModal's own confirm handler
+      // already decides whether to close itself based on remaining
+      // quantity, so this callback would just fight that decision.
     });
 
   // ── Edit mode handlers ──────────────────────────────────────────────────
@@ -574,6 +572,9 @@ useEffect(() => {
             binderSlots={displaySlots}
             cardDefMap={cardDefMap}
             ownershipMap={ownershipMap}
+            inventoryGroupMap={inventoryGroupMap}
+            allBinderSlots={allBinderSlots}
+            allBinderPanels={allBinderPanels}
             spread={spread}
             isPreviewMode={view.isPreviewMode}
             selectedSlot={view.selectedSlot}
@@ -616,7 +617,8 @@ useEffect(() => {
           collections={collections}
           templateFields={templateFields}
           inventory={inventory}
-          binderSlots={view.isPreviewMode ? (view.previewSlots ?? binderSlots) : binderSlots}
+          allBinderSlots={allBinderSlots}
+          allBinderPanels={allBinderPanels}
           onSubmit={handlePlaceCard}
           onClose={view.closeAddToSlot}
         />
@@ -625,7 +627,7 @@ useEffect(() => {
       {view.viewingCardDef && (
         <CardDetailModal
           card={view.viewingCardDef}
-          inventoryItem={ownershipMap[view.viewingCardDef.id] ?? null}
+          inventoryItems={inventoryGroupMap[view.viewingCardDef.id] ?? []}
           templateFields={cardTemplateFields}
           onOwn={() => handleOwn({ cardDefId: view.viewingCardDef.id, collectionId: view.viewingCardDef.collectionId })}
           onUnown={(inventoryId) => handleUnown(inventoryId)}

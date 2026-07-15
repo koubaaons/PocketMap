@@ -33,6 +33,9 @@ export function validateBinderPanel(data) {
   if (!['card', 'insert'].includes(data.panelType)) errors.push('panelType must be "card" or "insert"');
   if (data.panelType === 'card' && !data.cardDefId) errors.push('cardDefId is required when panelType is "card"');
   if (data.panelType === 'insert' && !data.insertId) errors.push('insertId is required when panelType is "insert"');
+  if (data.inventoryItemId !== null && data.inventoryItemId !== undefined && typeof data.inventoryItemId !== 'string') {
+    errors.push('inventoryItemId must be a string or null');
+  }
   // === Drag/resize positioning within the combined space — same
   // percentage-based approach as binder cover stickers (see
   // binder.types.js's validateSticker), so the image can be
@@ -67,6 +70,7 @@ export function createBinderPanel({
   panelType,
   cardDefId = null,
   insertId = null,
+  inventoryItemId = null,
   imageX = 50,
   imageY = 50,
   imageScale = 1,
@@ -83,6 +87,7 @@ export function createBinderPanel({
     panelType,
     cardDefId: panelType === 'card' ? cardDefId : null,
     insertId:  panelType === 'insert' ? insertId : null,
+    inventoryItemId: panelType === 'card' ? inventoryItemId : null,
     imageX:     Number(imageX),
     imageY:     Number(imageY),
     imageScale: Number(imageScale),

@@ -7,8 +7,8 @@ import { useDispatch } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
-import { buildOwnershipMap } from '../../selectors/inventorySelectors.js';
-import { getSlotForCard } from '../../selectors/binderSelectors.js';
+import { buildOwnershipMap, buildInventoryGroupMap, getQuantityOwned } from '../../selectors/inventorySelectors.js';
+import { getAllSlotsForCard } from '../../selectors/binderSelectors.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 import { ACTIONS } from '../../store/index.js';
 import {
@@ -45,6 +45,7 @@ export function SearchView({
   }, [binders]);
 
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
+  const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
 
   // Only consider slots whose binder is still active (not soft-deleted).
   // Soft-deleted binders are filtered out of the store, so any slot
@@ -55,7 +56,7 @@ export function SearchView({
   );
   const templateFields = useStore(s => s.templateFields);
   const [viewingCard, setViewingCard] = useState(null);
-  const { handleOwn, handleUnown } = useInventoryActions(toast);
+  const { handleOwn, handleUnown, handleUpdateAcquisition, handleToggleFavorite } = useInventoryActions(toast);
 
   // Each result type is computed separately so tabs filter correctly
   const cardResults       = useMemo(() => searchCardResults(cardDefinitions, query),                         [cardDefinitions, query]);
@@ -84,20 +85,29 @@ export function SearchView({
 
   const getCardLocation = (card) => {
     const isOwned = ownershipMap[card.id] !== undefined;
-    if (!isOwned) return { label: 'Not owned', type: 'not-owned' };
-    const slot = getSlotForCard(activeBinderSlots, null, card.id);
-    if (slot) {
-      const binder = binderMap[slot.binderId];
-      // If binder no longer exists (orphan slot), treat as unorganised
-      if (!binder) return { label: 'Unorganised', type: 'unorganised' };
-      return {
-        label: `${binder.name} · p${slot.pageNumber} · slot ${slot.slotIndex + 1}`,
-        type: 'organised',
-        binderId: slot.binderId,
-        pageNumber: slot.pageNumber,
-      };
-    }
-    return { label: 'Unorganised', type: 'unorganised' };
+    if (!isOwned) return { type: 'not-owned', locations: [] };
+
+    const quantityOwned = getQuantityOwned(inventoryGroupMap, card.id);
+    const allSlots = getAllSlotsForCard(activeBinderSlots, card.id);
+    const locations = allSlots
+      .map(slot => {
+        const binder = binderMap[slot.binderId];
+        if (!binder) return null; // orphan slot, binder no longer exists
+        return {
+          label: `${binder.name} · p${slot.pageNumber} · slot ${slot.slotIndex + 1}`,
+          binderId: slot.binderId,
+          pageNumber: slot.pageNumber,
+        };
+      })
+      .filter(Boolean);
+
+    if (locations.length === 0) return { type: 'unorganised', locations: [] };
+
+    // How many owned copies aren't placed anywhere at all — relevant
+    // context once there's more than one copy (e.g. "2 placed, 1
+    // unorganised" instead of implying every copy is accounted for).
+    const unplacedCount = quantityOwned - locations.length;
+    return { type: 'organised', locations, unplacedCount: Math.max(0, unplacedCount) };
   };
 
   // ── Row renderers ───────────────────────────────────────────────────────────
@@ -131,20 +141,29 @@ export function SearchView({
             ? <button className="search-link" onClick={e => { e.stopPropagation(); onNavigateToCollection?.(collection.id); }}>{collection.name}</button>
             : '—'}
         </td>
-        <td className="search-cell">
+        <td className="search-cell search-cell-locations">
           {location.type === 'organised' ? (
-            <button
-              className="search-link search-location-link"
-              onClick={e => { e.stopPropagation(); onNavigateToBinder?.(location.binderId, location.pageNumber); }}
-              title={`Open ${binderMap[location.binderId]?.name ?? 'binder'}`}
-            >
-              📖 {location.label}
-            </button>
+            <div className="search-location-list">
+              {location.locations.map((loc, i) => (
+                <button
+                  key={`${loc.binderId}-${loc.pageNumber}-${i}`}
+                  className="search-link search-location-link"
+                  onClick={e => { e.stopPropagation(); onNavigateToBinder?.(loc.binderId, loc.pageNumber); }}
+                  title={`Open ${binderMap[loc.binderId]?.name ?? 'binder'}`}
+                >
+                  📖 {loc.label}
+                </button>
+              ))}
+              {location.unplacedCount > 0 && (
+                <span className="result-org-status result-org-unorganised">
+                  ○ +{location.unplacedCount} unorganised
+                </span>
+              )}
+            </div>
           ) : (
             <span className={`result-org-status result-org-${location.type}`}>
-              {location.type === 'unorganised' && '○ '}
-              {location.type === 'not-owned'   && '✕ '}
-              {location.label}
+              {location.type === 'unorganised' && '○ Unorganised'}
+              {location.type === 'not-owned'   && '✕ Not owned'}
             </span>
           )}
         </td>
@@ -358,10 +377,12 @@ export function SearchView({
       {viewingCard && (
         <CardDetailModal
           card={viewingCard}
-          inventoryItem={ownershipMap[viewingCard.id] ?? null}
+          inventoryItems={inventoryGroupMap[viewingCard.id] ?? []}
           templateFields={templateFields}
           onOwn={() => handleOwn({ cardDefId: viewingCard.id, collectionId: viewingCard.collectionId })}
           onUnown={(itemId) => handleUnown(itemId)}
+          onUpdateAcquisition={handleUpdateAcquisition}
+          onToggleFavorite={handleToggleFavorite}
           onEdit={() => { onNavigateToCollection?.(viewingCard.collectionId); setViewingCard(null); }}
           onDelete={() => setViewingCard(null)}
           onClose={() => setViewingCard(null)}
