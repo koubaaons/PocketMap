@@ -20,6 +20,9 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
       // existing card with no holoType at all (created before this
       // field existed) still correctly defaults to 'none' here. ===
       holoType: initialCard?.holoType ?? 'none',
+      // Free text, not a fixed picker like holoType — different TCG
+      // franchises use very different rarity naming systems.
+      rarity: initialCard?.rarity ?? '',
     };
     sortedFields.forEach(f => {
       const existing = initialCard?.attributes?.[f.field_name];
@@ -87,6 +90,7 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
         // === HOLO: pass the picked holoType through to the factory,
         // which itself clamps any invalid value back to 'none'. ===
         holoType: values.holoType ?? 'none',
+        rarity: values.rarity?.trim() || null,
       });
       if (!cardDef) { console.error('Card creation failed:', createErrors); return; }
       onSubmit(cardDef);
@@ -102,6 +106,7 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
         // silently discarded, since ...initialCard's old value would
         // otherwise be the only one present on the update object. ===
         holoType: values.holoType ?? 'none',
+        rarity: values.rarity?.trim() || null,
         updatedAt: Date.now(),
       });
     }

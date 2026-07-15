@@ -631,6 +631,11 @@ textarea.form-input {
   color: var(--text-muted);
 }
 
+.status-rarity {
+  background: rgba(255, 107, 157, 0.15);
+  color: var(--accent);
+}
+
 /* ── Sort select ──────────────────────────────────────────────────────────── */
 
 .sort-select {

@@ -131,12 +131,18 @@ export function validateCardDefinition(data) {
   if (data.holoType !== undefined && !HOLO_TYPES.includes(data.holoType)) {
     errors.push(`holoType must be one of: ${HOLO_TYPES.join(', ')}`);
   }
+  // Free text, not a fixed enum — different TCG franchises (Pokémon,
+  // Yu-Gi-Oh, One Piece, etc.) use very different rarity naming
+  // systems, so a closed list here would be wrong for most of them.
+  if (data.rarity !== undefined && data.rarity !== null && typeof data.rarity !== 'string') {
+    errors.push('rarity must be a string or null');
+  }
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   if (typeof data.updatedAt !== 'number') errors.push('updatedAt must be a timestamp');
   return { valid: errors.length === 0, errors };
 }
 
-export function createCardDefinition({ collectionId, name, image_url = null, attributes = {}, holoType = 'none' }) {
+export function createCardDefinition({ collectionId, name, image_url = null, attributes = {}, holoType = 'none', rarity = null }) {
   const now = Date.now();
   const cardDef = {
     id: generateId(),
@@ -145,6 +151,7 @@ export function createCardDefinition({ collectionId, name, image_url = null, att
     image_url: image_url ?? null,
     attributes: attributes ?? {},
     holoType: HOLO_TYPES.includes(holoType) ? holoType : 'none',
+    rarity: rarity ?? null,
     createdAt: now,
     updatedAt: now,
   };

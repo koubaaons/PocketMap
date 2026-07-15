@@ -44,13 +44,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { AcquisitionFields } from '../collections/AcquisitionForm.jsx';
 import { AcquisitionSummary } from '../collections/AcquisitionSummary.jsx';
-import { HolographicPicker, DynamicField } from '../collections/CardDefinitionForm.jsx';
+import { CardDefinitionFields } from '../collections/CardDefinitionFields.jsx';
 import { useCardDefinitionForm } from '../../hooks/useCardDefinitionForm.js';
 import { useAcquisitionForm } from '../../hooks/useAcquisitionForm.js';
 import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
-import { compressImage } from '../../utils/index.js';
-import { uploadImageToStorage } from '../../utils/supabaseImageUpload.js';
-import { useAuth } from '../../hooks/useAuth.js';
+import { useCardImageUpload } from '../../hooks/useCardImageUpload.js';
 
 export function CardDetailModal({
   card,
@@ -75,7 +73,6 @@ export function CardDetailModal({
 
   const quantityOwned = inventoryItems.length;
   const isOwned = quantityOwned > 0;
-  const { user } = useAuth();
 
   const sortedFields = [...templateFields]
     .filter(f => f.collectionId === card.collectionId)
@@ -142,32 +139,10 @@ export function CardDetailModal({
   const displayImageUrl = isEditingCard ? cardForm.values.image_url : card.image_url;
   const { holoRef, handlePointerMoveWithTilt, handlePointerLeaveWithTilt } = useCardHoloPointer();
 
-  // === Image upload while editing — same compressImage + Storage
-  // upload CardDefinitionForm.jsx already does, replicated here since
-  // it's inline JSX there rather than an exportable sub-component. ===
-  const [isCompressing, setIsCompressing] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const handleImageChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsCompressing(true);
-    try {
-      const compressed = await compressImage(file);
-      const path = `${user.id}/${crypto.randomUUID()}.jpg`;
-      const publicUrl = await uploadImageToStorage(compressed, path);
-      cardForm.set('image_url', publicUrl);
-    } catch (err) {
-      console.error('Image upload failed:', err);
-    } finally {
-      setIsCompressing(false);
-    }
-  };
-
-  const handleRemoveImage = () => {
-    cardForm.set('image_url', null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  // === Image upload while editing — now genuinely shared with
+  // CardDefinitionForm.jsx via useCardImageUpload, not just similar
+  // code duplicated in two places. ===
+  const { isCompressing, fileInputRef, handleImageChange, handleRemoveImage } = useCardImageUpload({ set: cardForm.set });
 
   // Same overlay/escape-key/focus-trap behavior as the shared Modal
   // component (see ui/index.jsx) — replicated here since this needs
@@ -303,32 +278,14 @@ export function CardDetailModal({
                   aria-label="Upload card image"
                 />
 
-                <div className="form-group">
-                  <label>Holographic Effect</label>
-                  <HolographicPicker value={cardForm.values.holoType} onChange={(v) => cardForm.set('holoType', v)} />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="card-detail-edit-name">Card Name *</label>
-                  <input
-                    id="card-detail-edit-name"
-                    className={`form-input ${cardForm.errors.name ? 'input-error' : ''}`}
-                    value={cardForm.values.name}
-                    onChange={e => cardForm.set('name', e.target.value)}
-                    autoFocus
-                  />
-                  {cardForm.errors.name && <span className="field-error-msg">{cardForm.errors.name}</span>}
-                </div>
-
-                {sortedFields.map(field => (
-                  <DynamicField
-                    key={field.id}
-                    field={field}
-                    value={cardForm.values[field.field_name]}
-                    error={cardForm.errors[field.field_name]}
-                    onChange={(val) => cardForm.set(field.field_name, val)}
-                  />
-                ))}
+                <CardDefinitionFields
+                  values={cardForm.values}
+                  errors={cardForm.errors}
+                  set={cardForm.set}
+                  sortedFields={sortedFields}
+                  nameFieldId="card-detail-edit-name"
+                  rarityFieldId="card-detail-edit-rarity"
+                />
 
                 <hr className="modal-divider" />
 
@@ -376,6 +333,7 @@ export function CardDetailModal({
                   ) : (
                     <span className="status-badge status-not-owned">Not owned</span>
                   )}
+                  {card.rarity && <span className="status-badge status-rarity">{card.rarity}</span>}
                 </div>
 
                 {sortedFields.length > 0 && (

@@ -19,16 +19,12 @@ import { BinderSlot } from './BinderSlot.jsx';
 import { BinderPanelSlot } from './BinderPanelSlot.jsx';
 import { getQuantityOwned } from '../../selectors/inventorySelectors.js';
 import { getTotalPlacedCount } from '../../selectors/binderSelectors.js';
+import { useBinderData } from '../../contexts/BinderDataContext.jsx';
 
 export function BinderPage({
   binder,
   pageNumber,
   pageSlotMap,
-  cardDefMap,
-  ownershipMap,
-  inventoryGroupMap = {},
-  allBinderSlots = [],
-  allBinderPanels = [],
   pagePanels = [],
   binderInsertMap = {},
   isPreviewMode = false,
@@ -45,6 +41,7 @@ export function BinderPage({
   getCombineRectangle,
   onConfirmCombine,
 }) {
+  const { cardDefMap, ownershipMap, inventoryGroupMap, allBinderSlots, allBinderPanels } = useBinderData();
   const totalSlots = binder.rows * binder.cols;
   const cols = binder.cols;
 
@@ -127,6 +124,7 @@ export function BinderPage({
               isCombineSelected={combineSelection.includes(slotIndex)}
               quantityOwned={cardDef ? getQuantityOwned(inventoryGroupMap, cardDef.id) : 0}
               totalPlaced={cardDef ? getTotalPlacedCount(allBinderSlots, allBinderPanels, cardDef.id) : 0}
+              inventoryItem={cardDef ? (ownershipMap[cardDef.id] ?? null) : null}
               gridColumnStart={gridColumnStart}
               gridRowStart={gridRowStart}
               onClickEmpty={() => onClickEmpty(slotIndex)}

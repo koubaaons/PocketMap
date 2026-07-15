@@ -4,7 +4,6 @@
  */
 
 import { validateOneTemplatePerCollection } from '../types/index.js';
-import { isSlotPositionFree } from '../selectors/binderSelectors.js';
 
 export const ACTIONS = Object.freeze({
   BINDER_ADD:      'BINDER_ADD',
@@ -134,34 +133,25 @@ export function reducer(state, action) {
       const { itemId } = action.payload;
       const item = state.bin.find(i => i.id === itemId && i._type === 'inventoryItem');
       if (!item) return state;
-      const { _type, deletedAt, cardName, hadPlacementRemoved, _removedSlot, _removedPanel, ...inventoryItem } = item;
+      const { _type, deletedAt, cardName, hadPlacementRemoved, _unlinkedSlotId, _unlinkedPanelId, ...inventoryItem } = item;
 
-      // === Handles the edge case flagged directly by the user: if
-      // the old slot/panel position has since been taken by a
-      // DIFFERENT card, don't overwrite it — just restore ownership
-      // of this copy without its old placement. The UI predicts this
-      // same outcome itself (useBinActions.js) using the identical
-      // check, right before dispatching, to show an accurate message.
+      // === Matches the real fix in INVENTORY_DELETE — the slot/panel
+      // was never actually deleted when this copy was removed, only
+      // unlinked (left as a grey, unowned placeholder). Restoring
+      // just needs to check it's still there (the user could have
+      // separately removed that placeholder slot manually while this
+      // copy sat in Trash — the ONE way this could genuinely no
+      // longer exist) and re-link it, rather than trying to "re-add"
+      // something that was never gone. No position-taken check
+      // needed either, since the slot never became available for
+      // something else to occupy in the first place. ===
       let binderSlots  = state.binderSlots;
       let binderPanels = state.binderPanels;
 
-      const binderStillExists = (binderId) => state.binders.some(b => b.id === binderId);
-
-      if (_removedSlot && binderStillExists(_removedSlot.binderId) &&
-          isSlotPositionFree(state.binderSlots, _removedSlot.binderId, _removedSlot.pageNumber, _removedSlot.slotIndex)) {
-        binderSlots = [...state.binderSlots, { ..._removedSlot, inventoryItemId: inventoryItem.id }];
-      } else if (_removedPanel && binderStillExists(_removedPanel.binderId)) {
-        // Panels don't share binder_slots' simple per-position
-        // occupancy check — a panel is "free" if nothing (slot or
-        // panel) currently covers any of the cells its own span
-        // would occupy. Kept simple here: only re-add if literally
-        // nothing currently starts at that exact position.
-        const positionTaken = state.binderPanels.some(
-          p => p.binderId === _removedPanel.binderId && p.pageNumber === _removedPanel.pageNumber && p.startSlotIndex === _removedPanel.startSlotIndex
-        ) || !isSlotPositionFree(state.binderSlots, _removedPanel.binderId, _removedPanel.pageNumber, _removedPanel.startSlotIndex);
-        if (!positionTaken) {
-          binderPanels = [...state.binderPanels, { ..._removedPanel, inventoryItemId: inventoryItem.id }];
-        }
+      if (_unlinkedSlotId && state.binderSlots.some(s => s.id === _unlinkedSlotId)) {
+        binderSlots = state.binderSlots.map(s => s.id === _unlinkedSlotId ? { ...s, inventoryItemId: inventoryItem.id } : s);
+      } else if (_unlinkedPanelId && state.binderPanels.some(p => p.id === _unlinkedPanelId)) {
+        binderPanels = state.binderPanels.map(p => p.id === _unlinkedPanelId ? { ...p, inventoryItemId: inventoryItem.id } : p);
       }
 
       return {
@@ -421,22 +411,25 @@ export function reducer(state, action) {
       const cardDef = state.cardDefinitions.find(cd => cd.id === item.cardDefId);
       const remainingInventory = state.inventory.filter(inv => inv.id !== item.id);
 
-      // === Real fix (was: count-only, "any slot for this card"):
-      // finds the EXACT slot/panel linked to this specific copy via
-      // inventoryItemId, rather than an arbitrary one. Falls back to
-      // the old count-based approach only for pre-migration slots
-      // that were never linked to any specific copy at all — in that
-      // case there's genuinely no way to know which one corresponds
-      // to this copy, so the same "any slot, if placed count exceeds
-      // owned count" logic as before is the only option.
-      let removedSlot = null, removedPanel = null;
+      // === FIX (real bug: this used to DELETE the linked slot/panel
+      // outright, which is wrong — a card that isn't owned can still
+      // sit in a slot as a grey placeholder, same as it always could
+      // before quantity tracking existed. Removing a copy should only
+      // clear that slot's ownership link, not remove the slot
+      // itself. Finds the EXACT slot/panel linked to this specific
+      // copy via inventoryItemId, rather than an arbitrary one. Falls
+      // back to the old count-based approach only for pre-migration
+      // slots that were never linked to any specific copy at all —
+      // in that case there's genuinely no way to know which one
+      // corresponds to this copy. ===
+      let unlinkedSlotId = null, unlinkedPanelId = null;
       const linkedSlot = state.binderSlots.find(s => s.inventoryItemId === item.id);
       if (linkedSlot) {
-        removedSlot = linkedSlot;
+        unlinkedSlotId = linkedSlot.id;
       } else {
         const linkedPanel = state.binderPanels.find(p => p.panelType === 'card' && p.inventoryItemId === item.id);
         if (linkedPanel) {
-          removedPanel = linkedPanel;
+          unlinkedPanelId = linkedPanel.id;
         } else {
           // Backward-compat fallback for unlinked, pre-migration slots
           const quantityOwned = remainingInventory.filter(inv => inv.cardDefId === item.cardDefId).length;
@@ -446,16 +439,21 @@ export function reducer(state, action) {
           if (totalPlaced > quantityOwned) {
             const excessSlot = state.binderSlots.find(s => s.cardDefId === item.cardDefId);
             if (excessSlot) {
-              removedSlot = excessSlot;
+              unlinkedSlotId = excessSlot.id;
             } else {
-              removedPanel = state.binderPanels.find(p => p.panelType === 'card' && p.cardDefId === item.cardDefId) ?? null;
+              const excessPanel = state.binderPanels.find(p => p.panelType === 'card' && p.cardDefId === item.cardDefId);
+              if (excessPanel) unlinkedPanelId = excessPanel.id;
             }
           }
         }
       }
 
-      const binderSlots  = removedSlot  ? state.binderSlots.filter(s => s.id !== removedSlot.id)   : state.binderSlots;
-      const binderPanels = removedPanel ? state.binderPanels.filter(p => p.id !== removedPanel.id) : state.binderPanels;
+      const binderSlots = unlinkedSlotId
+        ? state.binderSlots.map(s => s.id === unlinkedSlotId ? { ...s, inventoryItemId: null } : s)
+        : state.binderSlots;
+      const binderPanels = unlinkedPanelId
+        ? state.binderPanels.map(p => p.id === unlinkedPanelId ? { ...p, inventoryItemId: null } : p)
+        : state.binderPanels;
 
       return {
         ...state,
@@ -466,14 +464,13 @@ export function reducer(state, action) {
           ...item,
           _type: 'inventoryItem',
           cardName: cardDef?.name ?? 'Unknown card', // no name field on inventory rows themselves - captured here for the Trash Bin display
-          hadPlacementRemoved: !!(removedSlot || removedPanel),
-          // Snapshot of the exact slot/panel removed (if any), so
-          // restoring this copy can try to put it back in the same
-          // position — see BIN_RESTORE_INVENTORY_ITEM below for what
-          // happens if that position has since been taken by
-          // something else.
-          _removedSlot:  removedSlot,
-          _removedPanel: removedPanel,
+          hadPlacementRemoved: !!(unlinkedSlotId || unlinkedPanelId),
+          // The slot/panel itself was NOT deleted (see fix above) —
+          // just remember its id so restoring this copy can try to
+          // re-link it, see BIN_RESTORE_INVENTORY_ITEM below for what
+          // happens if it's since been deleted by the user directly.
+          _unlinkedSlotId: unlinkedSlotId,
+          _unlinkedPanelId: unlinkedPanelId,
           deletedAt: Date.now(),
         }],
       };
@@ -504,6 +501,37 @@ export function reducer(state, action) {
         }
         console.warn('[BinderVault] BINDER_SLOT_ADD: replacing orphaned slot (card no longer exists)', existingAtPosition.id);
       }
+      // === FIX (real regression): placing a card you don't own at
+      // all used to always work — a grey placeholder, for organising
+      // a wishlist/planned layout before you actually have the card.
+      // The quantity-tracking logic below (find an unplaced OWNED
+      // copy) accidentally required at least one copy to exist before
+      // ANY placement was allowed — quantityOwned=0 made
+      // totalPlacedCount >= quantityOwned (0 >= 0) always true,
+      // rejecting every attempt to place an unowned card at all. The
+      // quantity limit only makes sense once a card is actually
+      // owned; for zero-owned cards, this restores the original
+      // behavior instead (same per-binder duplicate check as before
+      // quantity tracking existed — no inventoryItemId to link, since
+      // there's no physical copy at all yet).
+      const quantityOwned = state.inventory.filter(inv => inv.cardDefId === slot.cardDefId).length;
+      if (quantityOwned === 0) {
+        const alreadyPlacedUnowned = state.binderSlots.some(
+          s => s.binderId === slot.binderId && s.cardDefId === slot.cardDefId && s.id !== existingAtPosition?.id
+        );
+        if (alreadyPlacedUnowned) {
+          console.warn('[BinderVault] BINDER_SLOT_ADD: this unowned card is already placed in this binder', slot.cardDefId);
+          return state;
+        }
+        return {
+          ...state,
+          binderSlots: [
+            ...state.binderSlots.filter(s => s.id !== existingAtPosition?.id),
+            { ...slot, inventoryItemId: null },
+          ],
+        };
+      }
+
       // === CHANGED (quantity tracking): this used to block placing
       // the same card twice in the same binder at all, treating
       // ownership as purely boolean. Now that owning multiple copies
@@ -535,7 +563,6 @@ export function reducer(state, action) {
       const totalPlacedCount =
         state.binderSlots.filter(s => s.cardDefId === slot.cardDefId && s.id !== existingAtPosition?.id).length +
         state.binderPanels.filter(p => p.panelType === 'card' && p.cardDefId === slot.cardDefId).length;
-      const quantityOwned = state.inventory.filter(inv => inv.cardDefId === slot.cardDefId).length;
       if (totalPlacedCount >= quantityOwned) {
         console.warn(`[BinderVault] BINDER_SLOT_ADD: no unplaced copies left (own ${quantityOwned}, ${totalPlacedCount} already placed)`, slot.cardDefId);
         return state;

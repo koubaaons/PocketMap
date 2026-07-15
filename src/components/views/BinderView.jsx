@@ -34,6 +34,7 @@ import { ConfirmModal, Button } from '../ui/index.jsx';
 import { BinderTopbar } from './BinderTopbar.jsx';
 import { BinderPageNav } from './BinderPageNav.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
+import { BinderDataProvider } from '../../contexts/BinderDataContext.jsx';
 import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { CombineSlotsModal } from '../modals/CombineSlotsModal.jsx';
@@ -48,6 +49,7 @@ import { useBinderSlotActions } from '../../hooks/useBinderSlotActions.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 import { useBinderView } from '../../hooks/useBinderView.js';
 import { useBinderFullscreen } from '../../hooks/useBinderFullscreen.js';
+import { useCardInfoToggle } from '../../hooks/useCardInfoToggle.js';
 import { useStore, useDispatch } from '../../hooks/useStore.js';
 import { ACTIONS } from '../../store/index.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
@@ -92,6 +94,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const isClosed = view.page === 0;
 
   const coverEditor = useBinderCoverEditor({ binder, toast });
+  const { showCardInfo, toggle: toggleCardInfo } = useCardInfoToggle();
 
   // === Home's "Customize" shortcut sets nav.autoOpenCustomize so the
   // binder opens straight into customize mode instead of requiring a
@@ -500,6 +503,8 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         isCombineMode={view.isCombineMode}
         onEnterCombineMode={view.enterCombineMode}
         onExitCombineMode={view.exitCombineMode}
+        showCardInfo={showCardInfo}
+        onToggleCardInfo={toggleCardInfo}
       />
 
       {/* Page navigation — greyed out while closed, same as topbar. */}
@@ -567,25 +572,22 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
               was forcing the whole row wider and shrinking the binder
               itself to compensate. */}
           {isCover && !isAnimatingCoverFlip && !isPreOpenSliding && <BinderCustomizePanel isCover={isCover} {...coverEditor} />}
-          <BinderBookFlip
-            binder={binder}
-            binderSlots={displaySlots}
-            cardDefMap={cardDefMap}
-            ownershipMap={ownershipMap}
-            inventoryGroupMap={inventoryGroupMap}
-            allBinderSlots={allBinderSlots}
-            allBinderPanels={allBinderPanels}
-            spread={spread}
-            isPreviewMode={view.isPreviewMode}
-            selectedSlot={view.selectedSlot}
-            makePageHandlers={makePageHandlers}
-            coverColor={coverEditor.isEditingCover ? coverEditor.draftColor : color}
-            pageColor={coverEditor.isEditingCover ? coverEditor.draftPageColor : (binder.page_color ?? '#1e1e1e')}
-            isFrontCoverTransparent={coverEditor.isPreviewingPageColor}
-            coverFrontContent={<BinderCoverStickers binder={binder} {...coverEditor} />}
-            onCoverClick={handleOpenBinder}
-            isClickable={isCover && !coverEditor.isEditingCover}
-          />
+          <BinderDataProvider value={{ cardDefMap, ownershipMap, inventoryGroupMap, allBinderSlots, allBinderPanels }}>
+            <BinderBookFlip
+              binder={binder}
+              binderSlots={displaySlots}
+              spread={spread}
+              isPreviewMode={view.isPreviewMode}
+              selectedSlot={view.selectedSlot}
+              makePageHandlers={makePageHandlers}
+              coverColor={coverEditor.isEditingCover ? coverEditor.draftColor : color}
+              pageColor={coverEditor.isEditingCover ? coverEditor.draftPageColor : (binder.page_color ?? '#1e1e1e')}
+              isFrontCoverTransparent={coverEditor.isPreviewingPageColor}
+              coverFrontContent={<BinderCoverStickers binder={binder} {...coverEditor} />}
+              onCoverClick={handleOpenBinder}
+              isClickable={isCover && !coverEditor.isEditingCover}
+            />
+          </BinderDataProvider>
         </div>
 
         <button

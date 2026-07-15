@@ -34,6 +34,9 @@ export {
   CONDITION_RATINGS,
   CONDITION_LABELS,
   formatConditionRating,
+  LANGUAGE_OPTIONS,
+  LANGUAGE_LABELS,
+  formatLanguage,
 } from './inventory.types.js';
 
 // === ISSUE #53 START: Binder Slot Entity ===

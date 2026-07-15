@@ -12,7 +12,7 @@ import { getUnorganisedCards } from '../../selectors/inventorySelectors.js';
 import { getOrganisedCardDefIds } from '../../selectors/binderSelectors.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
-export function UnorganisedTab({ collectionCards, collectionTemplateFields, ownershipMap, inventory, binderSlots, allBinderSlots, allBinderPanels, summary, onView, onEdit, onDelete }) {
+export function UnorganisedTab({ collectionCards, collectionTemplateFields, ownershipMap, binderSlots, showCardInfo, onToggleCardInfo, summary, onView, onEdit, onDelete }) {
   const [query, setQuery] = useState('');
   const [sort,  setSort]  = useState('newest');
 
@@ -27,14 +27,11 @@ export function UnorganisedTab({ collectionCards, collectionTemplateFields, owne
 
   return (
     <div className="tab-content">
-      <TabToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
+      <TabToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} showCardInfo={showCardInfo} onToggleCardInfo={onToggleCardInfo} />
       <CardDefinitionList
         cards={cards}
         templateFields={collectionTemplateFields}
         ownershipMap={ownershipMap}
-        inventory={inventory}
-        allBinderSlots={allBinderSlots}
-        allBinderPanels={allBinderPanels}
         totalCount={summary.unorganised}
         onView={onView}
         onEdit={onEdit}

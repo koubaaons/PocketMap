@@ -15,6 +15,7 @@ import { useStore } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { Button, ConfirmModal, EmptyState } from '../ui/index.jsx';
 import { CardDefinitionList } from '../collections/CardDefinitionList.jsx';
+import { CollectionDataProvider } from '../../contexts/CollectionDataContext.jsx';
 import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
 import { CollectionSummary } from '../collections/CollectionSummary.jsx';
 import { TabToolbar } from '../collections/TabToolbar.jsx';
@@ -25,6 +26,7 @@ import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.j
 import { useCardEditor } from '../../hooks/useCardEditor.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 import { useOwnershipEditor } from '../../hooks/useOwnershipEditor.js';
+import { useCardInfoToggle } from '../../hooks/useCardInfoToggle.js';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 
 // === REFACTOR7e START: import extracted tab components ===
@@ -49,6 +51,7 @@ export function CollectionDetailView({ toast, onBack }) {
 
   const editor    = useCardEditor();
   const ownership = useOwnershipEditor();
+  const { showCardInfo, toggle: toggleCardInfo } = useCardInfoToggle();
 
   const collectionCards = useMemo(
     () => cardDefinitions.filter(cd => cd.collectionId === collection?.id),
@@ -109,9 +112,8 @@ export function CollectionDetailView({ toast, onBack }) {
     collectionCards,
     collectionTemplateFields,
     ownershipMap,
-    inventory,
-    allBinderSlots: binderSlots,
-    allBinderPanels: binderPanels,
+    showCardInfo,
+    onToggleCardInfo: toggleCardInfo,
     summary,
     onView:   ownership.openDetail,
     onEdit:   handleUpdate,
@@ -174,36 +176,39 @@ export function CollectionDetailView({ toast, onBack }) {
         })}
       </div>
 
-      {/* Cards tab — stays in parent since it needs editor state */}
-      {activeTab === 'Cards' && (
-        <div className="tab-content">
-          <TabToolbar
-            query={editor.query} setQuery={editor.setQuery}
-            sort={editor.sortBy} setSort={editor.setSortBy}
-            showAdd onAdd={editor.openCreate}
-          />
-          <CardDefinitionList
-            cards={filteredCards}
-            templateFields={collectionTemplateFields}
-            ownershipMap={ownershipMap}
-            totalCount={collectionCards.length}
-            onView={ownership.openDetail}
-            onEdit={handleUpdate}
-            onDelete={editor.openDelete}
-            onToggleFavorite={handleToggleFavorite}
-            onToggleOwned={handleToggleOwned}
-            emptyTitle={editor.query ? `No results for "${editor.query}"` : 'No cards yet'}
-            emptySubtitle={editor.query ? 'Try a different search' : 'Add your first card to start building this collection'}
-          />
-        </div>
-      )}
+      <CollectionDataProvider value={{ inventory, allBinderSlots: binderSlots, allBinderPanels: binderPanels }}>
+        {/* Cards tab — stays in parent since it needs editor state */}
+        {activeTab === 'Cards' && (
+          <div className="tab-content">
+            <TabToolbar
+              query={editor.query} setQuery={editor.setQuery}
+              sort={editor.sortBy} setSort={editor.setSortBy}
+              showAdd onAdd={editor.openCreate}
+              showCardInfo={showCardInfo} onToggleCardInfo={toggleCardInfo}
+            />
+            <CardDefinitionList
+              cards={filteredCards}
+              templateFields={collectionTemplateFields}
+              ownershipMap={ownershipMap}
+              totalCount={collectionCards.length}
+              onView={ownership.openDetail}
+              onEdit={handleUpdate}
+              onDelete={editor.openDelete}
+              onToggleFavorite={handleToggleFavorite}
+              onToggleOwned={handleToggleOwned}
+              emptyTitle={editor.query ? `No results for "${editor.query}"` : 'No cards yet'}
+              emptySubtitle={editor.query ? 'Try a different search' : 'Add your first card to start building this collection'}
+            />
+          </div>
+        )}
 
-      {/* === REFACTOR7e START: extracted tab components === */}
-      {activeTab === 'Owned'        && <OwnedTab       {...sharedTabProps} />}
-      {activeTab === 'Missing'      && <MissingTab      {...sharedTabProps} />}
-      {activeTab === 'Unorganised'  && <UnorganisedTab  {...sharedTabProps} binderSlots={binderSlots} />}
+        {/* === REFACTOR7e START: extracted tab components === */}
+        {activeTab === 'Owned'        && <OwnedTab       {...sharedTabProps} />}
+        {activeTab === 'Missing'      && <MissingTab      {...sharedTabProps} />}
+        {activeTab === 'Unorganised'  && <UnorganisedTab  {...sharedTabProps} binderSlots={binderSlots} />}
+        {/* === REFACTOR7e END === */}
+      </CollectionDataProvider>
       {activeTab === 'Settings'     && <SettingsTab     collection={collection} templateFields={templateFields} toast={toast} />}
-      {/* === REFACTOR7e END === */}
 
       {/* Card detail modal */}
       {ownership.viewingCard && (

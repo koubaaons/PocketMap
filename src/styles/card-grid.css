@@ -147,6 +147,36 @@
   z-index: 2;
 }
 
+/* === Language/condition info badge — bottom of the tile, since the
+   top is already occupied by the fav star/ownership circle/quantity
+   badge. Toggled globally via useCardInfoToggle. === */
+.card-grid-item-info-badge {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: var(--weight-medium);
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  white-space: nowrap;
+  z-index: 2;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* === The actual show/hide mechanism for the badge above — see
+   useCardInfoToggle.js. Matches useTheme.js's own data-theme
+   pattern: a single attribute on the document root, read by CSS
+   directly, so no component between the toggle button and this
+   badge needs to know about the preference at all. === */
+[data-show-card-info="false"] .card-grid-item-info-badge {
+  display: none;
+}
+
 .card-grid-item-status {
   position: absolute;
   top: 5px;

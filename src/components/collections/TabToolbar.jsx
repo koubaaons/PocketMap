@@ -7,7 +7,7 @@
 
 import { CARD_SORT_OPTIONS } from '../../selectors/cardDefinitionSelectors.js';
 
-export function TabToolbar({ query, setQuery, sort, setSort, showAdd = false, onAdd }) {
+export function TabToolbar({ query, setQuery, sort, setSort, showAdd = false, onAdd, showCardInfo, onToggleCardInfo }) {
   return (
     <div className="card-list-toolbar">
       <div className="search-bar-wrapper" style={{ flex: 1 }}>
@@ -28,6 +28,11 @@ export function TabToolbar({ query, setQuery, sort, setSort, showAdd = false, on
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
+      {onToggleCardInfo && (
+        <button className="btn btn-ghost btn-sm" onClick={onToggleCardInfo}>
+          {showCardInfo ? 'Hide Card Info' : 'Show Card Info'}
+        </button>
+      )}
       {showAdd && onAdd && (
         <button className="btn btn-primary btn-sm" onClick={onAdd}>+ Add Card</button>
       )}

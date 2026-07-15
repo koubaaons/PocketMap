@@ -19,6 +19,7 @@
  * the circle stays non-interactive there). */
 
 import { useEffect, useRef, useState } from 'react';
+import { formatConditionRating, formatLanguage } from '../../types/index.js';
 
 export function CardGridItem({ card, inventoryItem, collectionName, onView, onToggleFavorite, onToggleOwned, quantityOwned = 0, totalPlaced = 0 }) {
   const isOwned    = inventoryItem !== null && inventoryItem !== undefined;
@@ -104,6 +105,21 @@ export function CardGridItem({ card, inventoryItem, collectionName, onView, onTo
             title={isOwned ? 'Owned' : 'Not owned'}
           >
             {isOwned ? '✓' : '○'}
+          </span>
+        )}
+
+        {/* === Language/condition info badge — visibility controlled
+            entirely by CSS via [data-show-card-info] on the document
+            root (see useCardInfoToggle.js and card-grid.css), not a
+            prop threaded down here. Only shown for owned cards with
+            at least one of the two set — an empty badge would just
+            be noise. === */}
+        {isOwned && (inventoryItem?.condition_rating || inventoryItem?.language) && (
+          <span className="card-grid-item-info-badge">
+            {[
+              inventoryItem.language && formatLanguage(inventoryItem.language),
+              inventoryItem.condition_rating && formatConditionRating(inventoryItem.condition_rating),
+            ].filter(Boolean).join(' · ')}
           </span>
         )}
 

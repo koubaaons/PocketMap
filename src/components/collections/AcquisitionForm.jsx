@@ -9,7 +9,7 @@
  */
 
 import { Button, Modal, ModalActions } from '../ui/index.jsx';
-import { CONDITION_RATINGS, CONDITION_LABELS } from '../../types/index.js';
+import { CONDITION_RATINGS, CONDITION_LABELS, LANGUAGE_OPTIONS, LANGUAGE_LABELS } from '../../types/index.js';
 import { useAcquisitionForm } from '../../hooks/useAcquisitionForm.js';
 
 export function AcquisitionFields({ fields, set }) {
@@ -23,6 +23,18 @@ export function AcquisitionFields({ fields, set }) {
           <option value="">Not graded</option>
           {CONDITION_RATINGS.map(r => (
             <option key={r} value={r}>{CONDITION_LABELS[r]}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="acq-language">Language</label>
+        <select id="acq-language" className="form-input"
+          value={fields.language}
+          onChange={e => set('language', e.target.value)}>
+          <option value="">Not set</option>
+          {LANGUAGE_OPTIONS.map(l => (
+            <option key={l} value={l}>{LANGUAGE_LABELS[l]}</option>
           ))}
         </select>
       </div>

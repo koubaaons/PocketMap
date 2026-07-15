@@ -11,6 +11,7 @@
 // card actually has a holoType set; ordinary cards pay nothing. ===
 import { useEffect, useRef, useState } from 'react';
 import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
+import { formatConditionRating, formatLanguage } from '../../types/index.js';
 
 export function BinderSlot({
   slotIndex,
@@ -25,6 +26,7 @@ export function BinderSlot({
   isCombineSelected = false,
   quantityOwned = 0,
   totalPlaced = 0,
+  inventoryItem = null,
   gridColumnStart,
   gridRowStart,
   onClickEmpty,
@@ -137,6 +139,19 @@ export function BinderSlot({
       {quantityOwned > 1 && (
         <span className="card-grid-item-quantity-badge">
           {totalPlaced} of {quantityOwned} placed
+        </span>
+      )}
+
+      {/* === Language/condition info badge — same as CardGridItem.jsx's
+          Collection grid version, visibility controlled entirely by
+          CSS via [data-show-card-info] on the document root, not a
+          prop threaded down here. === */}
+      {isOwned && (inventoryItem?.condition_rating || inventoryItem?.language) && (
+        <span className="card-grid-item-info-badge">
+          {[
+            inventoryItem.language && formatLanguage(inventoryItem.language),
+            inventoryItem.condition_rating && formatConditionRating(inventoryItem.condition_rating),
+          ].filter(Boolean).join(' · ')}
         </span>
       )}
 

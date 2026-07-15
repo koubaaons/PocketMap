@@ -27,6 +27,8 @@ export function BinderTopbar({
   isCombineMode,
   onEnterCombineMode,
   onExitCombineMode,
+  showCardInfo,
+  onToggleCardInfo,
 }) {
   const percentComplete = capacity > 0 ? Math.round((filled / capacity) * 100) : 0;
 
@@ -84,6 +86,12 @@ export function BinderTopbar({
         {isCombineMode && (
           <Button variant="ghost" size="sm" onClick={onExitCombineMode}>
             Exit Combine Mode
+          </Button>
+        )}
+
+        {!isPreviewMode && !isClosed && (
+          <Button variant="ghost" size="sm" onClick={onToggleCardInfo}>
+            {showCardInfo ? 'Hide Card Info' : 'Show Card Info'}
           </Button>
         )}
 

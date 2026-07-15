@@ -51,6 +51,49 @@ export function formatConditionRating(rating) {
 }
 // === REFACTOR5c END ===
 
+/**
+ * Valid card languages — covers the common print languages across
+ * the TCG franchises this app supports. Per-copy, not per-card (two
+ * copies of the same card can genuinely be different languages),
+ * same reasoning as condition_rating above.
+ */
+export const LANGUAGE_OPTIONS = Object.freeze([
+  'english',
+  'japanese',
+  'chinese_simplified',
+  'chinese_traditional',
+  'korean',
+  'german',
+  'french',
+  'italian',
+  'spanish',
+  'portuguese',
+]);
+
+export const LANGUAGE_LABELS = Object.freeze({
+  english:              'English',
+  japanese:             'Japanese',
+  chinese_simplified:   'Chinese (Simplified)',
+  chinese_traditional:  'Chinese (Traditional)',
+  korean:               'Korean',
+  german:               'German',
+  french:               'French',
+  italian:              'Italian',
+  spanish:              'Spanish',
+  portuguese:           'Portuguese',
+});
+
+/**
+ * Returns a human-readable label for a language code.
+ * Falls back to the raw value if not found.
+ * @param {string|null} language
+ * @returns {string}
+ */
+export function formatLanguage(language) {
+  if (!language) return 'Not set';
+  return LANGUAGE_LABELS[language] ?? language.replace('_', ' ');
+}
+
 export function validateInventoryItem(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return { valid: false, errors: ['Must be an object'] };
@@ -58,16 +101,19 @@ export function validateInventoryItem(data) {
   if (!data.userId || typeof data.userId !== 'string') errors.push('userId must be a non-empty string');
   if (!data.cardDefId || typeof data.cardDefId !== 'string') errors.push('cardDefId must be a non-empty string');
   if (!data.collectionId || typeof data.collectionId !== 'string') errors.push('collectionId must be a non-empty string');
-  if (data.condition_rating !== null && !CONDITION_RATINGS.includes(data.condition_rating)) {
+  if (data.condition_rating !== null && data.condition_rating !== undefined && !CONDITION_RATINGS.includes(data.condition_rating)) {
     errors.push(`condition_rating must be one of: ${CONDITION_RATINGS.join(', ')} or null`);
+  }
+  if (data.language !== null && data.language !== undefined && !LANGUAGE_OPTIONS.includes(data.language)) {
+    errors.push(`language must be one of: ${LANGUAGE_OPTIONS.join(', ')} or null`);
   }
   if (typeof data.is_tradeable !== 'boolean') errors.push('is_tradeable must be a boolean');
   if (typeof data.is_sellable !== 'boolean') errors.push('is_sellable must be a boolean');
   if (typeof data.is_favorite !== 'boolean') errors.push('is_favorite must be a boolean');
-  if (data.personal_notes !== null && typeof data.personal_notes !== 'string') {
+  if (data.personal_notes !== null && data.personal_notes !== undefined && typeof data.personal_notes !== 'string') {
     errors.push('personal_notes must be a string or null');
   }
-  if (data.acquired_at !== null && typeof data.acquired_at !== 'number') {
+  if (data.acquired_at !== null && data.acquired_at !== undefined && typeof data.acquired_at !== 'number') {
     errors.push('acquired_at must be a timestamp or null');
   }
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
@@ -80,6 +126,7 @@ export function createInventoryItem({
   collectionId,
   userId = 'local-user-1',
   condition_rating = null,
+  language = null,
   is_tradeable = false,
   is_sellable = false,
   is_favorite = false,
@@ -93,6 +140,7 @@ export function createInventoryItem({
     cardDefId,
     collectionId,
     condition_rating,
+    language,
     is_tradeable: Boolean(is_tradeable),
     is_sellable: Boolean(is_sellable),
     is_favorite: Boolean(is_favorite),

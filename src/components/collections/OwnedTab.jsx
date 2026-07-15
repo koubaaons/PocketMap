@@ -11,7 +11,7 @@ import { CARD_SORT_OPTIONS, applyCardDefinitionFilters } from '../../selectors/c
 import { getOwnedCards } from '../../selectors/inventorySelectors.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
-export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipMap, inventory, allBinderSlots, allBinderPanels, summary, onView, onEdit, onDelete, onToggleOwned, onToggleFavorite }) {
+export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipMap, showCardInfo, onToggleCardInfo, summary, onView, onEdit, onDelete, onToggleOwned, onToggleFavorite }) {
   const [query, setQuery] = useState('');
   const [sort,  setSort]  = useState('newest');
 
@@ -22,14 +22,11 @@ export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipM
 
   return (
     <div className="tab-content">
-      <TabToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
+      <TabToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} showCardInfo={showCardInfo} onToggleCardInfo={onToggleCardInfo} />
       <CardDefinitionList
         cards={cards}
         templateFields={collectionTemplateFields}
         ownershipMap={ownershipMap}
-        inventory={inventory}
-        allBinderSlots={allBinderSlots}
-        allBinderPanels={allBinderPanels}
         totalCount={summary.owned}
         onView={onView}
         onEdit={onEdit}

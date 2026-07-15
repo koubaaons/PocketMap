@@ -9,7 +9,7 @@
 
 // === REFACTOR5b START: Extract AcquisitionSummary component ===
 
-import { formatConditionRating } from '../../types/index.js';
+import { formatConditionRating, formatLanguage } from '../../types/index.js';
 
 /**
  * @param {{ inventoryItem: object, compact?: boolean }} props
@@ -17,6 +17,7 @@ import { formatConditionRating } from '../../types/index.js';
 export function AcquisitionSummary({ inventoryItem, compact = false }) {
   const hasAnyDetail =
     inventoryItem.condition_rating ||
+    inventoryItem.language ||
     inventoryItem.acquired_at ||
     inventoryItem.personal_notes ||
     inventoryItem.is_tradeable ||
@@ -33,6 +34,7 @@ export function AcquisitionSummary({ inventoryItem, compact = false }) {
   if (compact) {
     const parts = [
       inventoryItem.condition_rating && formatConditionRating(inventoryItem.condition_rating),
+      inventoryItem.language && formatLanguage(inventoryItem.language),
       inventoryItem.acquired_at && new Date(inventoryItem.acquired_at).toLocaleDateString(),
     ].filter(Boolean);
     return <span className="acquisition-summary-compact">{parts.join(' · ') || 'No details yet'}</span>;
@@ -45,6 +47,15 @@ export function AcquisitionSummary({ inventoryItem, compact = false }) {
           <span className="detail-label">Condition</span>
           <span className="detail-value">
             {formatConditionRating(inventoryItem.condition_rating)}
+          </span>
+        </div>
+      )}
+
+      {inventoryItem.language && (
+        <div className="detail-field">
+          <span className="detail-label">Language</span>
+          <span className="detail-value">
+            {formatLanguage(inventoryItem.language)}
           </span>
         </div>
       )}

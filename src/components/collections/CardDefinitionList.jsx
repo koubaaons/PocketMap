@@ -12,14 +12,12 @@ import { CardGridItem } from './CardGridItem.jsx';
 import { EmptyState } from '../ui/index.jsx';
 import { buildInventoryGroupMap, getQuantityOwned } from '../../selectors/inventorySelectors.js';
 import { getTotalPlacedCount } from '../../selectors/binderSelectors.js';
+import { useCollectionData } from '../../contexts/CollectionDataContext.jsx';
 
 export function CardDefinitionList({
   cards,
   templateFields,
   ownershipMap = {},
-  inventory = [],
-  allBinderSlots = [],
-  allBinderPanels = [],
   totalCount,
   onView,
   onEdit,
@@ -29,6 +27,8 @@ export function CardDefinitionList({
   emptyTitle = 'No cards yet',
   emptySubtitle = 'Add your first card to this collection',
 }) {
+  const { inventory, allBinderSlots, allBinderPanels } = useCollectionData();
+
   if (cards.length === 0) {
     return <EmptyState icon="🃏" title={emptyTitle} subtitle={emptySubtitle} />;
   }

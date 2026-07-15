@@ -14,11 +14,6 @@ const RENDER_RADIUS = 3;
 export function BinderBookFlip({
   binder,
   binderSlots,
-  cardDefMap,
-  ownershipMap,
-  inventoryGroupMap,
-  allBinderSlots,
-  allBinderPanels,
   spread,
   isPreviewMode,
   selectedSlot,
@@ -166,11 +161,6 @@ export function BinderBookFlip({
                   binder={binder}
                   pageNumber={frontPageNum}
                   pageSlotMap={slotMapsByPage[frontPageNum] ?? {}}
-                  cardDefMap={cardDefMap}
-                  ownershipMap={ownershipMap}
-                  inventoryGroupMap={inventoryGroupMap}
-                  allBinderSlots={allBinderSlots}
-                  allBinderPanels={allBinderPanels}
                   isPreviewMode={isPreviewMode}
                   selectedSlot={selectedSlot}
                   {...makePageHandlers(frontPageNum)}
@@ -183,11 +173,6 @@ export function BinderBookFlip({
                   binder={binder}
                   pageNumber={backPageNum}
                   pageSlotMap={slotMapsByPage[backPageNum] ?? {}}
-                  cardDefMap={cardDefMap}
-                  ownershipMap={ownershipMap}
-                  inventoryGroupMap={inventoryGroupMap}
-                  allBinderSlots={allBinderSlots}
-                  allBinderPanels={allBinderPanels}
                   isPreviewMode={isPreviewMode}
                   selectedSlot={selectedSlot}
                   {...makePageHandlers(backPageNum)}

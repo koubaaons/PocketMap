@@ -332,9 +332,23 @@ const RARITY_TO_HOLO_TYPE = {
  * unrecognized (and logging it, so real gaps get noticed instead of
  * silently defaulting forever).
  */
+// Normalizes a rarity string for comparison — lowercase, underscores/
+// hyphens become spaces, collapse repeated whitespace, trim. Built
+// once from RARITY_TO_HOLO_TYPE's own keys so the table above stays
+// exactly as written (human-readable, "Mega Attack Rare" etc.) while
+// still matching whatever casing/format the API actually sends
+// (confirmed varies — e.g. "MEGA_ATTACK_RARE" for the same rarity).
+function normalizeRarityKey(str) {
+  return str.toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+const NORMALIZED_RARITY_TO_HOLO_TYPE = Object.fromEntries(
+  Object.entries(RARITY_TO_HOLO_TYPE).map(([key, value]) => [normalizeRarityKey(key), value])
+);
+
 export function mapRarityToHoloType(rarity) {
   if (!rarity) return 'none';
-  const mapped = RARITY_TO_HOLO_TYPE[rarity];
+  const mapped = NORMALIZED_RARITY_TO_HOLO_TYPE[normalizeRarityKey(rarity)];
   if (mapped) return mapped;
   console.warn(`[pokemonApi] Unrecognized rarity "${rarity}" — defaulting holoType to 'none'. Add this to RARITY_TO_HOLO_TYPE if it's common enough to matter.`);
   return 'none';
@@ -353,6 +367,13 @@ export function mapPokemonCardToDraft(apiCard) {
     name: apiCard.name,
     sourceImageUrl: apiCard.images?.large ?? apiCard.images?.small ?? null,
     holoType: mapRarityToHoloType(apiCard.rarity),
+    // Dedicated field (card_definitions.rarity) — the raw rarity
+    // string this card was actually printed with, used for the new
+    // sort-by-rarity feature and the rarity badge. Kept alongside the
+    // attributes-based "Rarity" entry below for backward
+    // compatibility with existing template-field displays, even
+    // though they're now the same value stored two ways.
+    rarity: apiCard.rarity ?? null,
     attributes: {
       'Pokémon':     apiCard.name,
       'Set':         apiCard.set?.name ?? '',

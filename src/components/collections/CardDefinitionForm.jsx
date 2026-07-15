@@ -5,12 +5,10 @@
  *     compression handles it automatically ===
  */
 
-import { useState, useRef } from 'react';
 import { Button, Modal, ModalActions } from '../ui/index.jsx';
 import { useCardDefinitionForm } from '../../hooks/useCardDefinitionForm.js';
-import { compressImage } from '../../utils/index.js';
-import { uploadImageToStorage } from '../../utils/supabaseImageUpload.js';
-import { useAuth } from '../../hooks/useAuth.js';
+import { useCardImageUpload } from '../../hooks/useCardImageUpload.js';
+import { CardDefinitionFields } from './CardDefinitionFields.jsx';
 import { HOLO_TYPES, HOLO_LABELS } from '../../types/index.js';
 import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
 
@@ -46,34 +44,7 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
   //     is now uploaded to Storage immediately after, and it's the
   //     returned public URL, not the base64 itself, that ends up in
   //     values.image_url and eventually the database. ===
-  const [isCompressing, setIsCompressing] = useState(false);
-  const fileInputRef = useRef(null);
-  const { user } = useAuth();
-
-  const handleImageChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsCompressing(true);
-    try {
-      const compressed = await compressImage(file);
-      // Card definitions don't have a real id yet in create mode, so
-      // the storage path uses a fresh random id rather than the
-      // eventual card def id — nothing downstream depends on the two
-      // matching, this just needs to be a unique path in the bucket.
-      const path = `${user.id}/${crypto.randomUUID()}.jpg`;
-      const publicUrl = await uploadImageToStorage(compressed, path);
-      set('image_url', publicUrl);
-    } catch (err) {
-      console.error('Image upload failed:', err);
-    } finally {
-      setIsCompressing(false);
-    }
-  };
-
-  const handleRemoveImage = () => {
-    set('image_url', null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  const { isCompressing, fileInputRef, handleImageChange, handleRemoveImage } = useCardImageUpload({ set });
 
   // === HOLO: live preview, driven directly by values.holoType as the
   // user clicks different picker buttons — no save needed to see it.
@@ -137,36 +108,14 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
         </div>
       </div>
 
-      {/* Holographic effect */}
-      <div className="form-group">
-        <label>Holographic Effect</label>
-        <HolographicPicker value={values.holoType} onChange={(v) => set('holoType', v)} />
-      </div>
-
-      {/* Card name */}
-      <div className="form-group">
-        <label htmlFor="card-def-name">Card Name *</label>
-        <input
-          id="card-def-name"
-          className={`form-input ${errors.name ? 'input-error' : ''}`}
-          placeholder="e.g. Bloom Believix"
-          value={values.name}
-          onChange={e => set('name', e.target.value)}
-          autoFocus
-        />
-        {errors.name && <span className="field-error-msg">{errors.name}</span>}
-      </div>
-
-      {/* Dynamic fields */}
-      {sortedFields.map(field => (
-        <DynamicField
-          key={field.id}
-          field={field}
-          value={values[field.field_name]}
-          error={errors[field.field_name]}
-          onChange={(val) => set(field.field_name, val)}
-        />
-      ))}
+      <CardDefinitionFields
+        values={values}
+        errors={errors}
+        set={set}
+        sortedFields={sortedFields}
+        nameFieldId="card-def-name"
+        rarityFieldId="card-def-rarity"
+      />
 
       <ModalActions>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>

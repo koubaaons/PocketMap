@@ -44,6 +44,29 @@ export function PokemonImportModal({ set, onSubmit, onClose }) {
   const [loadError, setLoadError] = useState('');
   const [isFetchingFullList, setIsFetchingFullList] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  // === FIX (real, high-impact bug): large imports (295 cards) take
+  // meaningfully longer than small ones (30 cards) — sequential
+  // writes are the correct tradeoff for reliability (see the
+  // foreign-key race fix elsewhere), but the tradeoff is TIME. If the
+  // browser tab gets refreshed or closed while this is still
+  // actively running, the whole JS execution context — including
+  // this exact loop — is destroyed instantly, and whatever cards
+  // hadn't been written yet simply never get their turn. There is no
+  // way to resume this from where it left off; the only real fix is
+  // preventing the interruption from happening by accident in the
+  // first place. This is the standard, browser-native way to do
+  // that — same mechanism as "you have unsaved changes, are you sure
+  // you want to leave?" on any form.
+  useEffect(() => {
+    if (!isImporting) return;
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // required for the browser's native dialog to actually show
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isImporting]);
   const [progress, setProgress] = useState(null); // { done, total }
   const [importError, setImportError] = useState('');
 
@@ -151,6 +174,7 @@ export function PokemonImportModal({ set, onSubmit, onClose }) {
           image_url,
           attributes: draft.attributes,
           holoType: draft.holoType,
+          rarity: draft.rarity,
         });
         if (!cardDef) throw new Error(errors.join(', '));
 

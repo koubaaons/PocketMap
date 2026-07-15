@@ -121,6 +121,7 @@ function rowToCardDefinition(row) {
     name:         row.name,
     image_url:    row.image_url,
     holoType:     row.holo_type,
+    rarity:       row.rarity,
     attributes:   row.attributes ?? {},
     createdAt:    new Date(row.created_at).getTime(),
     updatedAt:    new Date(row.updated_at).getTime(),
@@ -135,6 +136,7 @@ function rowToInventoryItem(row) {
     collectionId:        row.collection_id,
     is_favorite:         row.is_favorite,
     condition_rating:    row.condition_rating,
+    language:            row.language,
     // Map Supabase column names back to JS field names — keep both
     // naming conventions so existing code reading either still works
     acquired_at:         row.date_acquired,
@@ -328,6 +330,7 @@ export function cardDefinitionToRow(cd) {
     name:          cd.name,
     image_url:     cd.image_url ?? null,
     holo_type:     cd.holoType ?? 'none',
+    rarity:        cd.rarity ?? null,
     attributes:    cd.attributes ?? {},
     updated_at:    new Date().toISOString(),
   };
@@ -341,6 +344,7 @@ export function inventoryItemToRow(item) {
     collection_id:       item.collectionId,
     is_favorite:         item.is_favorite ?? false,
     condition_rating:    item.condition_rating ?? null,
+    language:            item.language ?? null,
     // Handle both JS naming conventions
     date_acquired:       item.acquired_at ?? item.date_acquired ?? null,
     notes:               item.personal_notes ?? item.notes ?? null,
