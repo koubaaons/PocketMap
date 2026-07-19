@@ -40,7 +40,8 @@
  * every other modal in the app.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { AcquisitionFields } from '../collections/AcquisitionForm.jsx';
 import { AcquisitionSummary } from '../collections/AcquisitionSummary.jsx';
@@ -162,6 +163,55 @@ export function CardDetailModal({
 
   const confirmUnownItem = confirmUnownId ? inventoryItems.find(i => i.id === confirmUnownId) : null;
 
+  // === Keep the (portaled, position:fixed) detail panel visually
+  // anchored beside the actual floating card, instead of a flat
+  // corner offset with no relation to where the card really is.
+  //
+  // Deliberately does NOT read the group's position directly off
+  // getBoundingClientRect() — .card-detail-group is still 0.4s into
+  // its own translateX transition at the exact moment it first opens
+  // (see .card-detail-group's transition), so its rect at that instant
+  // reflects wherever the CSS transition happens to be, not where it's
+  // settling to. That's exactly what made the panel appear in the
+  // wrong place for a moment and then jump into its real position a
+  // beat later. Computing the settled position analytically —
+  // viewport center, minus the known -160px .card-detail-group-open
+  // shift, plus half the group's own width (which the shift doesn't
+  // affect, safe to read at any point) — gives the right answer
+  // immediately, with no dependency on the transition's timing at all.
+  // Still re-measures via ResizeObserver/resize for cases where the
+  // group's WIDTH itself changes later (a window resize, mainly).
+  const isOpen = isDetailsOpen || isEditingCard || isEditingAcquisition;
+  const [panelLeft, setPanelLeft] = useState(null);
+
+  // Matches .card-detail-group-open's transform: translateX(-160px) —
+  // see the comment above for why this has to be a known constant
+  // rather than read off the group's own (possibly still-animating)
+  // bounding rect.
+  const GROUP_OPEN_SHIFT_X = 160;
+
+  useLayoutEffect(() => {
+    if (!isOpen) { setPanelLeft(null); return; }
+    const el = firstFocusRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+
+    const measure = () => {
+      const width = el.getBoundingClientRect().width; // shift doesn't affect width, safe to read anytime
+      const shiftedCenterX = window.innerWidth / 2 - GROUP_OPEN_SHIFT_X;
+      setPanelLeft(shiftedCenterX + width / 2 + 20);
+    };
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [isOpen]);
+
+
   if (confirmUnownItem) {
     return (
       <ConfirmModal
@@ -194,7 +244,7 @@ export function CardDetailModal({
       aria-modal="true"
       aria-labelledby="card-detail-title"
     >
-      <div className={`card-detail-group ${(isDetailsOpen || isEditingCard || isEditingAcquisition) ? 'card-detail-group-open' : ''}`} ref={firstFocusRef} tabIndex={-1}>
+      <div className={`card-detail-group ${isOpen ? 'card-detail-group-open' : ''}`} ref={firstFocusRef} tabIndex={-1}>
 
         {/* Card image — floats freely, no box or background behind
             it at all, just its own drop shadow. Shows the draft
@@ -246,8 +296,11 @@ export function CardDetailModal({
             make room, so this appears in the space that opens up.
             Edit mode is a SUB-PAGE of this same panel, not a separate
             modal — swaps its contents in place. */}
-        {(isDetailsOpen || isEditingCard || isEditingAcquisition) && (
-          <div className="card-detail-panel animate-slide-up-fade-in">
+        {isOpen && createPortal(
+          <div
+            className="card-detail-panel animate-fade-in"
+            style={panelLeft != null ? { left: panelLeft, right: 'auto' } : undefined}
+          >
 
             {isEditingCard ? (
               <>
@@ -394,7 +447,8 @@ export function CardDetailModal({
                 </div>
               </>
             )}
-          </div>
+          </div>,
+          document.body
         )}
 
       </div>

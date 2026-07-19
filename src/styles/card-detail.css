@@ -50,59 +50,49 @@
   background: rgba(255, 107, 157, 0.28);
 }
 
-/* The boxed panel — reveals on the card's RIGHT once open, absolutely
-   positioned relative to .card-detail-group so its appearance doesn't
-   also shift .card-detail-group's own transition target. Same visual
-   language as the shared .modal (background/border/radius tokens). */
+/* The boxed panel — reveals on the card's RIGHT once open. Deliberately
+   position:fixed to the VIEWPORT (not position:absolute relative to
+   .card-detail-group) — see the FIX comment right below for why.
+   Same visual language as the shared .modal (background/border/radius
+   tokens). */
 .card-detail-panel {
-  position: absolute;
+  position: fixed;
   top: 50%;
-  left: 100%;
-  margin-left: var(--space-5);
+  right: 24px;
+  transform: translateY(-50%);
   width: 320px;
+  max-width: calc(100vw - 48px);
   background: var(--bg-primary);
   border: 0.5px solid var(--border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-5);
-  max-height: 90vh;
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  z-index: 210;
 }
 
-/* === FIX (zoom-out-to-see-everything bug): the panel used to be
-   anchored with top:0 (relative to .card-detail-group, whose own
-   height is just the card image — usually much shorter than the
-   panel's content). With a fixed, non-scrolling .modal-overlay, that
-   let a tall panel (many custom fields, or the copy-editing sub-page)
-   extend past the bottom of the viewport with nothing to scroll it
-   back into view. Centering it at the group's own vertical midpoint
-   keeps it within the viewport regardless of the image's height,
-   since the group is itself centered by the overlay's flexbox — so
-   the panel's existing max-height: 90vh + overflow-y: auto can
-   finally do their job instead of clipping unreachable content.
-   Uses its own keyframes (rather than the shared
-   .animate-slide-up-fade-in) so the entrance slide combines with this
-   -50% centering in one transform value instead of overwriting it —
-   transform isn't additive across separate rules, so animating a
-   plain translateY(16px)→translateY(0) here would silently undo the
-   centering the instant the entrance animation finished. ===
-@keyframes card-detail-panel-slide-up-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(calc(-50% + 16px));
-  }
-  to {
-    opacity: 1;
-    transform: translateY(-50%);
-  }
-}
-
-.card-detail-panel.animate-slide-up-fade-in {
-  animation: card-detail-panel-slide-up-fade-in 0.3s ease-out;
-  animation-fill-mode: both;
-}
+/* === FIX (zoom-out-to-see-everything bug, second pass): this used to
+   be position:absolute, centered relative to .card-detail-group (top:
+   50% + translateY(-50%) on the GROUP, whose own height is just the
+   card image). That relied on the group's own vertical centering
+   inside the flex overlay staying mathematically correct even while
+   the group itself overflows the viewport — which held up in testing
+   but still didn't reliably reach the Save button on a short window
+   in practice, with the "Edit Card" sub-page in particular sometimes
+   showing no scrollbar at all. Making the panel position:fixed
+   removes that whole dependency: its centering is now computed
+   directly against the real viewport, every time, regardless of the
+   card image's height, the group's own layout, or which sub-page
+   (view / edit card / edit a copy) happens to be showing.
+   Entrance uses the plain .animate-fade-in (see animations.css) —
+   no transform-based slide of its own, since the panel's left
+   position is already computed correctly (see CardDetailModal.jsx)
+   before it ever renders. A slide animation here was purely a source
+   of "moves the wrong direction" bugs with no real benefit. === */
 
 .card-detail-panel-header {
   display: flex;
@@ -148,13 +138,11 @@
 
   .card-detail-panel {
     position: static;
-    margin-left: 0;
+    right: auto;
+    transform: none;
     margin-top: var(--space-4);
     width: 100%;
-  }
-
-  .card-detail-panel.animate-slide-up-fade-in {
-    animation: slide-up-fade-in 0.3s ease-out;
+    max-width: 100%;
   }
 
   .card-detail-show-btn {

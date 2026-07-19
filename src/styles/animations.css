@@ -61,6 +61,19 @@
   animation: slide-up-fade-in 0.3s ease-out;
 }
 
+/* Plain fade, no movement — for elements whose position is already
+   computed/correct on the very first frame, where any transform-based
+   slide would just be extra risk of visibly moving in the wrong
+   direction for no real benefit. */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
 /* Pulsing glow behind the closed binder cover — lights up and dims
    on a loop, rather than a static glow. Positioned to match the
    cover's own footprint (right half of .binder-book), colored from

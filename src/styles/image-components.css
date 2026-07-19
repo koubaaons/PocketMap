@@ -108,8 +108,18 @@
      this file. max-width:420px makes this genuinely BIGGER than
      edit mode's preview (which has no width cap beyond its own
      200px-capped wrapper), matching the actual request: same
-     behavior, bigger size, in the detail view specifically. === */
+     behavior, bigger size, in the detail view specifically. ===
+     === FIX (edit panel still felt cramped on a short browser
+     window, even after centering .card-detail-panel): max-width
+     alone means this always renders at a FIXED ~588px tall
+     (420 * 3.5/2.5), on every window size, since nothing ever
+     constrained the height. On a short window that's most of the
+     visible viewport gone before the side panel even gets a chance —
+     max-height lets the image shrink together with a short window
+     instead of always claiming the same fixed height regardless. === */
   max-width: 420px;
+  max-height: 65vh;
+  max-height: 65dvh;
   aspect-ratio: 2.5 / 3.5;
   object-fit: cover;
   border-radius: var(--radius-lg);
