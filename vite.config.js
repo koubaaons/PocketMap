@@ -4,6 +4,13 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    // Node environment is enough for now — reducer/selector/type
+    // tests are pure logic, no DOM needed. Add 'jsdom' + React
+    // Testing Library later if/when component-level tests start.
+    environment: 'node',
+    globals: true, // describe/it/expect available without importing them in every file
+  },
   server: {
     proxy: {
       // === ISSUE #130: Pokemon TCG API CORS is genuinely

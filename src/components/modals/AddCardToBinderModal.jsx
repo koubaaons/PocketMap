@@ -6,7 +6,7 @@
 
 import { useState, useMemo } from 'react';
 import { Modal, ModalActions, Button } from '../ui/index.jsx';
-import { buildOwnershipMap, buildInventoryGroupMap, getQuantityOwned } from '../../selectors/inventorySelectors.js';
+import { buildOwnershipMap, buildInventoryGroupMap, getQuantityOwned, getDisplayLabelForCopy } from '../../selectors/inventorySelectors.js';
 import { getFullyPlacedCardDefIds, filterCardsForBinder } from '../../selectors/binderSelectors.js';
 
 export function AddCardToBinderModal({
@@ -17,12 +17,13 @@ export function AddCardToBinderModal({
 }) {
   const [query, setQuery]               = useState('');
   const [selectedCard, setSelectedCard] = useState(null);
+  const [selectedCopyId, setSelectedCopyId] = useState(null);
 
   const ownershipMap      = useMemo(() => buildOwnershipMap(inventory), [inventory]);
   const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
   const fullyPlacedIds    = useMemo(
-    () => getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, inventory),
-    [allBinderSlots, allBinderPanels, inventory]
+    () => getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, inventory, binder.id),
+    [allBinderSlots, allBinderPanels, inventory, binder.id]
   );
 
   const collectionMap = useMemo(() => {
@@ -38,9 +39,34 @@ export function AddCardToBinderModal({
   );
   // === REFACTOR7b END ===
 
+  // === New: which copies of the selected card are actually available
+  // to place — same "already linked to a slot/panel elsewhere" check
+  // the reducer itself uses, surfaced here so the user can choose
+  // deliberately (e.g. "place the English one, not the Chinese one")
+  // instead of the reducer silently auto-picking. Only relevant once
+  // more than one copy exists; a single copy needs no picker at all. ===
+  const unplacedCopiesForSelected = useMemo(() => {
+    if (!selectedCard) return [];
+    const group = inventoryGroupMap[selectedCard.id] ?? [];
+    if (group.length <= 1) return [];
+    const placedIds = new Set([
+      ...allBinderSlots.filter(s => s.inventoryItemId).map(s => s.inventoryItemId),
+      ...allBinderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
+    ]);
+    return group.filter(inv => !placedIds.has(inv.id));
+  }, [selectedCard, inventoryGroupMap, allBinderSlots, allBinderPanels]);
+
+  const needsCopyChoice = unplacedCopiesForSelected.length > 1;
+
+  const handleSelectCard = (card) => {
+    setSelectedCard(card);
+    setSelectedCopyId(null); // reset — re-derived below once we know if a choice is needed
+  };
+
   const handleConfirm = () => {
     if (!selectedCard) return;
-    onSubmit(selectedCard, selectedCard.collectionId);
+    if (needsCopyChoice && !selectedCopyId) return; // must pick one first
+    onSubmit(selectedCard, selectedCard.collectionId, selectedCopyId);
   };
 
   return (
@@ -54,9 +80,9 @@ export function AddCardToBinderModal({
         <span className="search-icon">◎</span>
         <input className="search-input" placeholder="Search by card name or collection…"
           value={query}
-          onChange={e => { setQuery(e.target.value); setSelectedCard(null); }}
+          onChange={e => { setQuery(e.target.value); setSelectedCard(null); setSelectedCopyId(null); }}
           autoFocus aria-label="Search cards" />
-        {query && <button className="search-clear" onClick={() => { setQuery(''); setSelectedCard(null); }}>✕</button>}
+        {query && <button className="search-clear" onClick={() => { setQuery(''); setSelectedCard(null); setSelectedCopyId(null); }}>✕</button>}
       </div>
 
       <div className="add-to-binder-results">
@@ -70,7 +96,7 @@ export function AddCardToBinderModal({
           return (
             <button key={card.id}
               className={`add-to-binder-row ${isSelected ? 'selected' : ''} ${!isOwned ? 'unowned' : ''}`}
-              onClick={() => setSelectedCard(card)}>
+              onClick={() => handleSelectCard(card)}>
               <div className="atb-card-info">
                 <span className="atb-card-name">{card.name}</span>
                 <span className="atb-card-collection">{collection?.name ?? '—'}</span>
@@ -83,6 +109,24 @@ export function AddCardToBinderModal({
         })}
       </div>
 
+      {/* === Copy picker — only shown once more than one unplaced copy
+          exists for the selected card. A single copy (or none, for an
+          unowned card) needs no choice at all. === */}
+      {selectedCard && needsCopyChoice && (
+        <div className="atb-copy-picker">
+          <p className="atb-copy-picker-label">Which copy do you want to place?</p>
+          {unplacedCopiesForSelected.map(copy => (
+            <button
+              key={copy.id}
+              className={`add-to-binder-row atb-copy-row ${selectedCopyId === copy.id ? 'selected' : ''}`}
+              onClick={() => setSelectedCopyId(copy.id)}
+            >
+              {getDisplayLabelForCopy(copy, inventoryGroupMap[selectedCard.id] ?? [])}
+            </button>
+          ))}
+        </div>
+      )}
+
       {selectedCard && (
         <div className="atb-selected-summary">
           <span>Placing: <strong>{selectedCard.name}</strong></span>
@@ -94,7 +138,7 @@ export function AddCardToBinderModal({
 
       <ModalActions>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" onClick={handleConfirm} disabled={!selectedCard}>Place Card</Button>
+        <Button variant="primary" onClick={handleConfirm} disabled={!selectedCard || (needsCopyChoice && !selectedCopyId)}>Place Card</Button>
       </ModalActions>
     </Modal>
   );

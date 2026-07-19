@@ -21,9 +21,14 @@ export function useInventoryActions(toast, callbacks = {}) {
 
   /**
    * Marks a card as owned — creates an inventory entry.
-   * @param {{ cardDefId: string, collectionId: string }} params
+   * @param {{ cardDefId: string, collectionId: string, linkToSlotId?: string }} params
+   * linkToSlotId — when marking an unowned placeholder slot as
+   * owned (the hover ✓/○ toggle in a binder), links the newly-created
+   * copy to that exact slot via BINDER_SLOT_UPDATE. Without this the
+   * slot would stay unlinked even though the card now shows as owned
+   * somewhere — see BINDER_SLOT_UPDATE's own comment in reducer.js.
    */
-  const handleOwn = useCallback(({ cardDefId, collectionId }) => {
+  const handleOwn = useCallback(({ cardDefId, collectionId, linkToSlotId }) => {
     const { item, errors } = createInventoryItem({ cardDefId, collectionId });
     if (!item) {
       console.error('[BinderVault] Failed to create inventory item:', errors);
@@ -31,6 +36,9 @@ export function useInventoryActions(toast, callbacks = {}) {
       return;
     }
     dispatch({ type: ACTIONS.INVENTORY_ADD, payload: item });
+    if (linkToSlotId) {
+      dispatch({ type: ACTIONS.BINDER_SLOT_UPDATE, payload: { slotId: linkToSlotId, inventoryItemId: item.id } });
+    }
     toast('Card marked as owned');
     callbacks.onOwnSuccess?.();
   }, [dispatch, toast, callbacks.onOwnSuccess]);

@@ -231,7 +231,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
   // ── Edit mode handlers ──────────────────────────────────────────────────
 
-  const handlePlaceCard = (cardDef, collectionId) => {
+  const handlePlaceCard = (cardDef, collectionId, chosenCopyId = null) => {
     if (view.isPreviewMode) {
       const { slot } = createBinderSlot({
         binderId:     binder.id,
@@ -239,6 +239,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         collectionId,
         pageNumber:   view.addingToSlot.pageNumber,
         slotIndex:    view.addingToSlot.slotIndex,
+        inventoryItemId: chosenCopyId,
       });
       if (slot) {
         view.previewAddSlot(slot);
@@ -252,6 +253,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         collectionId,
         pageNumber:   view.addingToSlot.pageNumber,
         slotIndex:    view.addingToSlot.slotIndex,
+        chosenCopyId,
       });
     }
   };
@@ -259,13 +261,30 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   // === New: hover-triggered ✓/○ toggle directly on a filled slot,
   // mirroring CardGridItem.jsx's own toggle circle in the Collection
   // grid — same underlying handleOwn/handleUnown, just reachable
-  // without opening the full SlotActionModal first. ===
-  const handleToggleOwnedInSlot = (cardDef) => {
-    const inventoryItem = ownershipMap[cardDef.id];
+  // without opening the full SlotActionModal first.
+  //
+  // === FIX (real bug reported directly by the user): copies are
+  // supposed to act independently — unowning the copy in one slot
+  // shouldn't affect a different copy of the same card placed
+  // elsewhere (e.g. an English copy and a Chinese copy of the same
+  // card). This used to look up ownershipMap[cardDef.id] — the
+  // generic "earliest acquired" REPRESENTATIVE copy for the card
+  // overall, not necessarily the one actually sitting in this slot.
+  // Now uses slot.inventoryItemId (the specific copy THIS slot is
+  // linked to) when available, falling back to the representative
+  // only for pre-migration slots that never got a specific link.
+  // Symmetrically, when OWNING from an unowned placeholder slot, the
+  // newly-created copy is now linked to this exact slot
+  // (linkToSlotId), so it doesn't end up unlinked either. ===
+  const handleToggleOwnedInSlot = (cardDef, slot = null) => {
+    const specificItem = slot?.inventoryItemId
+      ? (inventoryGroupMap[cardDef.id] ?? []).find(inv => inv.id === slot.inventoryItemId)
+      : null;
+    const inventoryItem = specificItem ?? ownershipMap[cardDef.id];
     if (inventoryItem) {
       handleUnown(inventoryItem.id);
     } else {
-      handleOwn({ cardDefId: cardDef.id, collectionId: cardDef.collectionId });
+      handleOwn({ cardDefId: cardDef.id, collectionId: cardDef.collectionId, linkToSlotId: slot?.id });
     }
   };
 
@@ -363,29 +382,6 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     : [];
 
   // === ISSUE: editable page-number jump, replaces the thumbnails bar ===
-  // === FIX (typing "1" landed on the cover, and the displayed page
-  // number didn't match what was actually on screen): per
-  // BinderBookFlip's own numbering (spread N: left=page(2N-2),
-  // right=page(2N-1) for N>=1), page 1 belongs to spread 1 — it's a
-  // normal right-hand page, not the cover. This used to special-case
-  // pageNum<=1 to spread 0, which is the CLOSED cover, a different
-  // thing entirely (reaching the cover is already handleCloseBinder's
-  // job, not the page-number input's). Separately, the displayed page
-  // number used `spread * 2`, which is 2 pages ahead of the real right-
-  // hand page at that spread (2*spread - 1) — e.g. spread 1 (page 1
-  // showing) displayed "2".
-  //
-  // ONE MORE EDGE CASE: when binder.pages is even, BinderBookFlip's own
-  // last-pair special case (see its big header comment) flips the
-  // final pair as soon as ITS OWN spread is reached rather than
-  // strictly past it — so the final page (an even, back-face page)
-  // actually appears one spread EARLIER than `spread * 2 - 1` would
-  // predict, and that final spread's right side is empty (there's no
-  // next pair to hand off to). lastPairSpreadIndex below mirrors
-  // BinderBookFlip's own pagePairs.length exactly (same generating
-  // condition), so both the displayed number and its inverse agree
-  // with what's actually rendered at that spread instead of pointing
-  // at a right-hand page that no longer exists there. ===
   const isCover = spread === 0;
   const lastPairSpreadIndex = Math.ceil(binder.pages / 2);
   const isFinalEvenSpread = binder.pages % 2 === 0 && spread === lastPairSpreadIndex;

@@ -58,7 +58,7 @@ function applyMigrations(state) {
   return current;
 }
 
-function sanitizeState(raw) {
+export function sanitizeState(raw) {
   const user = (raw.user && raw.user.id && raw.user.username)
     ? raw.user
     : DEFAULT_STATE.user;

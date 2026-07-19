@@ -15,12 +15,17 @@ export function useBinderSlotActions(toast, callbacks = {}) {
 
   /**
    * Places a card into a binder slot.
+   * @param {{chosenCopyId?: string}} params - when the user deliberately
+   *   picked a specific copy (e.g. via the Add Card modal's copy
+   *   picker), links the new slot to it directly instead of letting
+   *   the reducer auto-pick whichever unplaced copy comes first.
    */
   const handleAddToSlot = useCallback(({
-    binderId, cardDefId, collectionId, pageNumber, slotIndex,
+    binderId, cardDefId, collectionId, pageNumber, slotIndex, chosenCopyId = null,
   }) => {
     const { slot, errors } = createBinderSlot({
       binderId, cardDefId, collectionId, pageNumber, slotIndex,
+      inventoryItemId: chosenCopyId,
     });
     if (!slot) {
       console.error('[BinderVault] Failed to create binder slot:', errors);

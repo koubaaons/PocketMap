@@ -52,12 +52,42 @@ export function buildOwnershipMap(inventory) {
  * the card detail view's per-copy list, and slot-placement limits.
  * @returns {Record<string, object[]>}
  */
+/**
+ * Groups every inventory row by cardDefId — unlike buildOwnershipMap
+ * (one representative item per card), this returns EVERY owned copy,
+ * needed anywhere quantity actually matters: the owned-count badge,
+ * the card detail view's per-copy list, and slot-placement limits.
+ *
+ * Each group is sorted by acquisition order (earliest first) — this
+ * is what makes the automatic "Copy N" fallback label (used wherever
+ * the user hasn't set their own custom label) stable and consistent
+ * everywhere it's shown, rather than depending on whatever order the
+ * underlying inventory array happens to be in.
+ * @returns {Record<string, object[]>}
+ */
 export function buildInventoryGroupMap(inventory) {
   const map = {};
   inventory.forEach(inv => {
     (map[inv.cardDefId] ??= []).push(inv);
   });
+  Object.values(map).forEach(group => {
+    group.sort((a, b) => (a.acquired_at ?? a.createdAt) - (b.acquired_at ?? b.createdAt));
+  });
   return map;
+}
+
+/**
+ * The user-facing label for a specific copy — their own custom label
+ * if they've set one (e.g. "English", "PSA 10"), otherwise falls back
+ * to an automatic "Copy N" based on this copy's position within its
+ * (already acquisition-sorted, see buildInventoryGroupMap) group.
+ * @param {object} item - the specific inventory item
+ * @param {object[]} sortedGroup - every copy of this same card, already sorted by buildInventoryGroupMap
+ */
+export function getDisplayLabelForCopy(item, sortedGroup) {
+  if (item.label?.trim()) return item.label.trim();
+  const index = sortedGroup.findIndex(inv => inv.id === item.id);
+  return `Copy ${index >= 0 ? index + 1 : '?'}`;
 }
 
 /**

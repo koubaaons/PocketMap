@@ -18,6 +18,7 @@ export function useAcquisitionForm({ inventoryItem, onSubmit }) {
   const buildInitialFields = () => ({
     condition_rating: item.condition_rating ?? '',
     language:         item.language ?? '',
+    label:            item.label ?? '',
     personal_notes:   item.personal_notes ?? '',
     is_tradeable:     item.is_tradeable ?? false,
     is_sellable:      item.is_sellable ?? false,
@@ -49,6 +50,7 @@ export function useAcquisitionForm({ inventoryItem, onSubmit }) {
       ...inventoryItem,
       condition_rating: fields.condition_rating || null,
       language:         fields.language || null,
+      label:            fields.label.trim() || null,
       personal_notes:   fields.personal_notes.trim() || null,
       is_tradeable:     fields.is_tradeable,
       is_sellable:      fields.is_sellable,

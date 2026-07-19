@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '../services/supabase.js';
+import { backfillUnlinkedSlots } from '../utils/backfillUnlinkedSlots.js';
 
 const SCHEMA_VERSION = 2;
 
@@ -137,6 +138,7 @@ function rowToInventoryItem(row) {
     is_favorite:         row.is_favorite,
     condition_rating:    row.condition_rating,
     language:            row.language,
+    label:               row.label,
     // Map Supabase column names back to JS field names — keep both
     // naming conventions so existing code reading either still works
     acquired_at:         row.date_acquired,
@@ -202,16 +204,27 @@ export async function loadStateFromSupabase() {
       return null;
     }
 
+    const inventory   = (inventoryRes.data ?? []).map(rowToInventoryItem);
+    const rawSlots    = (slotsRes.data ?? []).map(rowToBinderSlot);
+    const rawPanels   = (panelsRes.data ?? []).map(rowToBinderPanel);
+
+    // === FIX (real bug reported directly by the user: owned cards
+    // turning grey on every refresh) — see backfillUnlinkedSlots.js's
+    // own header comment for the full explanation. This is the
+    // critical spot for this fix, since this Supabase-backed path is
+    // what most users actually load through. ===
+    const { binderSlots, binderPanels } = backfillUnlinkedSlots(inventory, rawSlots, rawPanels);
+
     return {
       version:         SCHEMA_VERSION,
       binders:         (bindersRes.data ?? []).map(rowToBinder),
-      binderSlots:     (slotsRes.data ?? []).map(rowToBinderSlot),
+      binderSlots,
       binderInserts:   (insertsRes.data ?? []).map(rowToBinderInsert),
-      binderPanels:    (panelsRes.data ?? []).map(rowToBinderPanel),
+      binderPanels,
       collections:     (collectionsRes.data ?? []).map(rowToCollection),
       templateFields:  (fieldsRes.data ?? []).map(rowToTemplateField),
       cardDefinitions: (cardsRes.data ?? []).map(rowToCardDefinition),
-      inventory:       (inventoryRes.data ?? []).map(rowToInventoryItem),
+      inventory,
       bin:             (binRes.data ?? []).map(rowToBinItem),
     };
   } catch (err) {
@@ -345,6 +358,7 @@ export function inventoryItemToRow(item) {
     is_favorite:         item.is_favorite ?? false,
     condition_rating:    item.condition_rating ?? null,
     language:            item.language ?? null,
+    label:               item.label ?? null,
     // Handle both JS naming conventions
     date_acquired:       item.acquired_at ?? item.date_acquired ?? null,
     notes:               item.personal_notes ?? item.notes ?? null,

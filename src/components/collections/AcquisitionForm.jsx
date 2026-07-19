@@ -15,6 +15,22 @@ import { useAcquisitionForm } from '../../hooks/useAcquisitionForm.js';
 export function AcquisitionFields({ fields, set }) {
   return (
     <>
+      {/* === Copy label — free text, the user's own way of telling
+          copies apart (e.g. "English", "1st Edition", "PSA 10").
+          Placed first since, with multiple copies, this is the main
+          thing that actually distinguishes this one from the others —
+          shown wherever a specific copy needs a name (the binder slot,
+          the Add Card picker, the per-copy list in card detail).
+          Falls back to an automatic "Copy N" when left blank. === */}
+      <div className="form-group">
+        <label htmlFor="acq-label">Label</label>
+        <input id="acq-label" className="form-input"
+          placeholder='e.g. "English", "1st Edition", "PSA 10"'
+          value={fields.label}
+          onChange={e => set('label', e.target.value)}
+        />
+      </div>
+
       <div className="form-group">
         <label htmlFor="acq-condition">Condition</label>
         <select id="acq-condition" className="form-input"

@@ -18,8 +18,8 @@ export function validateCollection(data) {
   if (!data.userId || typeof data.userId !== 'string') errors.push('userId must be a non-empty string');
   if (!data.name || typeof data.name !== 'string' || !data.name.trim()) errors.push('name must be a non-empty string');
   if (typeof data.is_custom !== 'boolean') errors.push('is_custom must be a boolean');
-  if (data.import_source !== null && typeof data.import_source !== 'string') errors.push('import_source must be a string or null');
-  if (data.cover_image_url !== null && typeof data.cover_image_url !== 'string') errors.push('cover_image_url must be a string or null');
+  if (data.import_source !== null && data.import_source !== undefined && typeof data.import_source !== 'string') errors.push('import_source must be a string or null');
+  if (data.cover_image_url !== null && data.cover_image_url !== undefined && typeof data.cover_image_url !== 'string') errors.push('cover_image_url must be a string or null');
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   if (typeof data.updatedAt !== 'number') errors.push('updatedAt must be a timestamp');
   return { valid: errors.length === 0, errors };
@@ -118,7 +118,7 @@ export function validateCardDefinition(data) {
   if (!data.id || typeof data.id !== 'string') errors.push('id must be a non-empty string');
   if (!data.collectionId || typeof data.collectionId !== 'string') errors.push('collectionId must be a non-empty string');
   if (!data.name || typeof data.name !== 'string' || !data.name.trim()) errors.push('name must be a non-empty string');
-  if (data.image_url !== null && typeof data.image_url !== 'string') errors.push('image_url must be a string or null');
+  if (data.image_url !== null && data.image_url !== undefined && typeof data.image_url !== 'string') errors.push('image_url must be a string or null');
   if (typeof data.attributes !== 'object' || data.attributes === null) errors.push('attributes must be an object');
   // holoType is OPTIONAL — existing cards created before this field
   // existed won't have it at all, and that's valid. Missing/undefined
@@ -127,8 +127,10 @@ export function validateCardDefinition(data) {
   // above, means those cards now show Regular Holo by default, not no
   // effect. Only a PRESENT value gets checked against the allowed
   // list, so old stored data is never retroactively invalidated by
-  // adding this field.
-  if (data.holoType !== undefined && !HOLO_TYPES.includes(data.holoType)) {
+  // adding this field. Explicit null is treated the same as
+  // undefined here too — `?? 'none'` at read-time doesn't
+  // distinguish between them, so the validator shouldn't either.
+  if (data.holoType !== undefined && data.holoType !== null && !HOLO_TYPES.includes(data.holoType)) {
     errors.push(`holoType must be one of: ${HOLO_TYPES.join(', ')}`);
   }
   // Free text, not a fixed enum — different TCG franchises (Pokémon,

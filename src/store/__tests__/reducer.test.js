@@ -119,6 +119,49 @@ describe('BINDER_SLOT_ADD', () => {
     expect(next.binderSlots[0].id).toBe('slot-existing'); // original untouched
   });
 
+  describe('explicit copy choice (user picked a specific copy via the Add Card modal)', () => {
+    it('links the new slot to exactly the requested copy, not whichever comes first', () => {
+      const state = baseState({ inventory: [makeInventoryItem('inv-1'), makeInventoryItem('inv-2')] });
+      const next = reducer(state, {
+        type: ACTIONS.BINDER_SLOT_ADD,
+        payload: { slot: makeSlotPayload({ inventoryItemId: 'inv-2' }) },
+      });
+      expect(next.binderSlots[0].inventoryItemId).toBe('inv-2');
+    });
+
+    it('rejects a requested copy that does not belong to this card', () => {
+      const state = baseState({
+        inventory: [makeInventoryItem('inv-1'), makeInventoryItem('inv-other', { cardDefId: 'card-2' })],
+      });
+      const next = reducer(state, {
+        type: ACTIONS.BINDER_SLOT_ADD,
+        payload: { slot: makeSlotPayload({ inventoryItemId: 'inv-other' }) },
+      });
+      expect(next.binderSlots).toHaveLength(0);
+    });
+
+    it('rejects a requested copy that is already placed elsewhere', () => {
+      const state = baseState({
+        inventory: [makeInventoryItem('inv-1'), makeInventoryItem('inv-2')],
+        binderSlots: [makeSlotPayload({ id: 'slot-existing', slotIndex: 0, inventoryItemId: 'inv-2' })],
+      });
+      const next = reducer(state, {
+        type: ACTIONS.BINDER_SLOT_ADD,
+        payload: { slot: makeSlotPayload({ id: 'slot-new', slotIndex: 1, inventoryItemId: 'inv-2' }) },
+      });
+      expect(next.binderSlots).toHaveLength(1); // only the original
+    });
+
+    it('rejects a requested copy id that does not exist at all', () => {
+      const state = baseState({ inventory: [makeInventoryItem('inv-1')] });
+      const next = reducer(state, {
+        type: ACTIONS.BINDER_SLOT_ADD,
+        payload: { slot: makeSlotPayload({ inventoryItemId: 'does-not-exist' }) },
+      });
+      expect(next.binderSlots).toHaveLength(0);
+    });
+  });
+
   it('replaces an orphaned slot (card no longer exists) instead of blocking the new placement', () => {
     const state = baseState({
       cardDefinitions: [], // card-1 no longer exists
@@ -135,8 +178,8 @@ describe('BINDER_SLOT_ADD', () => {
   });
 });
 
-describe('INVENTORY_DELETE', () => {
-  it('removing a copy linked to a slot UNLINKS it, never deletes the slot — the most important fix this session', () => {
+describe('INVENTORY_DELETE (hard delete - reverted from soft-delete per explicit request)', () => {
+  it('removing a copy linked to a slot UNLINKS it, never deletes the slot — still the most important fix here', () => {
     const state = baseState({
       inventory: [makeInventoryItem('inv-1')],
       binderSlots: [makeSlotPayload({ id: 'slot-1', inventoryItemId: 'inv-1' })],
@@ -150,26 +193,19 @@ describe('INVENTORY_DELETE', () => {
     expect(next.binderSlots[0].inventoryItemId).toBeNull(); // unlinked, now shows as a grey placeholder
   });
 
-  it('moves the removed item to bin with the correct metadata for restore', () => {
+  it('removes the item permanently — no bin entry created (reverted from soft-delete)', () => {
     const state = baseState({
       inventory: [makeInventoryItem('inv-1')],
       binderSlots: [makeSlotPayload({ id: 'slot-1', inventoryItemId: 'inv-1' })],
     });
     const next = reducer(state, { type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } });
-
-    expect(next.bin).toHaveLength(1);
-    const binItem = next.bin[0];
-    expect(binItem._type).toBe('inventoryItem');
-    expect(binItem.cardName).toBe('Pikachu');
-    expect(binItem.hadPlacementRemoved).toBe(true);
-    expect(binItem._unlinkedSlotId).toBe('slot-1');
+    expect(next.bin).toHaveLength(0);
   });
 
-  it('removing an unplaced copy does not touch any slots, and hadPlacementRemoved is false', () => {
+  it('removing an unplaced copy does not touch any slots', () => {
     const state = baseState({ inventory: [makeInventoryItem('inv-1')], binderSlots: [] });
     const next = reducer(state, { type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } });
     expect(next.binderSlots).toHaveLength(0);
-    expect(next.bin[0].hadPlacementRemoved).toBe(false);
   });
 
   it('removing one of several copies only unlinks the one actually linked to it, not any other slot', () => {
@@ -191,73 +227,6 @@ describe('INVENTORY_DELETE', () => {
     const state = baseState({ inventory: [makeInventoryItem('inv-1')] });
     const next = reducer(state, { type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'does-not-exist' } });
     expect(next).toBe(state); // unchanged reference
-  });
-});
-
-describe('BIN_RESTORE_INVENTORY_ITEM', () => {
-  function removedItemInBin(overrides = {}) {
-    return {
-      ...makeInventoryItem('inv-1'),
-      _type: 'inventoryItem',
-      cardName: 'Pikachu',
-      hadPlacementRemoved: true,
-      _unlinkedSlotId: 'slot-1',
-      _unlinkedPanelId: null,
-      deletedAt: 0,
-      ...overrides,
-    };
-  }
-
-  it('restores ownership AND re-links the slot if it still exists', () => {
-    const state = baseState({
-      inventory: [],
-      binderSlots: [makeSlotPayload({ id: 'slot-1', inventoryItemId: null })], // still there, just unlinked
-      bin: [removedItemInBin()],
-    });
-    const next = reducer(state, { type: ACTIONS.BIN_RESTORE_INVENTORY_ITEM, payload: { itemId: 'inv-1' } });
-
-    expect(next.inventory).toHaveLength(1);
-    expect(next.bin).toHaveLength(0);
-    const slot = next.binderSlots.find(s => s.id === 'slot-1');
-    expect(slot.inventoryItemId).toBe('inv-1'); // re-linked
-  });
-
-  it('restores ownership WITHOUT re-linking if the slot was separately deleted while in Trash', () => {
-    const state = baseState({
-      inventory: [],
-      binderSlots: [], // the placeholder slot was removed by the user directly
-      bin: [removedItemInBin()],
-    });
-    const next = reducer(state, { type: ACTIONS.BIN_RESTORE_INVENTORY_ITEM, payload: { itemId: 'inv-1' } });
-
-    expect(next.inventory).toHaveLength(1); // ownership still restored
-    expect(next.binderSlots).toHaveLength(0); // nothing to re-link to, and nothing invented
-  });
-
-  it('restoring an item with no placement history just restores ownership', () => {
-    const state = baseState({
-      inventory: [],
-      bin: [removedItemInBin({ hadPlacementRemoved: false, _unlinkedSlotId: null })],
-    });
-    const next = reducer(state, { type: ACTIONS.BIN_RESTORE_INVENTORY_ITEM, payload: { itemId: 'inv-1' } });
-    expect(next.inventory).toHaveLength(1);
-  });
-
-  it('strips internal bin-only fields off the restored inventory item', () => {
-    const state = baseState({ inventory: [], bin: [removedItemInBin()] });
-    const next = reducer(state, { type: ACTIONS.BIN_RESTORE_INVENTORY_ITEM, payload: { itemId: 'inv-1' } });
-    const restored = next.inventory[0];
-    expect(restored._type).toBeUndefined();
-    expect(restored.cardName).toBeUndefined();
-    expect(restored.hadPlacementRemoved).toBeUndefined();
-    expect(restored._unlinkedSlotId).toBeUndefined();
-    expect(restored.deletedAt).toBeUndefined();
-  });
-
-  it('does nothing if the bin item does not exist', () => {
-    const state = baseState({ bin: [] });
-    const next = reducer(state, { type: ACTIONS.BIN_RESTORE_INVENTORY_ITEM, payload: { itemId: 'does-not-exist' } });
-    expect(next).toBe(state);
   });
 });
 
@@ -292,6 +261,60 @@ describe('INVENTORY_ADD', () => {
     const state = baseState({ inventory: [makeInventoryItem('inv-1')] });
     const next = reducer(state, { type: ACTIONS.INVENTORY_ADD, payload: makeInventoryItem('inv-2') });
     expect(next.inventory).toHaveLength(2);
+  });
+
+  describe('auto-linking an unowned placeholder slot (fix for the real "Collection and binder are disconnected" bug)', () => {
+    it('links a newly-owned copy to an existing, unlinked placeholder slot for the same card', () => {
+      const state = baseState({
+        inventory: [],
+        binderSlots: [makeSlotPayload({ id: 'slot-1', inventoryItemId: null })], // grey placeholder
+      });
+      const newItem = makeInventoryItem('inv-1');
+      const next = reducer(state, { type: ACTIONS.INVENTORY_ADD, payload: newItem });
+      expect(next.binderSlots[0].inventoryItemId).toBe('inv-1');
+    });
+
+    it('links to an existing, unlinked card-type panel too, if no plain slot is unlinked', () => {
+      const state = baseState({
+        inventory: [],
+        binderPanels: [{ id: 'panel-1', binderId: 'binder-1', panelType: 'card', cardDefId: 'card-1', inventoryItemId: null, spanCols: 2, spanRows: 1, pageNumber: 1, startSlotIndex: 0, imageX: 50, imageY: 50, imageScale: 1, createdAt: 0 }],
+      });
+      const newItem = makeInventoryItem('inv-1');
+      const next = reducer(state, { type: ACTIONS.INVENTORY_ADD, payload: newItem });
+      expect(next.binderPanels[0].inventoryItemId).toBe('inv-1');
+    });
+
+    it('does nothing extra if no unlinked slot/panel exists for this card', () => {
+      const state = baseState({ inventory: [] });
+      const newItem = makeInventoryItem('inv-1');
+      const next = reducer(state, { type: ACTIONS.INVENTORY_ADD, payload: newItem });
+      expect(next.binderSlots).toHaveLength(0);
+      expect(next.inventory).toHaveLength(1);
+    });
+
+    it('only links ONE slot per new copy, not every unlinked slot for the card', () => {
+      const state = baseState({
+        inventory: [],
+        binderSlots: [
+          makeSlotPayload({ id: 'slot-1', slotIndex: 0, inventoryItemId: null }),
+          makeSlotPayload({ id: 'slot-2', slotIndex: 1, inventoryItemId: null }),
+        ],
+      });
+      const newItem = makeInventoryItem('inv-1');
+      const next = reducer(state, { type: ACTIONS.INVENTORY_ADD, payload: newItem });
+      const linkedCount = next.binderSlots.filter(s => s.inventoryItemId === 'inv-1').length;
+      expect(linkedCount).toBe(1);
+    });
+
+    it('does not touch a slot already linked to a different, existing copy', () => {
+      const state = baseState({
+        inventory: [makeInventoryItem('inv-existing')],
+        binderSlots: [makeSlotPayload({ id: 'slot-1', inventoryItemId: 'inv-existing' })],
+      });
+      const newItem = makeInventoryItem('inv-new');
+      const next = reducer(state, { type: ACTIONS.INVENTORY_ADD, payload: newItem });
+      expect(next.binderSlots[0].inventoryItemId).toBe('inv-existing'); // untouched
+    });
   });
 });
 

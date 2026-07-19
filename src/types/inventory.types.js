@@ -113,6 +113,14 @@ export function validateInventoryItem(data) {
   if (data.personal_notes !== null && data.personal_notes !== undefined && typeof data.personal_notes !== 'string') {
     errors.push('personal_notes must be a string or null');
   }
+  // Free text, user-chosen — how they distinguish this specific
+  // physical copy from any others of the same card (e.g. "English",
+  // "1st Edition", "PSA 10"). Falls back to an automatic "Copy N"
+  // (by acquisition order) wherever this is null — see
+  // getDisplayLabelForCopy in inventorySelectors.js.
+  if (data.label !== null && data.label !== undefined && typeof data.label !== 'string') {
+    errors.push('label must be a string or null');
+  }
   if (data.acquired_at !== null && data.acquired_at !== undefined && typeof data.acquired_at !== 'number') {
     errors.push('acquired_at must be a timestamp or null');
   }
@@ -127,6 +135,7 @@ export function createInventoryItem({
   userId = 'local-user-1',
   condition_rating = null,
   language = null,
+  label = null,
   is_tradeable = false,
   is_sellable = false,
   is_favorite = false,
@@ -141,6 +150,7 @@ export function createInventoryItem({
     collectionId,
     condition_rating,
     language,
+    label,
     is_tradeable: Boolean(is_tradeable),
     is_sellable: Boolean(is_sellable),
     is_favorite: Boolean(is_favorite),

@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isOwned, getInventoryItem, buildOwnershipMap, buildInventoryGroupMap,
-  getQuantityOwned, getOwnedCards, getMissingCards, getUnorganisedCards,
+  getQuantityOwned, getDisplayLabelForCopy, getOwnedCards, getMissingCards, getUnorganisedCards,
   buildCollectionSummary,
 } from '../inventorySelectors.js';
 
@@ -88,6 +88,40 @@ describe('buildInventoryGroupMap', () => {
   it('a card with zero copies has no key (not an empty array)', () => {
     const map = buildInventoryGroupMap([]);
     expect(map['card-1']).toBeUndefined();
+  });
+
+  it('sorts each group by acquisition order (earliest first) — needed for stable "Copy N" fallback numbering', () => {
+    const inventory = [
+      makeItem('inv-late', 'card-1', { acquired_at: 300 }),
+      makeItem('inv-earliest', 'card-1', { acquired_at: 100 }),
+      makeItem('inv-middle', 'card-1', { acquired_at: 200 }),
+    ];
+    const map = buildInventoryGroupMap(inventory);
+    expect(map['card-1'].map(i => i.id)).toEqual(['inv-earliest', 'inv-middle', 'inv-late']);
+  });
+});
+
+describe('getDisplayLabelForCopy', () => {
+  it('uses the custom label when the user has set one', () => {
+    const group = [makeItem('inv-1', 'card-1', { label: 'English' }), makeItem('inv-2', 'card-1', { label: 'Chinese' })];
+    expect(getDisplayLabelForCopy(group[0], group)).toBe('English');
+    expect(getDisplayLabelForCopy(group[1], group)).toBe('Chinese');
+  });
+
+  it('falls back to automatic "Copy N" (1-indexed) when no label is set', () => {
+    const group = [makeItem('inv-1', 'card-1'), makeItem('inv-2', 'card-1')];
+    expect(getDisplayLabelForCopy(group[0], group)).toBe('Copy 1');
+    expect(getDisplayLabelForCopy(group[1], group)).toBe('Copy 2');
+  });
+
+  it('treats a blank/whitespace-only label the same as no label at all', () => {
+    const group = [makeItem('inv-1', 'card-1', { label: '   ' })];
+    expect(getDisplayLabelForCopy(group[0], group)).toBe('Copy 1');
+  });
+
+  it('trims whitespace around a real label', () => {
+    const group = [makeItem('inv-1', 'card-1', { label: '  English  ' })];
+    expect(getDisplayLabelForCopy(group[0], group)).toBe('English');
   });
 });
 

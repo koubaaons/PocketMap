@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
 import { formatConditionRating, formatLanguage } from '../../types/index.js';
+import { getDisplayLabelForCopy } from '../../selectors/inventorySelectors.js';
 
 export function BinderSlot({
   slotIndex,
@@ -27,6 +28,7 @@ export function BinderSlot({
   quantityOwned = 0,
   totalPlaced = 0,
   inventoryItem = null,
+  copyGroup = [],
   gridColumnStart,
   gridRowStart,
   onClickEmpty,
@@ -146,11 +148,18 @@ export function BinderSlot({
           Collection grid version, visibility controlled entirely by
           CSS via [data-show-card-info] on the document root, not a
           prop threaded down here. === */}
-      {isOwned && (inventoryItem?.condition_rating || inventoryItem?.language) && (
+      {isOwned && (inventoryItem?.condition_rating || inventoryItem?.language || copyGroup.length > 1) && (
         <span className="card-grid-item-info-badge">
           {[
-            inventoryItem.language && formatLanguage(inventoryItem.language),
-            inventoryItem.condition_rating && formatConditionRating(inventoryItem.condition_rating),
+            // === New: which copy this slot actually holds, requested
+            // directly by the user — only shown once more than one
+            // copy exists at all, since a single copy has nothing to
+            // disambiguate. Uses the same label (custom, or automatic
+            // "Copy N") shown everywhere else a specific copy is
+            // named. ===
+            copyGroup.length > 1 && inventoryItem && getDisplayLabelForCopy(inventoryItem, copyGroup),
+            inventoryItem?.language && formatLanguage(inventoryItem.language),
+            inventoryItem?.condition_rating && formatConditionRating(inventoryItem.condition_rating),
           ].filter(Boolean).join(' · ')}
         </span>
       )}

@@ -23,7 +23,22 @@ export function buildPageSlotMap(binderSlots, binderId, pageNumber) {
  * card-type panel) — the actual real-world limit, not a per-binder
  * approximation of it.
  */
-export function getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, inventory) {
+/**
+ * @param {object[]} allBinderSlots
+ * @param {object[]} allBinderPanels
+ * @param {object[]} inventory
+ * @param {string} [currentBinderId] - needed to also exclude an
+ *   UNOWNED card already placed as a grey placeholder in THIS
+ *   specific binder. Owned cards are limited globally by quantity
+ *   (handled below regardless of binder), but unowned cards have no
+ *   quantity concept — they're limited per-binder instead (can't
+ *   place the same unowned card twice in the same binder, but CAN in
+ *   a different one — see reducer.js's BINDER_SLOT_ADD). Without this
+ *   param, an unowned card already placed in the current binder would
+ *   still show as "available to add" in search, only to be silently
+ *   rejected by the reducer if actually selected.
+ */
+export function getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, inventory, currentBinderId = null) {
   const quantityByCard = {};
   inventory.forEach(inv => { quantityByCard[inv.cardDefId] = (quantityByCard[inv.cardDefId] ?? 0) + 1; });
 
@@ -37,6 +52,21 @@ export function getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, invent
   Object.entries(quantityByCard).forEach(([cardDefId, qty]) => {
     if ((placedByCard[cardDefId] ?? 0) >= qty) fullyPlaced.add(cardDefId);
   });
+
+  // Unowned cards (quantity 0) never appear in quantityByCard above at
+  // all, so the loop never considers them — handled separately here.
+  if (currentBinderId) {
+    const unownedCardIdsInThisBinder = new Set([
+      ...allBinderSlots
+        .filter(s => s.binderId === currentBinderId && !quantityByCard[s.cardDefId])
+        .map(s => s.cardDefId),
+      ...allBinderPanels
+        .filter(p => p.binderId === currentBinderId && p.panelType === 'card' && !quantityByCard[p.cardDefId])
+        .map(p => p.cardDefId),
+    ]);
+    unownedCardIdsInThisBinder.forEach(cardDefId => fullyPlaced.add(cardDefId));
+  }
+
   return fullyPlaced;
 }
 

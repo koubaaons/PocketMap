@@ -1,5 +1,12 @@
 /**
- * @fileoverview BinView — redesigned trash bin with three sections.
+ * @fileoverview BinView — trash bin with three sections.
+ *
+ * === REMOVED: the "Copies" section === unowning a card used to
+ * soft-delete the removed copy here, but that was reverted per
+ * explicit request — unowning is trivially reversible already (click
+ * the ownership circle again), so routing it through Trash/restore
+ * was unnecessary friction for something that never actually needed
+ * recovering. Back to the original three sections.
  */
 
 // === ISSUE #57 START: Redesigned Trash Bin ===
@@ -12,11 +19,10 @@ import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
 import { useBinActions } from '../../hooks/useBinActions.js';
 // === REFACTOR7d END ===
 
-const SECTIONS = ['Binders', 'Collections', 'Cards', 'Copies'];
+const SECTIONS = ['Binders', 'Collections', 'Cards'];
 
 export function BinView({ toast }) {
   const bin = useStore(s => s.bin);
-  const inventory = useStore(s => s.inventory);
   const [activeSection, setActiveSection] = useState('Binders');
   const [confirmEmpty, setConfirmEmpty]   = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null); // item to delete forever
@@ -28,15 +34,14 @@ export function BinView({ toast }) {
   const binders     = useMemo(() => bin.filter(i => i._type === 'binder'),     [bin]);
   const collections = useMemo(() => bin.filter(i => i._type === 'collection'), [bin]);
   const cards       = useMemo(() => bin.filter(i => i._type === 'cardDef'),    [bin]);
-  const copies      = useMemo(() => bin.filter(i => i._type === 'inventoryItem'), [bin]);
 
-  const sectionItems = { Binders: binders, Collections: collections, Cards: cards, Copies: copies };
+  const sectionItems = { Binders: binders, Collections: collections, Cards: cards };
 
   if (bin.length === 0) {
     return (
       <div className="view">
         <EmptyState icon="🗑" title="Trash is empty"
-          subtitle="Deleted binders, collections, cards, and removed copies appear here." />
+          subtitle="Deleted binders, collections, and cards appear here." />
       </div>
     );
   }
@@ -63,53 +68,30 @@ export function BinView({ toast }) {
 
       {currentItems.length === 0 ? (
         <EmptyState icon="○"
-          title={activeSection === 'Copies' ? 'No unowned copies' : `No deleted ${activeSection.toLowerCase()}`}
-          subtitle={activeSection === 'Copies' ? 'Copies you remove ownership of will appear here' : `Deleted ${activeSection.toLowerCase()} will appear here`} />
+          title={`No deleted ${activeSection.toLowerCase()}`}
+          subtitle={`Deleted ${activeSection.toLowerCase()} will appear here`} />
       ) : (
         <div className="bin-list">
-          {currentItems.map(item => {
-            const isInventoryItem = item._type === 'inventoryItem';
-            // How many OTHER copies of this same card are still
-            // owned right now — extra context so it's clear this
-            // isn't "the card is gone", just one physical copy.
-            const remainingOwned = isInventoryItem
-              ? inventory.filter(inv => inv.cardDefId === item.cardDefId).length
-              : 0;
-
-            return (
-              <div key={item.id} className="bin-row">
-                <div className="bin-info">
-                  <span className="bin-name">{item.name ?? item.cardName}</span>
-                  <span className="bin-meta">
-                    {/* === Real distinction the user asked for: a fully
-                        deleted card (removed from the collection
-                        entirely) reads as "Deleted"; an unowned copy
-                        (the card itself is still there, untouched)
-                        reads as "Unowned" instead — same Trash
-                        mechanism underneath, genuinely different
-                        meaning, shouldn't look identical. === */}
-                    {isInventoryItem ? 'Unowned' : 'Deleted'} {new Date(item.deletedAt).toLocaleDateString()}
-                    {isInventoryItem && (
-                      remainingOwned > 0
-                        ? ` · the card itself is still in your collection (${remainingOwned} other cop${remainingOwned === 1 ? 'y' : 'ies'} still owned)`
-                        : ' · the card itself is still in your collection, just not owned anymore'
-                    )}
-                    {isInventoryItem && item.hadPlacementRemoved && ' · was placed in a binder when removed'}
-                  </span>
-                </div>
-                <div className="bin-actions">
-                  <Button variant="ghost" size="sm" onClick={() => handleRestore(item)}>Restore</Button>
-                  <Button variant="danger" size="sm" onClick={() => setConfirmDelete(item)}>Delete Forever</Button>
-                </div>
+          {currentItems.map(item => (
+            <div key={item.id} className="bin-row">
+              <div className="bin-info">
+                <span className="bin-name">{item.name}</span>
+                <span className="bin-meta">
+                  Deleted {new Date(item.deletedAt).toLocaleDateString()}
+                </span>
               </div>
-            );
-          })}
+              <div className="bin-actions">
+                <Button variant="ghost" size="sm" onClick={() => handleRestore(item)}>Restore</Button>
+                <Button variant="danger" size="sm" onClick={() => setConfirmDelete(item)}>Delete Forever</Button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
       {confirmDelete && (
         <ConfirmModal
-          title={`Permanently delete "${confirmDelete.name ?? confirmDelete.cardName}"?`}
+          title={`Permanently delete "${confirmDelete.name}"?`}
           message="This cannot be undone. The item will be gone forever."
           confirmLabel="Delete Forever"
           onConfirm={() => { handlePermDelete(confirmDelete); setConfirmDelete(null); }}

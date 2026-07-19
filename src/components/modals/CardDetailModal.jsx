@@ -49,6 +49,7 @@ import { useCardDefinitionForm } from '../../hooks/useCardDefinitionForm.js';
 import { useAcquisitionForm } from '../../hooks/useAcquisitionForm.js';
 import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
 import { useCardImageUpload } from '../../hooks/useCardImageUpload.js';
+import { getDisplayLabelForCopy } from '../../selectors/inventorySelectors.js';
 
 export function CardDetailModal({
   card,
@@ -359,10 +360,10 @@ export function CardDetailModal({
                     item before. === */}
                 {isOwned && (
                   <div className="card-detail-copies">
-                    {inventoryItems.map((item, idx) => (
+                    {inventoryItems.map((item) => (
                       <div key={item.id} className="card-detail-copy-row">
                         <div className="card-detail-copy-summary">
-                          <span className="card-detail-copy-label">Copy {idx + 1}</span>
+                          <span className="card-detail-copy-label">{getDisplayLabelForCopy(item, inventoryItems)}</span>
                           <AcquisitionSummary inventoryItem={item} compact />
                         </div>
                         <div className="card-detail-copy-actions">

@@ -135,7 +135,9 @@ export function BinderBookFlip({
             {coverFrontContent}
           </div>
 
-          {/* Back face — visible when flipped open */}
+          {/* Back face — visible when flipped open. This is page 1's
+              only real home — see the fix comment on the left-static
+              side above for why it's not duplicated there too. */}
           <div className="book-page-pair-cover-right-back">
             {coverBackContent}
           </div>

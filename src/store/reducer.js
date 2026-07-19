@@ -13,7 +13,6 @@ export const ACTIONS = Object.freeze({
   BIN_RESTORE_BINDER:     'BIN_RESTORE_BINDER',
   BIN_RESTORE_COLLECTION: 'BIN_RESTORE_COLLECTION',
   BIN_RESTORE_CARD:       'BIN_RESTORE_CARD',
-  BIN_RESTORE_INVENTORY_ITEM: 'BIN_RESTORE_INVENTORY_ITEM',
   BIN_DELETE_ITEM:        'BIN_DELETE_ITEM',
   BIN_EMPTY:              'BIN_EMPTY',
   NAV_SET:  'NAV_SET',
@@ -34,6 +33,7 @@ export const ACTIONS = Object.freeze({
   INVENTORY_UPDATE: 'INVENTORY_UPDATE',
   INVENTORY_DELETE: 'INVENTORY_DELETE',
   BINDER_SLOT_ADD:    'BINDER_SLOT_ADD',
+  BINDER_SLOT_UPDATE: 'BINDER_SLOT_UPDATE',
   BINDER_SLOT_REMOVE: 'BINDER_SLOT_REMOVE',
   BINDER_SLOT_MOVE:   'BINDER_SLOT_MOVE',
   // === Michi Method support: combined slots ===
@@ -113,55 +113,30 @@ export function reducer(state, action) {
     }
 
     // === FIX3: restore card with owned and favorite state ===
+    // === Also fixes the matching half of the multi-copy bug above —
+    // this used to only restore _inventoryItem (singular), so even
+    // once the delete side is fixed to capture every copy, restoring
+    // would still have only brought back one of them. ===
     case ACTIONS.BIN_RESTORE_CARD: {
       const { itemId } = action.payload;
       const item = state.bin.find(c => c.id === itemId && c._type === 'cardDef');
       if (!item) return state;
-      const { _type, deletedAt, _inventoryItem, ...cardDef } = item;
+      const { _type, deletedAt, _inventoryItems, ...cardDef } = item;
       return {
         ...state,
         cardDefinitions: [...state.cardDefinitions, cardDef],
-        inventory: _inventoryItem
-          ? [...state.inventory, _inventoryItem]
+        inventory: _inventoryItems
+          ? [...state.inventory, ..._inventoryItems]
           : state.inventory,
         bin: state.bin.filter(c => c.id !== itemId),
       };
     }
 
     // === Quantity tracking: restore a single removed copy ===
-    case ACTIONS.BIN_RESTORE_INVENTORY_ITEM: {
-      const { itemId } = action.payload;
-      const item = state.bin.find(i => i.id === itemId && i._type === 'inventoryItem');
-      if (!item) return state;
-      const { _type, deletedAt, cardName, hadPlacementRemoved, _unlinkedSlotId, _unlinkedPanelId, ...inventoryItem } = item;
-
-      // === Matches the real fix in INVENTORY_DELETE — the slot/panel
-      // was never actually deleted when this copy was removed, only
-      // unlinked (left as a grey, unowned placeholder). Restoring
-      // just needs to check it's still there (the user could have
-      // separately removed that placeholder slot manually while this
-      // copy sat in Trash — the ONE way this could genuinely no
-      // longer exist) and re-link it, rather than trying to "re-add"
-      // something that was never gone. No position-taken check
-      // needed either, since the slot never became available for
-      // something else to occupy in the first place. ===
-      let binderSlots  = state.binderSlots;
-      let binderPanels = state.binderPanels;
-
-      if (_unlinkedSlotId && state.binderSlots.some(s => s.id === _unlinkedSlotId)) {
-        binderSlots = state.binderSlots.map(s => s.id === _unlinkedSlotId ? { ...s, inventoryItemId: inventoryItem.id } : s);
-      } else if (_unlinkedPanelId && state.binderPanels.some(p => p.id === _unlinkedPanelId)) {
-        binderPanels = state.binderPanels.map(p => p.id === _unlinkedPanelId ? { ...p, inventoryItemId: inventoryItem.id } : p);
-      }
-
-      return {
-        ...state,
-        inventory: [...state.inventory, inventoryItem],
-        binderSlots,
-        binderPanels,
-        bin: state.bin.filter(i => i.id !== itemId),
-      };
-    }
+    // === REMOVED: BIN_RESTORE_INVENTORY_ITEM — unreachable now that
+    // INVENTORY_DELETE is back to a direct hard delete (see that
+    // case's own comment for why). Nothing ever dispatches this
+    // action anymore. ===
 
     case ACTIONS.BIN_DELETE_ITEM: {
       // === FIX (real gap): this used to only clear state.bin itself,
@@ -345,7 +320,14 @@ export function reducer(state, action) {
       const { cardDefId } = action.payload;
       const cardDef = state.cardDefinitions.find(cd => cd.id === cardDefId);
       if (!cardDef) return state;
-      const inventoryItem = state.inventory.find(inv => inv.cardDefId === cardDefId) ?? null;
+      // === FIX (real bug, found while writing tests for this: quantity
+      // tracking made owning several copies of one card real, but this
+      // still only captured ONE via .find() before wiping ALL of them
+      // out of active state — deleting a card with 3 owned copies
+      // silently, permanently lost 2 of them; restoring only ever
+      // brought back 1. Now captures every copy, and BIN_RESTORE_CARD
+      // below restores all of them, not just one. ===
+      const inventoryItems = state.inventory.filter(inv => inv.cardDefId === cardDefId);
       return {
         ...state,
         inventory:       state.inventory.filter(inv => inv.cardDefId !== cardDefId),
@@ -354,9 +336,9 @@ export function reducer(state, action) {
         cardDefinitions: state.cardDefinitions.filter(cd => cd.id !== cardDefId),
         bin: [...state.bin, {
           ...cardDef,
-          _type:          'cardDef',
-          deletedAt:      Date.now(),
-          _inventoryItem: inventoryItem,
+          _type:           'cardDef',
+          deletedAt:       Date.now(),
+          _inventoryItems: inventoryItems,
         }],
       };
     }
@@ -371,8 +353,41 @@ export function reducer(state, action) {
     // the very first add and something else raced it) copies. Each
     // INVENTORY_ADD is a genuinely new, distinct physical copy now,
     // not a toggle.
-    case ACTIONS.INVENTORY_ADD:
-      return { ...state, inventory: [...state.inventory, action.payload] };
+    // === FIX (real bug reported directly by the user: "owned and
+    // unowned state is totally disconnected from the binders"):
+    // owning a card from the Collection view (or really, anywhere
+    // other than a specific slot's own hover toggle) used to just
+    // create the inventory row with no connection to any existing
+    // slot at all. If that card already had an unowned, grey
+    // placeholder slot sitting in a binder, it stayed grey forever —
+    // nothing ever told it a copy had become available to claim. Now,
+    // right after creating the item, this looks for exactly one
+    // existing unlinked slot or panel for the same card and links it
+    // immediately, so ownership actually shows up wherever the card
+    // already has a placeholder waiting for it. ===
+    case ACTIONS.INVENTORY_ADD: {
+      const newItem = action.payload;
+      const newInventory = [...state.inventory, newItem];
+
+      const linkedIds = new Set([
+        ...state.binderSlots.filter(s => s.inventoryItemId).map(s => s.inventoryItemId),
+        ...state.binderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
+      ]);
+      const unlinkedSlot = state.binderSlots.find(s => s.cardDefId === newItem.cardDefId && !s.inventoryItemId);
+      const unlinkedPanel = !unlinkedSlot
+        ? state.binderPanels.find(p => p.panelType === 'card' && p.cardDefId === newItem.cardDefId && !p.inventoryItemId)
+        : null;
+
+      let binderSlots = state.binderSlots;
+      let binderPanels = state.binderPanels;
+      if (unlinkedSlot) {
+        binderSlots = state.binderSlots.map(s => s.id === unlinkedSlot.id ? { ...s, inventoryItemId: newItem.id } : s);
+      } else if (unlinkedPanel) {
+        binderPanels = state.binderPanels.map(p => p.id === unlinkedPanel.id ? { ...p, inventoryItemId: newItem.id } : p);
+      }
+
+      return { ...state, inventory: newInventory, binderSlots, binderPanels };
+    }
 
     case ACTIONS.INVENTORY_UPDATE:
       return {
@@ -404,24 +419,29 @@ export function reducer(state, action) {
     // remove exactly one placement for this card — preferring a
     // normal slot over a card-type panel — to bring the two back
     // into balance.
+    // === CHANGED (reverted per explicit request): this briefly
+    // soft-deleted to the Trash Bin, matching how binders/collections/
+    // cards work. Reverted back to an immediate, permanent removal —
+    // unowning is trivially reversible already (click the ownership
+    // circle again to re-own), so routing it through Trash/restore
+    // added a confirmation step and a whole extra UI section for
+    // something that never actually needed recovering. The other fix
+    // below stays: the specific slot/panel linked to this exact copy
+    // gets UNLINKED, not deleted — it remains as a grey, unowned
+    // placeholder, since a slot holding an unowned card has always
+    // been a legitimate state in this app. ===
     case ACTIONS.INVENTORY_DELETE: {
       const item = state.inventory.find(inv => inv.id === action.payload.inventoryId);
       if (!item) return state;
 
-      const cardDef = state.cardDefinitions.find(cd => cd.id === item.cardDefId);
       const remainingInventory = state.inventory.filter(inv => inv.id !== item.id);
 
-      // === FIX (real bug: this used to DELETE the linked slot/panel
-      // outright, which is wrong — a card that isn't owned can still
-      // sit in a slot as a grey placeholder, same as it always could
-      // before quantity tracking existed. Removing a copy should only
-      // clear that slot's ownership link, not remove the slot
-      // itself. Finds the EXACT slot/panel linked to this specific
-      // copy via inventoryItemId, rather than an arbitrary one. Falls
-      // back to the old count-based approach only for pre-migration
-      // slots that were never linked to any specific copy at all —
-      // in that case there's genuinely no way to know which one
-      // corresponds to this copy. ===
+      // Finds the EXACT slot/panel linked to this specific copy via
+      // inventoryItemId, rather than an arbitrary one. Falls back to
+      // the old count-based approach only for pre-migration slots
+      // that were never linked to any specific copy at all — in that
+      // case there's genuinely no way to know which one corresponds
+      // to this copy.
       let unlinkedSlotId = null, unlinkedPanelId = null;
       const linkedSlot = state.binderSlots.find(s => s.inventoryItemId === item.id);
       if (linkedSlot) {
@@ -431,7 +451,6 @@ export function reducer(state, action) {
         if (linkedPanel) {
           unlinkedPanelId = linkedPanel.id;
         } else {
-          // Backward-compat fallback for unlinked, pre-migration slots
           const quantityOwned = remainingInventory.filter(inv => inv.cardDefId === item.cardDefId).length;
           const totalPlaced =
             state.binderSlots.filter(s => s.cardDefId === item.cardDefId).length +
@@ -460,19 +479,6 @@ export function reducer(state, action) {
         inventory: remainingInventory,
         binderSlots,
         binderPanels,
-        bin: [...state.bin, {
-          ...item,
-          _type: 'inventoryItem',
-          cardName: cardDef?.name ?? 'Unknown card', // no name field on inventory rows themselves - captured here for the Trash Bin display
-          hadPlacementRemoved: !!(unlinkedSlotId || unlinkedPanelId),
-          // The slot/panel itself was NOT deleted (see fix above) —
-          // just remember its id so restoring this copy can try to
-          // re-link it, see BIN_RESTORE_INVENTORY_ITEM below for what
-          // happens if it's since been deleted by the user directly.
-          _unlinkedSlotId: unlinkedSlotId,
-          _unlinkedPanelId: unlinkedPanelId,
-          deletedAt: Date.now(),
-        }],
       };
     }
 
@@ -572,15 +578,38 @@ export function reducer(state, action) {
         ...state.binderSlots.filter(s => s.id !== existingAtPosition?.id && s.inventoryItemId).map(s => s.inventoryItemId),
         ...state.binderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
       ]);
-      // Falls back to null (old, less-precise behavior) only in the
-      // rare edge case where the count check above passed but every
-      // copy happens to already be referenced by a linked
-      // slot/panel — meaning the "extra room" is coming from
-      // pre-migration unlinked slots, which have no specific copy to
-      // exclude in the first place.
-      const unplacedCopy = state.inventory.find(
-        inv => inv.cardDefId === slot.cardDefId && !placedInventoryIds.has(inv.id)
-      );
+
+      // === New: respects a specific, user-chosen copy (e.g. from the
+      // Add Card modal's copy picker — "place the English one, not the
+      // Chinese one") instead of always silently auto-picking
+      // whichever unplaced copy happens to come first. Still
+      // validated here (must actually belong to this card and not
+      // already be placed elsewhere) rather than trusted blindly, in
+      // case of a stale UI state. Falls back to auto-picking only when
+      // the caller didn't request a specific one. ===
+      let unplacedCopy;
+      if (slot.inventoryItemId) {
+        const requested = state.inventory.find(inv => inv.id === slot.inventoryItemId && inv.cardDefId === slot.cardDefId);
+        if (!requested) {
+          console.warn('[BinderVault] BINDER_SLOT_ADD: requested inventoryItemId is not a valid, owned copy of this card', slot.inventoryItemId);
+          return state;
+        }
+        if (placedInventoryIds.has(requested.id)) {
+          console.warn('[BinderVault] BINDER_SLOT_ADD: requested copy is already placed elsewhere', slot.inventoryItemId);
+          return state;
+        }
+        unplacedCopy = requested;
+      } else {
+        // Falls back to null (old, less-precise behavior) only in the
+        // rare edge case where the count check above passed but every
+        // copy happens to already be referenced by a linked
+        // slot/panel — meaning the "extra room" is coming from
+        // pre-migration unlinked slots, which have no specific copy to
+        // exclude in the first place.
+        unplacedCopy = state.inventory.find(
+          inv => inv.cardDefId === slot.cardDefId && !placedInventoryIds.has(inv.id)
+        );
+      }
 
       return {
         ...state,
@@ -588,6 +617,24 @@ export function reducer(state, action) {
           ...state.binderSlots.filter(s => s.id !== existingAtPosition?.id),
           { ...slot, inventoryItemId: unplacedCopy?.id ?? null },
         ],
+      };
+    }
+
+    // === New action: links a slot to a specific inventory item —
+    // needed so marking an unowned placeholder slot as owned (the
+    // hover ✓/○ toggle) links the newly-created copy to THIS exact
+    // slot, not just "the card overall". Without this, the slot's
+    // inventoryItemId would stay null even though the card now shows
+    // as owned somewhere — meaning a later attempt to unown from this
+    // same slot wouldn't know which specific copy to remove, and
+    // could accidentally affect a different copy instead (see
+    // handleToggleOwnedInSlot in BinderView.jsx for the full fix this
+    // supports).
+    case ACTIONS.BINDER_SLOT_UPDATE: {
+      const { slotId, inventoryItemId } = action.payload;
+      return {
+        ...state,
+        binderSlots: state.binderSlots.map(s => s.id === slotId ? { ...s, inventoryItemId } : s),
       };
     }
 
@@ -686,25 +733,32 @@ export function reducer(state, action) {
         return state;
       }
 
-      // === Quantity tracking: same per-copy link as BINDER_SLOT_ADD —
-      // a card-type panel is still a specific physical copy placed
-      // somewhere, just occupying a combined space instead of one
-      // slot. Insert-type panels aren't a real card at all, so this
-      // doesn't apply to them. ===
+      // === FIX (same regression as BINDER_SLOT_ADD, caught by a test
+      // before ever being reported): a card-type panel for a card
+      // that isn't owned at all used to be rejected outright — the
+      // quantity-tracking logic below required finding an unplaced
+      // OWNED copy before allowing ANY placement. An unowned card
+      // should still be placeable as a grey placeholder here too,
+      // same as a normal slot. ===
       let finalPanel = panel;
       if (panel.panelType === 'card') {
-        const placedInventoryIds = new Set([
-          ...state.binderSlots.filter(s => s.inventoryItemId).map(s => s.inventoryItemId),
-          ...state.binderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
-        ]);
-        const unplacedCopy = state.inventory.find(
-          inv => inv.cardDefId === panel.cardDefId && !placedInventoryIds.has(inv.id)
-        );
-        if (!unplacedCopy) {
-          console.warn('[BinderVault] BINDER_PANEL_ADD: no unplaced copies left for this card', panel.cardDefId);
-          return state;
+        const quantityOwned = state.inventory.filter(inv => inv.cardDefId === panel.cardDefId).length;
+        if (quantityOwned === 0) {
+          finalPanel = { ...panel, inventoryItemId: null };
+        } else {
+          const placedInventoryIds = new Set([
+            ...state.binderSlots.filter(s => s.inventoryItemId).map(s => s.inventoryItemId),
+            ...state.binderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
+          ]);
+          const unplacedCopy = state.inventory.find(
+            inv => inv.cardDefId === panel.cardDefId && !placedInventoryIds.has(inv.id)
+          );
+          if (!unplacedCopy) {
+            console.warn('[BinderVault] BINDER_PANEL_ADD: no unplaced copies left for this card', panel.cardDefId);
+            return state;
+          }
+          finalPanel = { ...panel, inventoryItemId: unplacedCopy.id };
         }
-        finalPanel = { ...panel, inventoryItemId: unplacedCopy.id };
       }
 
       return { ...state, binderPanels: [...state.binderPanels, finalPanel] };

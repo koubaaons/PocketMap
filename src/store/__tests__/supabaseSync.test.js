@@ -1,14 +1,19 @@
 /**
  * @fileoverview Tests for supabaseSync.js's write-routing logic.
  *
- * This file had two real, confirmed bugs this session:
- *   - a database check constraint on bin.entity_type that was never
- *     updated to allow the new 'inventoryItem' type, silently failing
- *     every copy-removal sync with a 400
- *   - BIN_DELETE_ITEM/BIN_EMPTY falling through to a generic,
- *     bin-only cleanup for the inventoryItem type instead of also
- *     deleting the underlying user_inventory row, which would have
- *     left permanently-orphaned rows in the database
+ * This file had a real, confirmed bug this session: the slot/panel
+ * unlink sync (see reducer.js's INVENTORY_DELETE case) was stale,
+ * left over from before the "unlink, don't delete" reducer fix — it
+ * looked for a slot that DISAPPEARED (id gone from the array) instead
+ * of one that got UPDATED (same id, inventoryItemId cleared to null),
+ * meaning the unlink happened locally but never actually reached the
+ * database at all.
+ *
+ * INVENTORY_DELETE itself briefly soft-deleted to a bin.entity_type
+ * of 'inventoryItem' (with its own real bug: the database constraint
+ * never allowed that value at all) — reverted per explicit request
+ * back to a direct, immediate hard delete, since unowning is trivially
+ * reversible already. These tests reflect that reverted behavior.
  *
  * Testing this requires mocking the Supabase client entirely — the
  * real client throws on import if env vars aren't set, and even with
@@ -77,62 +82,44 @@ beforeEach(() => {
   calls = [];
 });
 
-describe('INVENTORY_DELETE sync — the real bin.entity_type bug', () => {
-  it('upserts to the bin table using entity_type "inventoryItem" for a removed copy', async () => {
-    const item = { id: 'inv-1', cardDefId: 'card-1', _type: 'inventoryItem', deletedAt: Date.now(), hadPlacementRemoved: false };
-    const nextState = baseState({ bin: [item] });
-    const prevState = baseState({ inventory: [{ id: 'inv-1' }] });
-
-    await syncToSupabase({ type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } }, nextState, prevState);
-
-    const binCall = calls.find(c => c.table === 'bin');
-    expect(binCall).toBeDefined();
-    const upsertOp = binCall.ops.find(o => o.op === 'upsert');
-    expect(upsertOp.args[0].entity_type).toBe('inventoryItem');
-  });
-
-  it('also soft-deletes the user_inventory row itself (sets deleted_at), not just the bin snapshot', async () => {
-    const item = { id: 'inv-1', cardDefId: 'card-1', _type: 'inventoryItem', deletedAt: Date.now(), hadPlacementRemoved: false };
-    const nextState = baseState({ bin: [item] });
-    const prevState = baseState({ inventory: [{ id: 'inv-1' }] });
+describe('INVENTORY_DELETE sync (hard delete, reverted from soft-delete)', () => {
+  it('hard-deletes the user_inventory row directly — no bin entry involved', async () => {
+    const nextState = baseState({ inventory: [] });
+    const prevState = baseState({ inventory: [{ id: 'inv-1', cardDefId: 'card-1' }] });
 
     await syncToSupabase({ type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } }, nextState, prevState);
 
     const inventoryCall = calls.find(c => c.table === 'user_inventory');
     expect(inventoryCall).toBeDefined();
-    expect(inventoryCall.ops.some(o => o.op === 'update')).toBe(true);
+    expect(inventoryCall.ops.some(o => o.op === 'delete')).toBe(true);
+    expect(calls.some(c => c.table === 'bin')).toBe(false);
   });
 
-  it('syncs the removed slot/panel unlink when a placement was removed', async () => {
-    const item = { id: 'inv-1', cardDefId: 'card-1', _type: 'inventoryItem', deletedAt: Date.now(), hadPlacementRemoved: true };
+  it('syncs the slot unlink correctly (the real bug this session: this used to look for a DELETED slot, never an UPDATED one)', async () => {
     const prevSlot = { id: 'slot-1', inventoryItemId: 'inv-1' };
     const nextSlot = { id: 'slot-1', inventoryItemId: null };
-    const nextState = baseState({ bin: [item], binderSlots: [nextSlot] });
-    const prevState = baseState({ inventory: [{ id: 'inv-1' }], binderSlots: [prevSlot] });
+    const nextState = baseState({ inventory: [], binderSlots: [nextSlot] });
+    const prevState = baseState({ inventory: [{ id: 'inv-1', cardDefId: 'card-1' }], binderSlots: [prevSlot] });
 
     await syncToSupabase({ type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } }, nextState, prevState);
 
     const slotCall = calls.find(c => c.table === 'binder_slots');
     expect(slotCall).toBeDefined();
+    const updateOp = slotCall.ops.find(o => o.op === 'update');
+    expect(updateOp.args[0].inventory_item_id).toBeNull();
+  });
+
+  it('does not touch binder_slots at all if nothing was unlinked', async () => {
+    const nextState = baseState({ inventory: [] });
+    const prevState = baseState({ inventory: [{ id: 'inv-1', cardDefId: 'card-1' }] });
+
+    await syncToSupabase({ type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } }, nextState, prevState);
+
+    expect(calls.some(c => c.table === 'binder_slots')).toBe(false);
   });
 });
 
 describe('BIN_DELETE_ITEM sync — the real missing-cascade bug', () => {
-  it('permanently deleting an inventoryItem bin entry also deletes the underlying user_inventory row (was previously missing entirely)', async () => {
-    const binItem = { id: 'inv-1', _type: 'inventoryItem', deletedAt: Date.now() };
-    const nextState = baseState({ bin: [] });
-    const prevState = baseState({ bin: [binItem] });
-
-    await syncToSupabase({ type: ACTIONS.BIN_DELETE_ITEM, payload: { itemId: 'inv-1' } }, nextState, prevState);
-
-    const inventoryCall = calls.find(c => c.table === 'user_inventory');
-    expect(inventoryCall).toBeDefined();
-    expect(inventoryCall.ops.some(o => o.op === 'delete')).toBe(true);
-    // and the bin row itself is cleaned up too
-    const binCall = calls.find(c => c.table === 'bin');
-    expect(binCall.ops.some(o => o.op === 'delete')).toBe(true);
-  });
-
   it('permanently deleting a cardDef bin entry cascades to inventory, binder_slots, and card_definitions', async () => {
     const binItem = { id: 'card-1', _type: 'cardDef', deletedAt: Date.now(), image_url: null };
     const nextState = baseState({ bin: [] });
