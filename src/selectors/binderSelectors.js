@@ -70,8 +70,11 @@ export function getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, invent
   return fullyPlaced;
 }
 
-export function getOrganisedCardDefIds(binderSlots) {
-  return binderSlots.map(s => s.cardDefId);
+export function getOrganisedCardDefIds(binderSlots, binderPanels = []) {
+  return [
+    ...binderSlots.map(s => s.cardDefId),
+    ...binderPanels.filter(p => p.panelType === 'card').map(p => p.cardDefId),
+  ];
 }
 
 /**

@@ -26,7 +26,28 @@ export function BinderBookFlip({
   onCoverClick,
   isClickable = true,
 }) {
-  const totalSpreads = Math.ceil(binder.pages / 2) + 1;
+  // === FIX: last-2-pages-skipped bug ===
+  // Each pair n covers physical pages {2n-1 (front), 2n (back)}. When
+  // pages is EVEN, the very last pair's back face (2n = binder.pages)
+  // is the true final page and has no partner — it needs its own
+  // spread, one more than a plain pair count gives. totalSpreads must
+  // match that (see useBinderView.js, which needs the identical
+  // formula so state clamping agrees with what's rendered here).
+  //
+  // The previous code kept the old (too-small) totalSpreads and instead
+  // special-cased isFlipped to flip the last pair one spread EARLY
+  // (`<=` instead of `<`) so its back face could still be reached.
+  // That's what caused the skip: the second-to-last pair's back face
+  // and the last pair's front face both fall on that same shared
+  // spread transition, so neither one is ever the topmost, visible
+  // face — they're flipped past in the same instant, invisibly.
+  // E.g. for a 10-page binder that hid pages 8 and 9 (spread jumped
+  // straight from showing 6-7 to showing the lone final page 10).
+  //
+  // Giving even-count binders the extra spread they actually need
+  // removes any reason to flip early, so isFlipped can just be the
+  // plain, uniform rule below.
+  const totalSpreads = Math.floor(binder.pages / 2) + 2;
 
   const slotMapsByPage = useMemo(() => {
     const maps = {};
@@ -41,17 +62,8 @@ export function BinderBookFlip({
   for (let n = 1; (n * 2 - 1) <= binder.pages; n++) {
     pagePairs.push({ spreadIndex: n, frontPageNum: n * 2 - 1, backPageNum: n * 2 });
   }
-  const lastPairSpreadIndex = pagePairs.length > 0
-    ? pagePairs[pagePairs.length - 1].spreadIndex
-    : 0;
 
-  // Early-flip (`<=`) only applies to even page counts, where the last
-  // pair's BACK face is the true final page. For odd counts the last
-  // pair's FRONT face is final instead — early-flipping would hide it,
-  // so odd counts use the normal strict "<" comparison.
-  const isFlipped = (pairSpreadIndex) => (pairSpreadIndex === lastPairSpreadIndex && binder.pages % 2 === 0)
-    ? pairSpreadIndex <= spread
-    : pairSpreadIndex < spread;
+  const isFlipped = (pairSpreadIndex) => pairSpreadIndex < spread;
 
   const allPairSpreadIndices = useMemo(
     () => [0, ...pagePairs.map(p => p.spreadIndex)],

@@ -62,8 +62,8 @@ export function CollectionDetailView({ toast, onBack }) {
   const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
 
   const summary = useMemo(
-    () => buildCollectionSummary(collectionCards, ownershipMap, getOrganisedCardDefIds(binderSlots)),
-    [collectionCards, ownershipMap, binderSlots]
+    () => buildCollectionSummary(collectionCards, ownershipMap, getOrganisedCardDefIds(binderSlots, binderPanels)),
+    [collectionCards, ownershipMap, binderSlots, binderPanels]
   );
 
   const filteredCards = useMemo(
@@ -205,7 +205,7 @@ export function CollectionDetailView({ toast, onBack }) {
         {/* === REFACTOR7e START: extracted tab components === */}
         {activeTab === 'Owned'        && <OwnedTab       {...sharedTabProps} />}
         {activeTab === 'Missing'      && <MissingTab      {...sharedTabProps} />}
-        {activeTab === 'Unorganised'  && <UnorganisedTab  {...sharedTabProps} binderSlots={binderSlots} />}
+        {activeTab === 'Unorganised'  && <UnorganisedTab  {...sharedTabProps} binderSlots={binderSlots} binderPanels={binderPanels} />}
         {/* === REFACTOR7e END === */}
       </CollectionDataProvider>
       {activeTab === 'Settings'     && <SettingsTab     collection={collection} templateFields={templateFields} toast={toast} />}

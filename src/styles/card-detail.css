@@ -56,7 +56,7 @@
    language as the shared .modal (background/border/radius tokens). */
 .card-detail-panel {
   position: absolute;
-  top: 0;
+  top: 50%;
   left: 100%;
   margin-left: var(--space-5);
   width: 320px;
@@ -69,6 +69,39 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* === FIX (zoom-out-to-see-everything bug): the panel used to be
+   anchored with top:0 (relative to .card-detail-group, whose own
+   height is just the card image — usually much shorter than the
+   panel's content). With a fixed, non-scrolling .modal-overlay, that
+   let a tall panel (many custom fields, or the copy-editing sub-page)
+   extend past the bottom of the viewport with nothing to scroll it
+   back into view. Centering it at the group's own vertical midpoint
+   keeps it within the viewport regardless of the image's height,
+   since the group is itself centered by the overlay's flexbox — so
+   the panel's existing max-height: 90vh + overflow-y: auto can
+   finally do their job instead of clipping unreachable content.
+   Uses its own keyframes (rather than the shared
+   .animate-slide-up-fade-in) so the entrance slide combines with this
+   -50% centering in one transform value instead of overwriting it —
+   transform isn't additive across separate rules, so animating a
+   plain translateY(16px)→translateY(0) here would silently undo the
+   centering the instant the entrance animation finished. ===
+@keyframes card-detail-panel-slide-up-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-50% + 16px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+}
+
+.card-detail-panel.animate-slide-up-fade-in {
+  animation: card-detail-panel-slide-up-fade-in 0.3s ease-out;
+  animation-fill-mode: both;
 }
 
 .card-detail-panel-header {
@@ -118,6 +151,10 @@
     margin-left: 0;
     margin-top: var(--space-4);
     width: 100%;
+  }
+
+  .card-detail-panel.animate-slide-up-fade-in {
+    animation: slide-up-fade-in 0.3s ease-out;
   }
 
   .card-detail-show-btn {

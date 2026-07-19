@@ -44,7 +44,13 @@ export function useBinderView(binder, binderSlots) {
   const [previewSlots, setPreviewSlots]     = useState(null); // null = not in preview
   const [selectedSlot, setSelectedSlot]     = useState(null);
 
-  const totalSpreads = Math.ceil(binder.pages / 2) + 1;
+  // Cover (1) + one spread per content page-pair, plus one extra spread
+  // when pages is even (the last page then has no partner and sits
+  // alone on its own final spread instead of sharing one).
+  // Math.floor(pages/2) + 2 gives this for both parities in one
+  // expression — see BinderBookFlip.jsx's file header for the full
+  // derivation of why an even-count binder needs that extra spread.
+  const totalSpreads = Math.floor(binder.pages / 2) + 2;
   const safePage = Math.min(page, totalSpreads - 1);
 
   // The slots to render — preview slots when in preview, real slots otherwise

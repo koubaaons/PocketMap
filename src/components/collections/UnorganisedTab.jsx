@@ -12,17 +12,17 @@ import { getUnorganisedCards } from '../../selectors/inventorySelectors.js';
 import { getOrganisedCardDefIds } from '../../selectors/binderSelectors.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
-export function UnorganisedTab({ collectionCards, collectionTemplateFields, ownershipMap, binderSlots, showCardInfo, onToggleCardInfo, summary, onView, onEdit, onDelete }) {
+export function UnorganisedTab({ collectionCards, collectionTemplateFields, ownershipMap, binderSlots, binderPanels = [], showCardInfo, onToggleCardInfo, summary, onView, onEdit, onDelete, onToggleOwned, onToggleFavorite }) {
   const [query, setQuery] = useState('');
   const [sort,  setSort]  = useState('newest');
 
   const cards = useMemo(
     () => applyCardDefinitionFilters(
-      getUnorganisedCards(collectionCards, ownershipMap, getOrganisedCardDefIds(binderSlots)),
+      getUnorganisedCards(collectionCards, ownershipMap, getOrganisedCardDefIds(binderSlots, binderPanels)),
       query,
       sort
     ),
-    [collectionCards, ownershipMap, binderSlots, query, sort]
+    [collectionCards, ownershipMap, binderSlots, binderPanels, query, sort]
   );
 
   return (
@@ -36,6 +36,8 @@ export function UnorganisedTab({ collectionCards, collectionTemplateFields, owne
         onView={onView}
         onEdit={onEdit}
         onDelete={onDelete}
+        onToggleOwned={onToggleOwned}
+        onToggleFavorite={onToggleFavorite}
         emptyTitle={query ? `No results for "${query}"` : 'No unorganised cards'}
         emptySubtitle={query ? 'Try a different search' : 'All your owned cards are in a binder'}
       />

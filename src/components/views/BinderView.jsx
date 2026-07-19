@@ -72,11 +72,21 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const view       = useBinderView(binder, binderSlots);
 
   // If navigated here from search with a specific page, open to that page.
-  // pageNumber from slot is 1-based; spread = Math.ceil(pageNumber / 2).
+  // pageNumber from slot is 1-based. BinderBookFlip pairs content pages
+  // as spread n = {front: page 2n-1, back: page 2n} (spread 0 is the
+  // cover, on its own). So the page-number -> spread mapping is
+  // floor(pageNumber / 2) + 1 for every pageNumber >= 1 — page 1 lands
+  // on spread 1, pages 2-3 on spread 2, pages 4-5 on spread 3, etc.
+  // NOTE: Math.ceil(pageNumber / 2) here was wrong for EVEN page
+  // numbers. Page 4 is the back half of pair {3, 4}, which is spread
+  // 3 — floor(4/2)+1 = 3 gives that correctly, but ceil(4/2) = 2 lands
+  // one spread too early. That's why opening a search result on an
+  // even page (e.g. "Cornelia" on page 4) always landed on the spread
+  // before the card's actual page.
   // Run only once on mount (empty deps) — user controls page after that.
   useEffect(() => {
     if (initialPage && initialPage > 0) {
-      const spread = Math.ceil(initialPage / 2);
+      const spread = Math.floor(initialPage / 2) + 1;
       view.goToPage(spread);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -207,7 +217,9 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const displaySlots = view.activeSlots;
 
   const spread       = view.page;
-  const totalSpreads = Math.ceil(binder.pages / 2) + 1;
+  // Keep in sync with useBinderView.js / BinderBookFlip.jsx — see the
+  // "FIX: last-2-pages-skipped bug" comment in BinderBookFlip.jsx.
+  const totalSpreads = Math.floor(binder.pages / 2) + 2;
 
   const filled   = getOwnedFilledSlotCount(binderSlots, binder.id, inventory, binderPanels);
   const capacity = binderCapacity(binder, binderPanels);
@@ -383,7 +395,11 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
   // === ISSUE: editable page-number jump, replaces the thumbnails bar ===
   const isCover = spread === 0;
-  const lastPairSpreadIndex = Math.ceil(binder.pages / 2);
+  // The last navigable spread — must match totalSpreads - 1 above (and
+  // useBinderView.js / BinderBookFlip.jsx). For an even page count the
+  // last page has no partner and gets its own final spread; for an odd
+  // count it shares a spread with the page before it.
+  const lastPairSpreadIndex = Math.floor(binder.pages / 2) + 1;
   const isFinalEvenSpread = binder.pages % 2 === 0 && spread === lastPairSpreadIndex;
   const currentDisplayPage = isCover
     ? 1
@@ -399,15 +415,12 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     setPageInputValue(String(currentDisplayPage));
   }
 
-  // Exact inverse of currentDisplayPage's mapping. Works for every page
-  // number with a single special case: binder.pages itself, when even,
-  // maps to lastPairSpreadIndex (see comment above) rather than one
-  // spread further, matching BinderBookFlip's own early-flip rule for
-  // the final pair.
-  const pageNumberToSpread = (pageNum) => {
-    if (binder.pages % 2 === 0 && pageNum === binder.pages) return lastPairSpreadIndex;
-    return Math.ceil((pageNum + 1) / 2);
-  };
+  // Exact inverse of currentDisplayPage's mapping — see the search-jump
+  // useEffect above for the same floor(pageNumber / 2) + 1 formula and
+  // why it's correct for every page number, even and odd alike. No
+  // special case needed: e.g. binder.pages = 10 -> floor(10/2)+1 = 6,
+  // which already equals lastPairSpreadIndex above.
+  const pageNumberToSpread = (pageNum) => Math.floor(pageNum / 2) + 1;
 
   const commitPageInput = () => {
     setIsEditingPageInput(false);
