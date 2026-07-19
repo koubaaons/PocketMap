@@ -28,9 +28,19 @@
  * devices. Clicking an empty slot still opens/keeps this panel open
  * (see BinderView.jsx's onClickEmpty), but actually placing a card
  * currently requires a mouse drag.
+ *
+ * === Repositionable panel ===
+ * The panel itself can be dragged (by its top grip bar) anywhere on
+ * screen — it defaults to the top-right corner, but that corner can
+ * sit on top of other UI (the binder's own Edit/Preview/+Page
+ * toolbar, in particular), so it needs to be movable out of the way
+ * rather than fixed there permanently. Position is plain component
+ * state (not persisted) and clamped to stay fully on-screen; disabled
+ * entirely on narrow/mobile layouts, where the panel is a full-width
+ * bottom sheet instead (see add-cards-panel.css's mobile override).
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/index.jsx';
 import { buildOwnershipMap, buildInventoryGroupMap, getQuantityOwned } from '../../selectors/inventorySelectors.js';
 import { getFullyPlacedCardDefIds } from '../../selectors/binderSelectors.js';
@@ -46,6 +56,212 @@ export function AddCardsPanel({
 }) {
   const [query, setQuery] = useState('');
   const [selectedCollectionId, setSelectedCollectionId] = useState(null); // null = All
+
+  // === Panel dragging — move the whole panel out of the way of
+  // whatever it's covering (see file header comment). Position is
+  // tracked in plain pixels from the top-left of the viewport;
+  // defaults to the top-right corner on first render.
+  const panelRef = useRef(null);
+  const dragState = useRef(null);
+  const [position, setPosition] = useState(null); // null = use default CSS (top-right)
+  const [isDragging, setIsDragging] = useState(false);
+
+  const clampPosition = (x, y) => {
+    const el = panelRef.current;
+    const width  = el?.offsetWidth  ?? 380;
+    const height = el?.offsetHeight ?? 400;
+    return {
+      x: Math.min(Math.max(x, 0), Math.max(0, window.innerWidth  - width)),
+      y: Math.min(Math.max(y, 0), Math.max(0, window.innerHeight - height)),
+    };
+  };
+
+  const getPointerCoords = (e) => {
+    if (e.touches && e.touches.length > 0) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    return { x: e.clientX, y: e.clientY };
+  };
+
+  const handleDragHandlePointerDown = (e) => {
+    // Mobile layout is a fixed bottom sheet — dragging is a desktop-
+    // only affordance (matches the CSS override that ignores position
+    // on narrow viewports anyway).
+    if (window.innerWidth <= 768) return;
+    if (!e.touches) e.preventDefault(); // avoid selecting page text mid-drag
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const coords = getPointerCoords(e);
+    dragState.current = {
+      offsetX: coords.x - rect.left,
+      offsetY: coords.y - rect.top,
+    };
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMove = (e) => {
+      const state = dragState.current;
+      if (!state) return;
+      const coords = getPointerCoords(e);
+      setPosition(clampPosition(coords.x - state.offsetX, coords.y - state.offsetY));
+    };
+    const handleUp = () => {
+      setIsDragging(false);
+      dragState.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleMove, { passive: true });
+    window.addEventListener('touchend', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
+    };
+  }, [isDragging]);
+
+  // Re-clamp on viewport resize so the panel can't get stranded
+  // off-screen if the window shrinks after it's been dragged.
+  useEffect(() => {
+    if (!position) return;
+    const handleResize = () => setPosition(p => p ? clampPosition(p.x, p.y) : p);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [position]);
+
+  // === Panel resizing — right/bottom edges plus a corner handle,
+  // top-left stays fixed while any of them are dragged (matching
+  // ordinary OS window-resize behavior). Resizing for the first time
+  // "pins" the panel's current on-screen position into `position`
+  // (if it hasn't been dragged yet and is still using the default
+  // docked-to-the-top-right CSS) so the box doesn't visually jump the
+  // instant a size is applied inline.
+  const MIN_WIDTH  = 320;
+  const MIN_HEIGHT = 280;
+
+  const resizeState = useRef(null);
+  const [size, setSize] = useState(null); // null = use default CSS sizing
+  const [isResizing, setIsResizing] = useState(false);
+
+  const maxWidth  = () => Math.min(900, window.innerWidth * 0.9);
+  const maxHeight = () => window.innerHeight - 16;
+
+  const clampSize = (width, height) => ({
+    width:  Math.min(Math.max(width,  MIN_WIDTH),  maxWidth()),
+    height: Math.min(Math.max(height, MIN_HEIGHT), maxHeight()),
+  });
+
+  const startResize = (e, axis) => {
+    if (window.innerWidth <= 768) return; // mobile is a fixed-size bottom sheet
+    if (!e.touches) e.preventDefault();
+    e.stopPropagation(); // don't also trigger the drag handle underneath
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+
+    // Pin the current position so resizing (which keeps top-left
+    // fixed) has a fixed point to grow/shrink from, even if the
+    // panel has never been dragged and is still docked via CSS.
+    if (!position) setPosition({ x: rect.left, y: rect.top });
+
+    const coords = getPointerCoords(e);
+    resizeState.current = {
+      axis, // 'width' | 'height' | 'both'
+      startX: coords.x,
+      startY: coords.y,
+      startWidth: rect.width,
+      startHeight: rect.height,
+    };
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMove = (e) => {
+      const state = resizeState.current;
+      if (!state) return;
+      const coords = getPointerCoords(e);
+      const deltaX = coords.x - state.startX;
+      const deltaY = coords.y - state.startY;
+      const nextWidth  = state.axis !== 'height' ? state.startWidth  + deltaX : state.startWidth;
+      const nextHeight = state.axis !== 'width'  ? state.startHeight + deltaY : state.startHeight;
+      setSize(clampSize(nextWidth, nextHeight));
+    };
+    const handleUp = () => {
+      setIsResizing(false);
+      resizeState.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleMove, { passive: true });
+    window.addEventListener('touchend', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
+    };
+  }, [isResizing]);
+
+  // Re-clamp on viewport resize, same reasoning as the position effect above.
+  useEffect(() => {
+    if (!size) return;
+    const handleWindowResize = () => setSize(s => s ? clampSize(s.width, s.height) : s);
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, [size]);
+
+  // === Measure the panel's actual rendered width (not just the
+  // `size` state) so the grid's column count can never disagree with
+  // what's really on screen — state alone could momentarily drift
+  // from the rendered box (clamping, the mobile CSS override forcing
+  // width:100%, etc.), and that's exactly what let one row of cards
+  // render narrower/wider than the row above it mid-resize.
+  const [measuredWidth, setMeasuredWidth] = useState(380);
+
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setMeasuredWidth(entry.contentRect.width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // === Dynamic column count — once the panel is resized wide enough
+  // to fit another comfortable card tile per row, add one, instead of
+  // staying locked at 2 columns regardless of how wide it gets.
+  // Mirrors the panel's own body padding (space-4 each side) and grid
+  // gap (space-2) so the math matches what's actually rendered.
+  // === Column sizing — NOT 1fr. Grid's `1fr` tracks round each
+  // column to a whole pixel independently and dump whatever's left
+  // over into the LAST track so the row still sums to the container's
+  // exact width — for most widths that's an invisible sub-pixel
+  // rounding, but it can add up to several visible pixels, which is
+  // exactly what made the last card in a row consistently render
+  // wider than the others. Computing one exact pixel width here and
+  // repeating that SAME number for every column removes any
+  // possibility of that: every column is bit-for-bit identical,
+  // and any leftover remainder just becomes a sliver of unused space
+  // at the row's right edge instead of stretching a card.
+  const GRID_GAP        = 8;  // matches --space-2
+  const BODY_PADDING_X  = 32; // matches --space-4 on each side of .add-cards-panel-body
+  const MIN_TILE_WIDTH  = 130;
+
+  const availableWidth = measuredWidth - BODY_PADDING_X;
+  const gridColumns = Math.max(
+    2,
+    Math.floor((availableWidth + GRID_GAP) / (MIN_TILE_WIDTH + GRID_GAP))
+  );
+  const tileWidth = Math.floor((availableWidth - GRID_GAP * (gridColumns - 1)) / gridColumns);
 
   const ownershipMap      = useMemo(() => buildOwnershipMap(inventory), [inventory]);
   const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
@@ -104,8 +320,50 @@ export function AddCardsPanel({
     e.dataTransfer.effectAllowed = 'copy';
   };
 
+  const inlineStyle = {
+    ...(position ? { left: position.x, top: position.y, right: 'auto' } : null),
+    ...(size ? { width: size.width, height: size.height } : null),
+  };
+
   return (
-    <div className="add-cards-panel" role="complementary" aria-label="Add cards to binder">
+    <div
+      ref={panelRef}
+      className={`add-cards-panel ${isDragging ? 'add-cards-panel-dragging' : ''} ${isResizing ? 'add-cards-panel-resizing' : ''}`}
+      role="complementary"
+      aria-label="Add cards to binder"
+      style={Object.keys(inlineStyle).length > 0 ? inlineStyle : undefined}
+    >
+      <div
+        className="add-cards-panel-drag-handle"
+        onMouseDown={handleDragHandlePointerDown}
+        onTouchStart={handleDragHandlePointerDown}
+        title="Drag to move this panel"
+      >
+        <span className="add-cards-panel-drag-grip" aria-hidden="true">⠿</span>
+      </div>
+
+      {/* === Resize handles — right/bottom edges resize one dimension,
+          the corner resizes both at once. Hidden on mobile (see CSS),
+          where the panel is a fixed-size bottom sheet. === */}
+      <div
+        className="add-cards-panel-resize-handle add-cards-panel-resize-right"
+        onMouseDown={(e) => startResize(e, 'width')}
+        onTouchStart={(e) => startResize(e, 'width')}
+        title="Drag to resize width"
+      />
+      <div
+        className="add-cards-panel-resize-handle add-cards-panel-resize-bottom"
+        onMouseDown={(e) => startResize(e, 'height')}
+        onTouchStart={(e) => startResize(e, 'height')}
+        title="Drag to resize height"
+      />
+      <div
+        className="add-cards-panel-resize-handle add-cards-panel-resize-corner"
+        onMouseDown={(e) => startResize(e, 'both')}
+        onTouchStart={(e) => startResize(e, 'both')}
+        title="Drag to resize"
+      />
+
       <div className="add-cards-panel-header">
         <div>
           <h2 className="add-cards-panel-title">Add Cards</h2>
@@ -162,7 +420,10 @@ export function AddCardsPanel({
         {groups.map(({ collection, cards }) => (
           <div key={collection.id} className="add-cards-panel-group">
             <h3 className="add-cards-panel-group-title">{collection.name}</h3>
-            <div className="card-grid add-cards-panel-grid">
+            <div
+              className="card-grid add-cards-panel-grid"
+              style={{ gridTemplateColumns: `repeat(${gridColumns}, ${tileWidth}px)` }}
+            >
               {cards.map(card => {
                 const isOwned  = ownershipMap[card.id] !== undefined;
                 const quantity = getQuantityOwned(inventoryGroupMap, card.id);

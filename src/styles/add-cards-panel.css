@@ -1,9 +1,11 @@
 /* ── Add Cards panel ──────────────────────────────────────────────────────── */
 /* Persistent, draggable card picker — stays open across multiple
    placements instead of the old per-slot modal. Deliberately NOT an
-   overlay: it sits alongside the binder (fixed to the right edge of
-   the viewport) so the user can see both the panel and the slot
-   they're dragging a card toward at the same time. */
+   overlay: it sits alongside the binder so the user can see both the
+   panel and the slot they're dragging a card toward at the same
+   time. Defaults to the top-right corner but can be dragged anywhere
+   on screen by its grip handle (see AddCardsPanel.jsx) — that corner
+   can otherwise sit right on top of the binder's own toolbar. */
 
 .add-cards-panel {
   position: fixed;
@@ -15,10 +17,90 @@
   max-width: 90vw;
   background: var(--bg-primary);
   border-left: 0.5px solid var(--border-primary);
+  border-radius: var(--radius-lg);
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
   z-index: 120;
   display: flex;
   flex-direction: column;
+}
+
+/* Once actually being dragged, height:100vh (meant for the default
+   docked-to-the-edge look) would push it off-screen at an arbitrary
+   dropped position — cap it instead so the whole panel, grip
+   included, always stays reachable. */
+.add-cards-panel-dragging {
+  height: auto;
+  max-height: 90vh;
+  max-height: 90dvh;
+}
+
+.add-cards-panel-drag-handle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  cursor: grab;
+  color: var(--text-hint);
+  touch-action: none;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+.add-cards-panel-drag-handle:hover {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+.add-cards-panel-dragging .add-cards-panel-drag-handle {
+  cursor: grabbing;
+  background: var(--bg-hover);
+}
+
+.add-cards-panel-drag-grip {
+  font-size: 14px;
+  letter-spacing: 2px;
+  transform: rotate(90deg);
+}
+
+/* === Resize handles — invisible hit targets (a visible border would
+   compete with the panel's own edge/shadow); only the cursor and a
+   faint hover tint signal they're there. === */
+.add-cards-panel-resize-handle {
+  position: absolute;
+  z-index: 2;
+}
+
+.add-cards-panel-resize-right {
+  top: 0;
+  right: 0;
+  bottom: 12px; /* leave room for the corner handle below */
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.add-cards-panel-resize-bottom {
+  left: 0;
+  right: 12px; /* leave room for the corner handle */
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.add-cards-panel-resize-corner {
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+
+.add-cards-panel-resize-handle:hover {
+  background: var(--accent-light);
+}
+
+.add-cards-panel-resizing {
+  user-select: none;
 }
 
 .add-cards-panel-header {
@@ -134,16 +216,25 @@
 
 @media (max-width: 768px) {
   .add-cards-panel {
-    top: auto;
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
     bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
+    width: 100% !important;
     max-width: 100%;
-    height: 55vh;
-    height: 55dvh;
+    height: 55vh !important;
+    height: 55dvh !important;
     border-left: none;
+    border-radius: 0;
     border-top: 0.5px solid var(--border-primary);
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  .add-cards-panel-drag-handle {
+    display: none;
+  }
+
+  .add-cards-panel-resize-handle {
+    display: none;
   }
 }
