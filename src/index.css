@@ -35,6 +35,7 @@
 /* === ISSUE #84: Card Grid Layout — shared grid/tile styles used by
    Collections tabs and Favorites === */
 @import './styles/card-grid.css';
+@import './styles/add-cards-panel.css';
 /* === ISSUE #86: Search View Polish — results table === */
 @import './styles/search-table.css';
 /* === ISSUE #89: Modal and Form Polish === */

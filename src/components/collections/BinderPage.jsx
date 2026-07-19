@@ -33,6 +33,7 @@ export function BinderPage({
   onClickSlot,
   onToggleOwned,
   onRemove,
+  onDropEmpty,
   onClickPanel,
   onUncombinePanel,
   onUpdatePanel,
@@ -175,6 +176,7 @@ export function BinderPage({
               onClickSlot={(s) => onClickSlot(s, cardDef)}
               onToggleOwned={cardDef ? () => onToggleOwned(cardDef, slot) : undefined}
               onRemove={slot ? () => onRemove(slot) : undefined}
+              onDropCard={onDropEmpty ? (payload) => onDropEmpty(slotIndex, payload) : undefined}
             />
           );
         })}

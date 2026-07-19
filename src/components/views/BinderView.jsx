@@ -35,7 +35,7 @@ import { BinderTopbar } from './BinderTopbar.jsx';
 import { BinderPageNav } from './BinderPageNav.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { BinderDataProvider } from '../../contexts/BinderDataContext.jsx';
-import { AddCardToBinderModal } from '../modals/AddCardToBinderModal.jsx';
+import { AddCardsPanel } from '../collections/AddCardsPanel.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { CombineSlotsModal } from '../modals/CombineSlotsModal.jsx';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
@@ -226,7 +226,6 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
   const { handleAddToSlot, handleRemoveFromSlot, handleAddPage } =
     useBinderSlotActions(toast, {
-      onAddSuccess:    view.closeAddToSlot,
       onRemoveSuccess: view.closeSlotAction,
     });
 
@@ -243,29 +242,31 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
   // ── Edit mode handlers ──────────────────────────────────────────────────
 
-  const handlePlaceCard = (cardDef, collectionId, chosenCopyId = null) => {
+  const handleDropCardOnSlot = (pageNumber, slotIndex, dragPayload) => {
+    const cardDef = cardDefMap[dragPayload?.cardDefId];
+    if (!cardDef) return; // malformed or stale drag payload — nothing to place
+
     if (view.isPreviewMode) {
       const { slot } = createBinderSlot({
         binderId:     binder.id,
         cardDefId:    cardDef.id,
-        collectionId,
-        pageNumber:   view.addingToSlot.pageNumber,
-        slotIndex:    view.addingToSlot.slotIndex,
-        inventoryItemId: chosenCopyId,
+        collectionId: cardDef.collectionId,
+        pageNumber,
+        slotIndex,
+        inventoryItemId: null, // reducer/preview both auto-pick an unplaced copy
       });
       if (slot) {
         view.previewAddSlot(slot);
-        view.closeAddToSlot();
         toast('Card added to preview');
       }
     } else {
       handleAddToSlot({
         binderId:     binder.id,
         cardDefId:    cardDef.id,
-        collectionId,
-        pageNumber:   view.addingToSlot.pageNumber,
-        slotIndex:    view.addingToSlot.slotIndex,
-        chosenCopyId,
+        collectionId: cardDef.collectionId,
+        pageNumber,
+        slotIndex,
+        chosenCopyId: null, // reducer auto-picks an unplaced copy
       });
     }
   };
@@ -475,6 +476,9 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     },
     onToggleOwned: handleToggleOwnedInSlot,
     onRemove: (slot) => handleRemoveFromSlot(slot.id),
+    onDropEmpty: (view.addingToSlot && !view.isCombineMode)
+      ? (slotIndex, payload) => handleDropCardOnSlot(pageNumber, slotIndex, payload)
+      : undefined,
     pagePanels: binderPanels.filter(p => p.pageNumber === pageNumber),
     binderInsertMap,
     onClickPanel: handleClickPanel,
@@ -620,17 +624,13 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
       {/* Modals */}
       {view.addingToSlot && (
-        <AddCardToBinderModal
+        <AddCardsPanel
           binder={binder}
-          pageNumber={view.addingToSlot.pageNumber}
-          slotIndex={view.addingToSlot.slotIndex}
           cardDefinitions={cardDefinitions}
           collections={collections}
-          templateFields={templateFields}
           inventory={inventory}
           allBinderSlots={allBinderSlots}
           allBinderPanels={allBinderPanels}
-          onSubmit={handlePlaceCard}
           onClose={view.closeAddToSlot}
         />
       )}

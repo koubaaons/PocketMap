@@ -35,8 +35,40 @@ export function BinderSlot({
   onClickSlot,
   onToggleOwned,
   onRemove,
+  onDropCard,
 }) {
   const hasCard = !!(slot && cardDef);
+
+  // === New: drag-and-drop target for the Add Cards panel. onDropCard
+  // is only ever passed while that panel is open (see BinderPage.jsx),
+  // so an empty slot elsewhere in the app just ignores drag events
+  // entirely — no dead handlers doing nothing on every slot always.
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e) => {
+    if (!onDropCard) return;
+    e.preventDefault(); // required for onDrop to fire at all
+    e.dataTransfer.dropEffect = 'copy';
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    if (isDragOver) setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    if (!onDropCard) return;
+    e.preventDefault();
+    setIsDragOver(false);
+    const raw = e.dataTransfer.getData('application/json');
+    if (!raw) return;
+    try {
+      onDropCard(JSON.parse(raw));
+    } catch {
+      // Malformed/foreign drag payload (e.g. dragged in from outside
+      // the app) — silently ignore rather than crash the drop.
+    }
+  };
 
   // === FIX (new card reveal animation, plus a latent hooks-order bug
   // this fix required correcting): useCardHoloPointer was previously
@@ -107,9 +139,12 @@ export function BinderSlot({
   if (!hasCard) {
     return (
       <button
-        className={`binder-slot binder-slot-empty ${isMoveTarget ? 'binder-slot-move-target' : ''} ${isCombineSelected ? 'binder-slot-combine-selected' : ''}`}
+        className={`binder-slot binder-slot-empty ${isMoveTarget ? 'binder-slot-move-target' : ''} ${isCombineSelected ? 'binder-slot-combine-selected' : ''} ${isDragOver ? 'binder-slot-drag-over' : ''}`}
         style={{ gridColumnStart, gridRowStart }}
         onClick={onClickEmpty}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         aria-label={`Add card to slot ${slotIndex + 1}`}
       >
         <span className="slot-index">{slotIndex + 1}</span>

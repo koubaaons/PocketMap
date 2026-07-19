@@ -88,6 +88,17 @@
   background: var(--accent-light);
 }
 
+/* === New: Add Cards panel drag-and-drop target highlight — shown
+   while a card tile from the panel is being dragged directly over
+   this empty slot, distinct from the plain :hover state above (which
+   still applies for the click-to-open-panel interaction). === */
+.binder-slot-drag-over {
+  border-color: var(--accent);
+  border-style: solid;
+  background: var(--accent-light);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
 .binder-slot-placeholder {
   background: var(--bg-tertiary);
   border: 0.5px solid var(--border-secondary);
