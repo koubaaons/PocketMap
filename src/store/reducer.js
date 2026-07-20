@@ -357,6 +357,20 @@ export function reducer(state, action) {
     // Restoring is the exact same action with isDecluttered: false.
     // Batch-shaped from the start (ids: string[]) since this is
     // explicitly meant to be usable via multiselect.
+    //
+    // === FIX (real bug: decluttered cards stayed in binders): a
+    // hidden card definition left its binder_slots/binder_panels
+    // rows completely untouched, still pointing at a card that no
+    // longer shows up anywhere else — visually it'd look like a
+    // regular placed card despite supposedly not existing anymore.
+    // Declutter now removes those placements outright (same as
+    // permanently deleting a card, below), not just unlinks them —
+    // there's no "unowned placeholder" concept that makes sense for a
+    // card that's meant to act like it doesn't exist. Restoring
+    // (isDecluttered: false) leaves binders alone; there's no
+    // reasonable way to know where a placement used to be once it's
+    // gone, so restoring only brings the card back to the normal
+    // tabs, not back into a binder.
     case ACTIONS.CARD_DEFINITION_BULK_SET_DECLUTTERED: {
       const { ids, isDecluttered } = action.payload;
       const idSet = new Set(ids);
@@ -365,6 +379,12 @@ export function reducer(state, action) {
         cardDefinitions: state.cardDefinitions.map(cd =>
           idSet.has(cd.id) ? { ...cd, isDecluttered, updatedAt: Date.now() } : cd
         ),
+        binderSlots: isDecluttered
+          ? state.binderSlots.filter(s => !idSet.has(s.cardDefId))
+          : state.binderSlots,
+        binderPanels: isDecluttered
+          ? state.binderPanels.filter(p => !(p.panelType === 'card' && idSet.has(p.cardDefId)))
+          : state.binderPanels,
       };
     }
 

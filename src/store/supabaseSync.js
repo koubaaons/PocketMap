@@ -388,10 +388,31 @@ export function syncToSupabase(action, nextState, prevState) {
       break;
     }
     case ACTIONS.CARD_DEFINITION_BULK_SET_DECLUTTERED: {
-      const idSet = new Set(action.payload?.ids ?? []);
+      const { ids = [], isDecluttered } = action.payload ?? {};
+      const idSet = new Set(ids);
       const cards = nextState.cardDefinitions.filter(cd => idSet.has(cd.id));
+
+      // Decluttering (not restoring) also strips any binder
+      // placements for these cards — see reducer.js's own comment on
+      // this action for why. Computed from prevState since nextState
+      // no longer has them.
+      const removedSlotIds = isDecluttered
+        ? prevState.binderSlots.filter(s => idSet.has(s.cardDefId)).map(s => s.id)
+        : [];
+      const removedPanelIds = isDecluttered
+        ? prevState.binderPanels.filter(p => p.panelType === 'card' && idSet.has(p.cardDefId)).map(p => p.id)
+        : [];
+
       pending.push((async () => {
         for (const cd of cards) await upsertCardDefinition(cd);
+        for (const id of removedSlotIds) {
+          const { error } = await supabase.from('binder_slots').delete().eq('id', id);
+          if (error) console.error('[Sync] binder slot removal (declutter) failed:', error);
+        }
+        for (const id of removedPanelIds) {
+          const { error } = await supabase.from('binder_panels').delete().eq('id', id);
+          if (error) console.error('[Sync] binder panel removal (declutter) failed:', error);
+        }
       })());
       break;
     }

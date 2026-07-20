@@ -26,10 +26,18 @@
  * @returns {Record<string, { total: number, owned: number, missing: number, pct: number }>}
  */
 export function buildCollectionStatsMap(collections, cardDefinitions, inventory) {
+  // Decluttered cards act like they don't exist — same rule
+  // CollectionDetailView applies when building collectionCards for
+  // the Owned/Missing/Unorganised/Cards tabs and their summary. This
+  // is the OTHER place a card count gets computed (the Collections
+  // list view's per-collection tiles), so it needs the identical
+  // exclusion or those tiles would never reflect a declutter at all.
+  const activeCardDefinitions = cardDefinitions.filter(cd => !cd.isDecluttered);
+
   // Step 1: Count card definitions per collection — O(M)
   const totalMap = {};
   collections.forEach(c => { totalMap[c.id] = 0; });
-  cardDefinitions.forEach(cd => {
+  activeCardDefinitions.forEach(cd => {
     if (totalMap[cd.collectionId] !== undefined) {
       totalMap[cd.collectionId]++;
     }
@@ -41,7 +49,7 @@ export function buildCollectionStatsMap(collections, cardDefinitions, inventory)
   // Step 3: Count owned cards per collection — O(M)
   const ownedMap = {};
   collections.forEach(c => { ownedMap[c.id] = 0; });
-  cardDefinitions.forEach(cd => {
+  activeCardDefinitions.forEach(cd => {
     if (ownedCardDefIds.has(cd.id) && ownedMap[cd.collectionId] !== undefined) {
       ownedMap[cd.collectionId]++;
     }

@@ -33,6 +33,7 @@ import { useOwnershipEditor } from '../../hooks/useOwnershipEditor.js';
 import { useCardInfoToggle } from '../../hooks/useCardInfoToggle.js';
 import { useMultiSelect } from '../../hooks/useMultiSelect.js';
 import { useBulkCardActions } from '../../hooks/useBulkCardActions.js';
+import { useDeclutterConfirm } from '../../hooks/useDeclutterConfirm.js';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 
 // === REFACTOR7e START: import extracted tab components ===
@@ -140,6 +141,10 @@ export function CollectionDetailView({ toast, onBack }) {
   // one direction).
   const cardsSelect = useMultiSelect();
   const { handleBulkOwn, handleBulkUnown, handleBulkSetFavorite, handleBulkSetDecluttered } = useBulkCardActions(toast);
+  const cardsDeclutterConfirm = useDeclutterConfirm({
+    binderSlots, binderPanels,
+    onDeclutter: (ids) => { handleBulkSetDecluttered(ids, true); cardsSelect.exitSelectMode(); },
+  });
 
   const sharedTabProps = {
     collectionCards,
@@ -147,6 +152,8 @@ export function CollectionDetailView({ toast, onBack }) {
     collectionId: collection?.id,
     ownershipMap,
     inventory,
+    binderSlots,
+    binderPanels,
     toast,
     showCardInfo,
     onToggleCardInfo: toggleCardInfo,
@@ -241,7 +248,7 @@ export function CollectionDetailView({ toast, onBack }) {
                     { label: 'Mark Owned', variant: 'btn-primary', onClick: () => handleBulkOwn(unownedSelected, collection.id) },
                     { label: 'Favorite', onClick: () => handleBulkSetFavorite(getRepresentativeInventoryIdsForCards(ownershipMap, ownedSelectedIds), true) },
                     { label: 'Unfavorite', onClick: () => handleBulkSetFavorite(getRepresentativeInventoryIdsForCards(ownershipMap, ownedSelectedIds), false) },
-                    { label: 'Declutter', onClick: () => { handleBulkSetDecluttered(selectedIds, true); cardsSelect.exitSelectMode(); } },
+                    { label: 'Declutter', onClick: () => cardsDeclutterConfirm.requestDeclutter(selectedIds) },
                     { label: 'Unown', variant: 'btn-danger', onClick: () => handleBulkUnown(getAllInventoryIdsForCards(inventoryGroupMap, ownedSelectedIds)) },
                   ]}
                 />
@@ -313,6 +320,15 @@ export function CollectionDetailView({ toast, onBack }) {
           confirmLabel="Delete Card"
           onConfirm={() => handleDelete(editor.confirmDelete.id, editor.confirmDelete.name)}
           onClose={editor.closeDelete}
+        />
+      )}
+      {cardsDeclutterConfirm.pendingIds && (
+        <ConfirmModal
+          title="Remove from binders?"
+          message={`${cardsDeclutterConfirm.pendingIds.length} of the selected card${cardsDeclutterConfirm.pendingIds.length !== 1 ? 's are' : ' is'} placed in a binder. Decluttering will remove ${cardsDeclutterConfirm.pendingIds.length !== 1 ? 'them' : 'it'} from the binder as well. This can't be undone automatically — you'd need to place it again after restoring.`}
+          confirmLabel="Declutter"
+          onConfirm={cardsDeclutterConfirm.confirmDeclutter}
+          onClose={cardsDeclutterConfirm.cancelDeclutter}
         />
       )}
     </div>
