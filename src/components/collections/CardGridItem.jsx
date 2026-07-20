@@ -21,7 +21,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatConditionRating, formatLanguage } from '../../types/index.js';
 
-export function CardGridItem({ card, inventoryItem, collectionName, onView, onToggleFavorite, onToggleOwned, quantityOwned = 0, totalPlaced = 0 }) {
+export function CardGridItem({ card, inventoryItem, collectionName, onView, onToggleFavorite, onToggleOwned, quantityOwned = 0, totalPlaced = 0, isSelectMode = false, isSelected = false, onToggleSelect }) {
   const isOwned    = inventoryItem !== null && inventoryItem !== undefined;
   const isFavorite = inventoryItem?.is_favorite ?? false;
 
@@ -48,15 +48,29 @@ export function CardGridItem({ card, inventoryItem, collectionName, onView, onTo
     if (onToggleOwned) onToggleOwned(card, inventoryItem);
   };
 
+  // In select mode, the tile's main action is toggling selection —
+  // clicking it to open the detail modal would fight the whole point
+  // of a quick multiselect (tap several cards in a row).
+  const handleTileActivate = () => {
+    if (isSelectMode) { onToggleSelect?.(card.id); return; }
+    onView();
+  };
+
   return (
     <div
-      className={`card-grid-item ${isOwned ? 'card-grid-item-owned' : 'card-grid-item-not-owned'} ${justRevealed ? 'card-grid-item-reveal' : ''}`}
-      onClick={onView}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView(); } }}
+      className={`card-grid-item ${isOwned ? 'card-grid-item-owned' : 'card-grid-item-not-owned'} ${justRevealed ? 'card-grid-item-reveal' : ''} ${isSelectMode ? 'card-grid-item-select-mode' : ''} ${isSelected ? 'card-grid-item-selected' : ''}`}
+      onClick={handleTileActivate}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTileActivate(); } }}
       role="button"
       tabIndex={0}
       aria-label={card.name}
+      aria-pressed={isSelectMode ? isSelected : undefined}
     >
+      {isSelectMode && (
+        <span className={`card-grid-item-select-checkbox ${isSelected ? 'card-grid-item-select-checkbox-checked' : ''}`} aria-hidden="true">
+          {isSelected ? '✓' : ''}
+        </span>
+      )}
       <div className="card-grid-item-image-wrapper">
         {/* === Quantity tracking: "X of Y placed" badge — only shown
             once more than one copy is owned; a single owned card

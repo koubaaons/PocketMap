@@ -387,6 +387,14 @@ export function syncToSupabase(action, nextState, prevState) {
       })());
       break;
     }
+    case ACTIONS.CARD_DEFINITION_BULK_SET_DECLUTTERED: {
+      const idSet = new Set(action.payload?.ids ?? []);
+      const cards = nextState.cardDefinitions.filter(cd => idSet.has(cd.id));
+      pending.push((async () => {
+        for (const cd of cards) await upsertCardDefinition(cd);
+      })());
+      break;
+    }
     case ACTIONS.CARD_DEFINITION_DELETE: {
       const { cardDefId } = action.payload ?? {};
       if (cardDefId) {
@@ -488,6 +496,76 @@ export function syncToSupabase(action, nextState, prevState) {
           );
         }
       }
+      break;
+    }
+
+    // === New: bulk own/unown/favorite for multiselect. Sequential
+    // writes (same reasoning as CARD_DEFINITION_BULK_ADD above), plus
+    // the same auto-link/unlink diffing as the single-item cases —
+    // just checked against every affected id at once instead of one.
+    case ACTIONS.INVENTORY_BULK_ADD: {
+      const newIds = new Set((action.payload?.items ?? []).map(i => i.id));
+      const items = nextState.inventory.filter(i => newIds.has(i.id));
+
+      const newlyLinkedSlots = nextState.binderSlots.filter(s => {
+        const prev = prevState.binderSlots.find(ps => ps.id === s.id);
+        return prev && !prev.inventoryItemId && s.inventoryItemId && newIds.has(s.inventoryItemId);
+      });
+      const newlyLinkedPanels = nextState.binderPanels.filter(p => {
+        const prev = prevState.binderPanels.find(pp => pp.id === p.id);
+        return prev && !prev.inventoryItemId && p.inventoryItemId && newIds.has(p.inventoryItemId);
+      });
+
+      pending.push((async () => {
+        for (const item of items) await upsertInventoryItem(item);
+        for (const slot of newlyLinkedSlots) {
+          const { error } = await supabase.from('binder_slots').update({ inventory_item_id: slot.inventoryItemId }).eq('id', slot.id);
+          if (error) console.error('[Sync] slot auto-link failed (bulk):', error);
+        }
+        for (const panel of newlyLinkedPanels) {
+          const { error } = await supabase.from('binder_panels').update({ inventory_item_id: panel.inventoryItemId }).eq('id', panel.id);
+          if (error) console.error('[Sync] panel auto-link failed (bulk):', error);
+        }
+      })());
+      break;
+    }
+
+    case ACTIONS.INVENTORY_BULK_DELETE: {
+      const deletedIds = action.payload?.inventoryIds ?? [];
+      const deletedIdSet = new Set(deletedIds);
+
+      const unlinkedSlots = nextState.binderSlots.filter(s => {
+        const prev = prevState.binderSlots.find(ps => ps.id === s.id);
+        return prev && deletedIdSet.has(prev.inventoryItemId) && s.inventoryItemId === null;
+      });
+      const unlinkedPanels = nextState.binderPanels.filter(p => {
+        const prev = prevState.binderPanels.find(pp => pp.id === p.id);
+        return prev && deletedIdSet.has(prev.inventoryItemId) && p.inventoryItemId === null;
+      });
+
+      pending.push((async () => {
+        for (const id of deletedIds) {
+          const { error } = await supabase.from('user_inventory').delete().eq('id', id);
+          if (error) console.error('[Sync] inventory bulk delete failed:', error);
+        }
+        for (const slot of unlinkedSlots) {
+          const { error } = await supabase.from('binder_slots').update({ inventory_item_id: null }).eq('id', slot.id);
+          if (error) console.error('[Sync] slot unlink failed (bulk):', error);
+        }
+        for (const panel of unlinkedPanels) {
+          const { error } = await supabase.from('binder_panels').update({ inventory_item_id: null }).eq('id', panel.id);
+          if (error) console.error('[Sync] panel unlink failed (bulk):', error);
+        }
+      })());
+      break;
+    }
+
+    case ACTIONS.INVENTORY_BULK_SET_FAVORITE: {
+      const favIdSet = new Set(action.payload?.ids ?? []);
+      const items = nextState.inventory.filter(i => favIdSet.has(i.id));
+      pending.push((async () => {
+        for (const item of items) await upsertInventoryItem(item);
+      })());
       break;
     }
 

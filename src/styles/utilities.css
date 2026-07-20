@@ -106,6 +106,43 @@
   margin-bottom: var(--space-4);
 }
 
+/* === New: multiselect bulk-action bar (own/unown/favorite/declutter
+   in batch) === */
+.multiselect-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+}
+
+.multiselect-count {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  margin-right: var(--space-2);
+}
+
+.multiselect-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.multiselect-done {
+  margin-left: var(--space-2);
+}
+
+.declutter-tab-intro {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-3);
+}
+
 /* === New: entity filters popover (rarity, holo effect, custom
    select/boolean fields) — see TabToolbar.jsx === */
 .tab-filters-wrapper {

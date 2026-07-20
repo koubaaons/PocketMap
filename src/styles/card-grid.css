@@ -58,6 +58,42 @@
   padding: 0;
   cursor: pointer;
   text-align: left;
+  position: relative;
+}
+
+/* === New: multiselect (own/unown/favorite/declutter in batch) === */
+.card-grid-item-select-mode .card-grid-item-image-wrapper {
+  transition: outline-color var(--transition-fast), opacity var(--transition-fast);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.card-grid-item-selected .card-grid-item-image-wrapper {
+  outline-color: var(--accent);
+  opacity: 0.92;
+}
+
+.card-grid-item-select-checkbox {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--bg-primary);
+  background: rgba(20, 20, 24, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--bg-primary);
+}
+
+.card-grid-item-select-checkbox-checked {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .card-grid-item-image-wrapper {

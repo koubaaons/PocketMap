@@ -19,6 +19,7 @@ import { HOLO_LABELS } from '../../types/index.js';
 export function TabToolbar({
   query, setQuery, sort, setSort, showAdd = false, onAdd, showCardInfo, onToggleCardInfo,
   filterGroups = [], filters = {}, setFilters,
+  isSelectMode, onToggleSelectMode,
 }) {
   const [showFilters, setShowFilters] = useState(false);
   const activeCount = Object.values(filters).filter(v => v !== '' && v != null).length;
@@ -94,6 +95,15 @@ export function TabToolbar({
             </div>
           )}
         </div>
+      )}
+
+      {onToggleSelectMode && (
+        <button
+          className={`btn btn-sm ${isSelectMode ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={onToggleSelectMode}
+        >
+          {isSelectMode ? 'Cancel Select' : 'Select'}
+        </button>
       )}
 
       {onToggleCardInfo && (

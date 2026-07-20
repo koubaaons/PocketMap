@@ -139,12 +139,19 @@ export function validateCardDefinition(data) {
   if (data.rarity !== undefined && data.rarity !== null && typeof data.rarity !== 'string') {
     errors.push('rarity must be a string or null');
   }
+  // Optional for the same reason holoType is — existing cards created
+  // before decluttering existed won't have this field at all, and
+  // that's valid; missing/undefined reads as "not decluttered" via
+  // `cardDef.isDecluttered ?? false` at every call site.
+  if (data.isDecluttered !== undefined && data.isDecluttered !== null && typeof data.isDecluttered !== 'boolean') {
+    errors.push('isDecluttered must be a boolean');
+  }
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   if (typeof data.updatedAt !== 'number') errors.push('updatedAt must be a timestamp');
   return { valid: errors.length === 0, errors };
 }
 
-export function createCardDefinition({ collectionId, name, image_url = null, attributes = {}, holoType = 'none', rarity = null }) {
+export function createCardDefinition({ collectionId, name, image_url = null, attributes = {}, holoType = 'none', rarity = null, isDecluttered = false }) {
   const now = Date.now();
   const cardDef = {
     id: generateId(),
@@ -154,6 +161,7 @@ export function createCardDefinition({ collectionId, name, image_url = null, att
     attributes: attributes ?? {},
     holoType: HOLO_TYPES.includes(holoType) ? holoType : 'none',
     rarity: rarity ?? null,
+    isDecluttered: Boolean(isDecluttered),
     createdAt: now,
     updatedAt: now,
   };

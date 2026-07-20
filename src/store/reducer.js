@@ -30,9 +30,13 @@ export const ACTIONS = Object.freeze({
   CARD_DEFINITION_BULK_ADD: 'CARD_DEFINITION_BULK_ADD',
   CARD_DEFINITION_UPDATE:   'CARD_DEFINITION_UPDATE',
   CARD_DEFINITION_DELETE:   'CARD_DEFINITION_DELETE',
+  CARD_DEFINITION_BULK_SET_DECLUTTERED: 'CARD_DEFINITION_BULK_SET_DECLUTTERED',
   INVENTORY_ADD:    'INVENTORY_ADD',
   INVENTORY_UPDATE: 'INVENTORY_UPDATE',
   INVENTORY_DELETE: 'INVENTORY_DELETE',
+  INVENTORY_BULK_ADD:          'INVENTORY_BULK_ADD',
+  INVENTORY_BULK_DELETE:       'INVENTORY_BULK_DELETE',
+  INVENTORY_BULK_SET_FAVORITE: 'INVENTORY_BULK_SET_FAVORITE',
   BINDER_SLOT_ADD:    'BINDER_SLOT_ADD',
   BINDER_SLOT_UPDATE: 'BINDER_SLOT_UPDATE',
   BINDER_SLOT_REMOVE: 'BINDER_SLOT_REMOVE',
@@ -347,6 +351,23 @@ export function reducer(state, action) {
         ),
       };
 
+    // === New: Declutter — hides one or many card definitions
+    // everywhere (Owned/Missing/Unorganised/Cards) without touching
+    // ownership, binder placement, or anything else about them.
+    // Restoring is the exact same action with isDecluttered: false.
+    // Batch-shaped from the start (ids: string[]) since this is
+    // explicitly meant to be usable via multiselect.
+    case ACTIONS.CARD_DEFINITION_BULK_SET_DECLUTTERED: {
+      const { ids, isDecluttered } = action.payload;
+      const idSet = new Set(ids);
+      return {
+        ...state,
+        cardDefinitions: state.cardDefinitions.map(cd =>
+          idSet.has(cd.id) ? { ...cd, isDecluttered, updatedAt: Date.now() } : cd
+        ),
+      };
+    }
+
     // === FIX3: save inventory item to bin alongside card def ===
     case ACTIONS.CARD_DEFINITION_DELETE: {
       const { cardDefId } = action.payload;
@@ -511,6 +532,39 @@ export function reducer(state, action) {
         inventory: remainingInventory,
         binderSlots,
         binderPanels,
+      };
+    }
+
+    // === New: bulk own/unown/favorite — for multiselect actions
+    // across a grid of cards. Bulk add/delete deliberately reuse the
+    // exact single-item logic above (auto-linking a new copy to an
+    // unlinked slot/panel; carefully unlinking only the slot/panel
+    // tied to the specific copy being removed) by folding this same
+    // reducer over each item in turn, rather than re-deriving that
+    // logic a second time in a way that could quietly drift out of
+    // sync with the single-item version.
+    case ACTIONS.INVENTORY_BULK_ADD: {
+      return action.payload.items.reduce(
+        (accState, item) => reducer(accState, { type: ACTIONS.INVENTORY_ADD, payload: item }),
+        state
+      );
+    }
+
+    case ACTIONS.INVENTORY_BULK_DELETE: {
+      return action.payload.inventoryIds.reduce(
+        (accState, inventoryId) => reducer(accState, { type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId } }),
+        state
+      );
+    }
+
+    case ACTIONS.INVENTORY_BULK_SET_FAVORITE: {
+      const { ids, isFavorite } = action.payload;
+      const idSet = new Set(ids);
+      return {
+        ...state,
+        inventory: state.inventory.map(inv =>
+          idSet.has(inv.id) ? { ...inv, is_favorite: isFavorite, updatedAt: Date.now() } : inv
+        ),
       };
     }
 

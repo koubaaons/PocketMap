@@ -97,7 +97,26 @@ export function getQuantityOwned(inventoryGroupMap, cardDefId) {
   return (inventoryGroupMap[cardDefId] ?? []).length;
 }
 
-// === ISSUE #36 END: Mark Card As Owned ===
+// === New: multiselect bulk-action helpers ===
+
+/**
+ * Every inventory item id across every given card — a card owned
+ * twice contributes both copies. Used for "unown selected", since
+ * removing ownership entirely means removing every copy, not just one.
+ */
+export function getAllInventoryIdsForCards(inventoryGroupMap, cardDefIds) {
+  return cardDefIds.flatMap(id => (inventoryGroupMap[id] ?? []).map(item => item.id));
+}
+
+/**
+ * One representative inventory item id per given (owned) card — the
+ * same "one representative copy" the single-card favorite star
+ * already acts on (see CardGridItem.jsx). Cards with no ownership
+ * entry are silently skipped (nothing to favorite).
+ */
+export function getRepresentativeInventoryIdsForCards(ownershipMap, cardDefIds) {
+  return cardDefIds.map(id => ownershipMap[id]?.id).filter(Boolean);
+}
 
 // === ISSUE #38 START: Favorite Cards — favorite selectors ===
 

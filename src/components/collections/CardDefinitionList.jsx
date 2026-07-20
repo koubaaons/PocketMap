@@ -26,6 +26,9 @@ export function CardDefinitionList({
   onToggleOwned,
   emptyTitle = 'No cards yet',
   emptySubtitle = 'Add your first card to this collection',
+  isSelectMode = false,
+  selectedIds,
+  onToggleSelect,
 }) {
   const { inventory, allBinderSlots, allBinderPanels } = useCollectionData();
 
@@ -53,6 +56,9 @@ export function CardDefinitionList({
             onView={() => onView(card)}
             onToggleFavorite={onToggleFavorite}
             onToggleOwned={onToggleOwned}
+            isSelectMode={isSelectMode}
+            isSelected={selectedIds?.has(card.id) ?? false}
+            onToggleSelect={onToggleSelect}
           />
         ))}
       </div>

@@ -15,28 +15,35 @@ import { useStore } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { Button, ConfirmModal, EmptyState } from '../ui/index.jsx';
 import { CardDefinitionList } from '../collections/CardDefinitionList.jsx';
+import { MultiSelectActionBar } from '../collections/MultiSelectActionBar.jsx';
 import { CollectionDataProvider } from '../../contexts/CollectionDataContext.jsx';
 import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
 import { CollectionSummary } from '../collections/CollectionSummary.jsx';
 import { TabToolbar } from '../collections/TabToolbar.jsx';
 import { applyCardDefinitionFilters, getFilterGroupsForCollection } from '../../selectors/cardDefinitionSelectors.js';
-import { buildOwnershipMap, buildInventoryGroupMap, buildCollectionSummary } from '../../selectors/inventorySelectors.js';
+import {
+  buildOwnershipMap, buildInventoryGroupMap, buildCollectionSummary,
+  getAllInventoryIdsForCards, getRepresentativeInventoryIdsForCards,
+} from '../../selectors/inventorySelectors.js';
 import { getOrganisedCardDefIds } from '../../selectors/binderSelectors.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useCardEditor } from '../../hooks/useCardEditor.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
 import { useOwnershipEditor } from '../../hooks/useOwnershipEditor.js';
 import { useCardInfoToggle } from '../../hooks/useCardInfoToggle.js';
+import { useMultiSelect } from '../../hooks/useMultiSelect.js';
+import { useBulkCardActions } from '../../hooks/useBulkCardActions.js';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 
 // === REFACTOR7e START: import extracted tab components ===
 import { OwnedTab }        from '../collections/OwnedTab.jsx';
 import { MissingTab }      from '../collections/MissingTab.jsx';
 import { UnorganisedTab }  from '../collections/UnorganisedTab.jsx';
+import { DeclutterTab }    from '../collections/DeclutterTab.jsx';
 import { SettingsTab }     from '../collections/SettingsTab.jsx';
 // === REFACTOR7e END ===
 
-const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Settings'];
+const TABS = ['Cards', 'Owned', 'Missing', 'Unorganised', 'Declutter', 'Settings'];
 
 export function CollectionDetailView({ toast, onBack }) {
   const nav             = useStore(s => s.nav);
@@ -53,9 +60,23 @@ export function CollectionDetailView({ toast, onBack }) {
   const ownership = useOwnershipEditor();
   const { showCardInfo, toggle: toggleCardInfo } = useCardInfoToggle();
 
-  const collectionCards = useMemo(
+  const allCollectionCards = useMemo(
     () => cardDefinitions.filter(cd => cd.collectionId === collection?.id),
     [cardDefinitions, collection?.id]
+  );
+
+  // Decluttered cards act like they don't exist everywhere except the
+  // Declutter tab itself — excluding them right here at the source
+  // means Owned/Missing/Unorganised, the summary, and the Cards tab
+  // all inherit that automatically, with no changes needed in any of
+  // those selectors.
+  const collectionCards = useMemo(
+    () => allCollectionCards.filter(cd => !cd.isDecluttered),
+    [allCollectionCards]
+  );
+  const declutteredCards = useMemo(
+    () => allCollectionCards.filter(cd => cd.isDecluttered),
+    [allCollectionCards]
   );
 
   const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection?.id);
@@ -113,10 +134,20 @@ export function CollectionDetailView({ toast, onBack }) {
     }
   };
 
+  // === New: multiselect for the Cards tab — a mixed set of owned and
+  // unowned cards, so both "mark owned" and "unown" are offered
+  // together (unlike Owned/Missing/Unorganised, which only ever need
+  // one direction).
+  const cardsSelect = useMultiSelect();
+  const { handleBulkOwn, handleBulkUnown, handleBulkSetFavorite, handleBulkSetDecluttered } = useBulkCardActions(toast);
+
   const sharedTabProps = {
     collectionCards,
     collectionTemplateFields,
+    collectionId: collection?.id,
     ownershipMap,
+    inventory,
+    toast,
     showCardInfo,
     onToggleCardInfo: toggleCardInfo,
     summary,
@@ -169,7 +200,8 @@ export function CollectionDetailView({ toast, onBack }) {
             tab === 'Cards'       ? summary.total       :
             tab === 'Owned'       ? summary.owned       :
             tab === 'Missing'     ? summary.missing     :
-            tab === 'Unorganised' ? summary.unorganised : null;
+            tab === 'Unorganised' ? summary.unorganised :
+            tab === 'Declutter'   ? declutteredCards.length : null;
           return (
             <button key={tab}
               className={`collection-tab ${activeTab === tab ? 'active' : ''}`}
@@ -191,7 +223,30 @@ export function CollectionDetailView({ toast, onBack }) {
               showAdd onAdd={editor.openCreate}
               showCardInfo={showCardInfo} onToggleCardInfo={toggleCardInfo}
               filterGroups={cardFilterGroups} filters={editor.filters} setFilters={editor.setFilters}
+              isSelectMode={cardsSelect.isSelectMode} onToggleSelectMode={cardsSelect.toggleSelectMode}
             />
+            {cardsSelect.isSelectMode && (() => {
+              const selectedIds = [...cardsSelect.selectedIds];
+              const selectedCards = filteredCards.filter(c => cardsSelect.selectedIds.has(c.id));
+              const unownedSelected = selectedCards.filter(c => !ownershipMap[c.id]);
+              const ownedSelectedIds = selectedCards.filter(c => ownershipMap[c.id]).map(c => c.id);
+              return (
+                <MultiSelectActionBar
+                  count={cardsSelect.selectedIds.size}
+                  totalAvailable={filteredCards.length}
+                  onSelectAll={() => cardsSelect.selectAll(filteredCards.map(c => c.id))}
+                  onClear={cardsSelect.clearSelection}
+                  onExit={cardsSelect.exitSelectMode}
+                  actions={[
+                    { label: 'Mark Owned', variant: 'btn-primary', onClick: () => handleBulkOwn(unownedSelected, collection.id) },
+                    { label: 'Favorite', onClick: () => handleBulkSetFavorite(getRepresentativeInventoryIdsForCards(ownershipMap, ownedSelectedIds), true) },
+                    { label: 'Unfavorite', onClick: () => handleBulkSetFavorite(getRepresentativeInventoryIdsForCards(ownershipMap, ownedSelectedIds), false) },
+                    { label: 'Declutter', onClick: () => { handleBulkSetDecluttered(selectedIds, true); cardsSelect.exitSelectMode(); } },
+                    { label: 'Unown', variant: 'btn-danger', onClick: () => handleBulkUnown(getAllInventoryIdsForCards(inventoryGroupMap, ownedSelectedIds)) },
+                  ]}
+                />
+              );
+            })()}
             <CardDefinitionList
               cards={filteredCards}
               templateFields={collectionTemplateFields}
@@ -204,6 +259,9 @@ export function CollectionDetailView({ toast, onBack }) {
               onToggleOwned={handleToggleOwned}
               emptyTitle={editor.query ? `No results for "${editor.query}"` : 'No cards yet'}
               emptySubtitle={editor.query ? 'Try a different search' : 'Add your first card to start building this collection'}
+              isSelectMode={cardsSelect.isSelectMode}
+              selectedIds={cardsSelect.selectedIds}
+              onToggleSelect={cardsSelect.toggle}
             />
           </div>
         )}
@@ -212,6 +270,17 @@ export function CollectionDetailView({ toast, onBack }) {
         {activeTab === 'Owned'        && <OwnedTab       {...sharedTabProps} />}
         {activeTab === 'Missing'      && <MissingTab      {...sharedTabProps} />}
         {activeTab === 'Unorganised'  && <UnorganisedTab  {...sharedTabProps} binderSlots={binderSlots} binderPanels={binderPanels} />}
+        {activeTab === 'Declutter'    && (
+          <DeclutterTab
+            declutteredCards={declutteredCards}
+            collectionTemplateFields={collectionTemplateFields}
+            ownershipMap={ownershipMap}
+            showCardInfo={showCardInfo}
+            onToggleCardInfo={toggleCardInfo}
+            onView={ownership.openDetail}
+            toast={toast}
+          />
+        )}
         {/* === REFACTOR7e END === */}
       </CollectionDataProvider>
       {activeTab === 'Settings'     && <SettingsTab     collection={collection} templateFields={templateFields} toast={toast} />}

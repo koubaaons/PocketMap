@@ -123,6 +123,7 @@ function rowToCardDefinition(row) {
     image_url:    row.image_url,
     holoType:     row.holo_type,
     rarity:       row.rarity,
+    isDecluttered: row.is_decluttered ?? false,
     attributes:   row.attributes ?? {},
     createdAt:    new Date(row.created_at).getTime(),
     updatedAt:    new Date(row.updated_at).getTime(),
@@ -344,6 +345,7 @@ export function cardDefinitionToRow(cd) {
     image_url:     cd.image_url ?? null,
     holo_type:     cd.holoType ?? 'none',
     rarity:        cd.rarity ?? null,
+    is_decluttered: cd.isDecluttered ?? false,
     attributes:    cd.attributes ?? {},
     updated_at:    new Date().toISOString(),
   };

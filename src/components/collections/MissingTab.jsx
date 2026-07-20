@@ -7,14 +7,20 @@
 
 import { useState, useMemo } from 'react';
 import { CardDefinitionList } from './CardDefinitionList.jsx';
+import { MultiSelectActionBar } from './MultiSelectActionBar.jsx';
 import { applyCardDefinitionFilters, getFilterGroupsForCollection } from '../../selectors/cardDefinitionSelectors.js';
 import { getMissingCards } from '../../selectors/inventorySelectors.js';
+import { useMultiSelect } from '../../hooks/useMultiSelect.js';
+import { useBulkCardActions } from '../../hooks/useBulkCardActions.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
-export function MissingTab({ collectionCards, collectionTemplateFields, ownershipMap, showCardInfo, onToggleCardInfo, summary, onView, onEdit, onDelete, onToggleOwned }) {
+export function MissingTab({ collectionCards, collectionTemplateFields, collectionId, ownershipMap, showCardInfo, onToggleCardInfo, summary, onView, onEdit, onDelete, onToggleOwned, toast }) {
   const [query, setQuery]     = useState('');
   const [sort,  setSort]      = useState('newest');
   const [filters, setFilters] = useState({});
+
+  const select = useMultiSelect();
+  const { handleBulkOwn, handleBulkSetDecluttered } = useBulkCardActions(toast);
 
   const missingCards = useMemo(
     () => getMissingCards(collectionCards, ownershipMap),
@@ -31,13 +37,39 @@ export function MissingTab({ collectionCards, collectionTemplateFields, ownershi
     [missingCards, query, sort, filters]
   );
 
+  const selectedCardIds = [...select.selectedIds];
+  const selectedCards = cards.filter(c => select.selectedIds.has(c.id));
+
+  const bulkActions = [
+    {
+      label: 'Mark Owned',
+      variant: 'btn-primary',
+      onClick: () => { handleBulkOwn(selectedCards, collectionId); select.exitSelectMode(); },
+    },
+    {
+      label: 'Declutter',
+      onClick: () => { handleBulkSetDecluttered(selectedCardIds, true); select.exitSelectMode(); },
+    },
+  ];
+
   return (
     <div className="tab-content">
       <TabToolbar
         query={query} setQuery={setQuery} sort={sort} setSort={setSort}
         showCardInfo={showCardInfo} onToggleCardInfo={onToggleCardInfo}
         filterGroups={filterGroups} filters={filters} setFilters={setFilters}
+        isSelectMode={select.isSelectMode} onToggleSelectMode={select.toggleSelectMode}
       />
+      {select.isSelectMode && (
+        <MultiSelectActionBar
+          count={select.selectedIds.size}
+          totalAvailable={cards.length}
+          onSelectAll={() => select.selectAll(cards.map(c => c.id))}
+          onClear={select.clearSelection}
+          onExit={select.exitSelectMode}
+          actions={bulkActions}
+        />
+      )}
       <CardDefinitionList
         cards={cards}
         templateFields={collectionTemplateFields}
@@ -49,6 +81,9 @@ export function MissingTab({ collectionCards, collectionTemplateFields, ownershi
         onToggleOwned={onToggleOwned}
         emptyTitle={query ? `No results for "${query}"` : 'No missing cards'}
         emptySubtitle={query ? 'Try a different search' : 'You own every card in this collection!'}
+        isSelectMode={select.isSelectMode}
+        selectedIds={select.selectedIds}
+        onToggleSelect={select.toggle}
       />
     </div>
   );
