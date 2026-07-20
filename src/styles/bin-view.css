@@ -44,6 +44,14 @@
   border-radius: var(--radius-md);
 }
 
+.bin-row-thumbnail {
+  width: 36px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
 .bin-name {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);

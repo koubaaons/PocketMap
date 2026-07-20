@@ -236,6 +236,9 @@ async function emptyBin(userId, binItems) {
         await logIfError(supabase.from('binder_slots').delete().eq('card_def_id', binItem.id).eq('user_id', userId), `empty bin: binder_slots for card ${binItem.id}`);
         await logIfError(supabase.from('card_definitions').delete().eq('id', binItem.id).eq('user_id', userId), `empty bin: card_definitions ${binItem.id}`);
         await deleteImageFromStorage(getStoragePathFromUrl(binItem.image_url));
+      } else if (binItem._type === 'insert') {
+        await logIfError(supabase.from('binder_inserts').delete().eq('id', binItem.id).eq('user_id', userId), `empty bin: binder_inserts ${binItem.id}`);
+        await deleteImageFromStorage(getStoragePathFromUrl(binItem.image_url));
       } else {
         console.error('[Sync] empty bin: unknown _type for bin item, skipping cascade:', binItem);
       }
@@ -611,8 +614,43 @@ export function syncToSupabase(action, nextState, prevState) {
       if (insert) pending.push(upsertBinderInsert(insert));
       break;
     }
+    case ACTIONS.BINDER_INSERT_BULK_ADD: {
+      const newIds = new Set((action.payload ?? []).map(i => i.id));
+      const inserts = nextState.binderInserts.filter(i => newIds.has(i.id));
+      pending.push((async () => {
+        for (const insert of inserts) await upsertBinderInsert(insert);
+      })());
+      break;
+    }
+    // === CHANGED: soft delete (matches reducer.js's own change) —
+    // marks deleted_at instead of removing the row, and mirrors it
+    // into the bin table so it shows up in Trash. Also syncs the
+    // insertId-cleared panels the reducer produces, the same
+    // diff-against-prevState approach used for slot/panel
+    // auto-link/unlink elsewhere in this file.
     case ACTIONS.BINDER_INSERT_DELETE: {
-      if (action.payload?.insertId) pending.push(deleteBinderInsert(action.payload.insertId));
+      const { insertId } = action.payload ?? {};
+      if (insertId) {
+        const deletedInsert = prevState.binderInserts.find(i => i.id === insertId);
+        pending.push(
+          supabase.from('binder_inserts').update({ deleted_at: new Date().toISOString() }).eq('id', insertId)
+            .then(({ error }) => { if (error) console.error('[Sync] insert soft delete failed:', error); })
+        );
+        if (deletedInsert) {
+          const binItem = nextState.bin.find(b => b.id === insertId);
+          if (binItem) pending.push(upsertBinItem(binItem, 'insert'));
+        }
+        const clearedPanels = nextState.binderPanels.filter(p => {
+          const prev = prevState.binderPanels.find(pp => pp.id === p.id);
+          return prev && prev.insertId === insertId && p.insertId === null;
+        });
+        for (const panel of clearedPanels) {
+          pending.push(
+            supabase.from('binder_panels').update({ insert_id: null }).eq('id', panel.id)
+              .then(({ error }) => { if (error) console.error('[Sync] panel insert-clear (declutter image) failed:', error); })
+          );
+        }
+      }
       break;
     }
     case ACTIONS.BINDER_PANEL_ADD: {
@@ -658,6 +696,35 @@ export function syncToSupabase(action, nextState, prevState) {
       }
       break;
     }
+    case ACTIONS.BINDER_INSERT_BULK_DELETE: {
+      const insertIds = action.payload?.insertIds ?? [];
+      const idSet = new Set(insertIds);
+
+      const clearedPanels = nextState.binderPanels.filter(p => {
+        const prev = prevState.binderPanels.find(pp => pp.id === p.id);
+        return prev && idSet.has(prev.insertId) && p.insertId === null;
+      });
+
+      pending.push((async () => {
+        for (const insertId of insertIds) {
+          const { error } = await supabase.from('binder_inserts').update({ deleted_at: new Date().toISOString() }).eq('id', insertId);
+          if (error) console.error('[Sync] insert bulk soft delete failed:', error);
+        }
+        for (const panel of clearedPanels) {
+          const { error } = await supabase.from('binder_panels').update({ insert_id: null }).eq('id', panel.id);
+          if (error) console.error('[Sync] panel insert-clear (bulk declutter image) failed:', error);
+        }
+      })());
+
+      pending.push(getRealUserId().then(async userId => {
+        if (!userId) return;
+        for (const insertId of insertIds) {
+          const binItem = nextState.bin.find(b => b.id === insertId);
+          if (binItem) await upsertBinItem(binItem, 'insert');
+        }
+      }));
+      break;
+    }
     case ACTIONS.BIN_RESTORE_CARD: {
       const { itemId: cardId } = action.payload ?? {};
       if (cardId) {
@@ -670,6 +737,17 @@ export function syncToSupabase(action, nextState, prevState) {
             .then(({ error }) => { if (error) console.error('[Sync] inventory restore failed:', error); })
         );
         pending.push(deleteBinItem(cardId));
+      }
+      break;
+    }
+    case ACTIONS.BIN_RESTORE_INSERT: {
+      const { itemId: insertId } = action.payload ?? {};
+      if (insertId) {
+        pending.push(
+          supabase.from('binder_inserts').update({ deleted_at: null }).eq('id', insertId)
+            .then(({ error }) => { if (error) console.error('[Sync] insert restore failed:', error); })
+        );
+        pending.push(deleteBinItem(insertId));
       }
       break;
     }
@@ -733,6 +811,19 @@ export function syncToSupabase(action, nextState, prevState) {
             await logIfError(supabase.from('binder_slots').delete().eq('card_def_id', itemId).eq('user_id', userId), `permanent delete: binder_slots for card ${itemId}`);
             await logIfError(supabase.from('card_definitions').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: card_definitions ${itemId}`);
             await logIfError(supabase.from('bin').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: bin row for card ${itemId}`);
+            await deleteImageFromStorage(getStoragePathFromUrl(binItem.image_url));
+          }));
+          break;
+        } else if (binItem._type === 'insert') {
+          // insertId on any panel was already cleared to null when
+          // this image was soft-deleted (see reducer.js's
+          // BINDER_INSERT_DELETE) — nothing left to cascade there,
+          // just the insert row itself, its bin entry, and its
+          // stored image.
+          pending.push(getRealUserId().then(async userId => {
+            if (!userId) return;
+            await logIfError(supabase.from('binder_inserts').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: binder_inserts ${itemId}`);
+            await logIfError(supabase.from('bin').delete().eq('id', itemId).eq('user_id', userId), `permanent delete: bin row for insert ${itemId}`);
             await deleteImageFromStorage(getStoragePathFromUrl(binItem.image_url));
           }));
           break;

@@ -25,6 +25,7 @@ const CollectionDetailView = lazy(() => import('./components/views/CollectionDet
 const AccountView          = lazy(() => import('./components/views/AccountView.jsx').then(m => ({ default: m.AccountView })));
 const FavoritesView        = lazy(() => import('./components/views/FavoritesView.jsx').then(m => ({ default: m.FavoritesView })));
 const BinView              = lazy(() => import('./components/views/BinView.jsx').then(m => ({ default: m.BinView })));
+const LibraryView          = lazy(() => import('./components/views/LibraryView.jsx').then(m => ({ default: m.LibraryView })));
 
 const VIEW_TITLES = {
   home:        'Home',
@@ -174,6 +175,9 @@ export default function App() {
 
       case 'bin':
         return <BinView bin={bin} toast={toast} />;
+
+      case 'library':
+        return <LibraryView toast={toast} />;
 
       case 'collections':
         return (

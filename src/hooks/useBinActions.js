@@ -17,6 +17,7 @@ export function useBinActions(toast, callbacks = {}) {
       binder:     ACTIONS.BIN_RESTORE_BINDER,
       collection: ACTIONS.BIN_RESTORE_COLLECTION,
       cardDef:    ACTIONS.BIN_RESTORE_CARD,
+      insert:     ACTIONS.BIN_RESTORE_INSERT,
     };
     const action = typeToAction[item._type];
     if (!action) return;

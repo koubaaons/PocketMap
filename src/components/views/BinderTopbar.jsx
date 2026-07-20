@@ -28,6 +28,8 @@ export function BinderTopbar({
   isCombineMode,
   onEnterCombineMode,
   onExitCombineMode,
+  isLibraryPanelOpen,
+  onToggleLibraryPanel,
   showCardInfo,
   onToggleCardInfo,
 }) {
@@ -93,6 +95,11 @@ export function BinderTopbar({
         {isCombineMode && (
           <Button variant="ghost" size="sm" onClick={onExitCombineMode}>
             Exit Combine Mode
+          </Button>
+        )}
+        {!isPreviewMode && (
+          <Button variant={isLibraryPanelOpen ? 'primary' : 'ghost'} size="sm" onClick={onToggleLibraryPanel} disabled={isClosed}>
+            Library
           </Button>
         )}
 

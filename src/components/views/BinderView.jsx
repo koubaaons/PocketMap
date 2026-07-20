@@ -36,8 +36,8 @@ import { BinderPageNav } from './BinderPageNav.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
 import { BinderDataProvider } from '../../contexts/BinderDataContext.jsx';
 import { AddCardsPanel } from '../collections/AddCardsPanel.jsx';
+import { InsertLibraryPanel } from '../collections/InsertLibraryPanel.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
-import { CombineSlotsModal } from '../modals/CombineSlotsModal.jsx';
 import { SwapPagesModal } from '../modals/BinderModals.jsx';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useBinderCoverEditor } from '../../hooks/useBinderCoverEditor.js';
@@ -97,7 +97,16 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   // rectangle {pageNumber, startSlotIndex, spanCols, spanRows} once
   // "Combine" is clicked, until the confirmation modal resolves it
   // into an actual panel (or is cancelled). ===
-  const [showCombineConfirm, setShowCombineConfirm] = useState(null);
+  const [isLibraryPanelOpen, setIsLibraryPanelOpen] = useState(false);
+
+  // === CHANGED: the library used to close automatically whenever
+  // combine mode ended, on the theory that it only made sense while
+  // combining. Per explicit design decision, that's backwards —
+  // Combine Mode is purely for combining slots; adding an image to an
+  // already-blank combined panel is a normal action available from
+  // any mode (view, preview, whatever), same as clicking any other
+  // empty thing in the binder. The panel now only ever closes via its
+  // own "Done" button.
 
   // === MIGRATION: "closed" is now purely spread === 0. BinderBookFlip's
   // cover pair flips off `spread` directly (isFlipped(0) = 0 < spread),
@@ -447,14 +456,50 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     dispatch({ type: ACTIONS.BINDER_PANEL_UPDATE, payload: { id: panelId, ...patch } });
   };
 
+  // === CHANGED: combining slots used to open a modal asking "real
+  // card or decorative image?" — jumbo/oversized real cards aren't an
+  // actual use case here, so that choice was just an extra click for
+  // something that was always going to be "decorative image" anyway.
+  // Confirming a combine now goes straight to creating the panel
+  // blank and opening the library panel to fill it, no modal at all.
+  const handleConfirmCombine = (rect) => {
+    const { panel, errors } = createBinderPanel({
+      binderId: binder.id,
+      pageNumber: rect.pageNumber,
+      startSlotIndex: rect.startSlotIndex,
+      spanCols: rect.spanCols,
+      spanRows: rect.spanRows,
+      panelType: 'insert',
+      insertId: null,
+      userId: binder.userId,
+    });
+    if (!panel) { console.error('Panel creation failed:', errors); return; }
+
+    dispatch({ type: ACTIONS.BINDER_PANEL_ADD, payload: panel });
+    toast('Slots combined');
+    view.clearCombineSelection();
+    // Stay in combine mode (so the user can combine another group
+    // right away without re-entering — see clearCombineSelection
+    // above) and open the library so there's a fresh blank panel
+    // ready for an image immediately. The library itself no longer
+    // cares whether combine mode is active or not — see this
+    // component's isLibraryPanelOpen comment for why.
+    setIsLibraryPanelOpen(true);
+  };
+
   const handleClickPanel = (panel) => {
     if (panel.panelType === 'card') {
       const cardDef = cardDefMap[panel.cardDefId];
       if (cardDef) view.openCardDetail(cardDef);
+      return;
     }
-    // Insert-type panels don't have a card-detail equivalent to open —
-    // editing/replacing the insert image happens via the panel's own
-    // uncombine + re-add flow for now, not a separate detail view.
+    // A blank insert-type panel ("Click to add an image") opens the
+    // library so the user can drag something onto it right away —
+    // one already has an image, editing/replacing it happens via the
+    // panel's own uncombine + re-add flow for now, not this.
+    if (panel.panelType === 'insert' && !panel.insertId) {
+      setIsLibraryPanelOpen(true);
+    }
   };
 
   const makePageHandlers = (pageNumber) => ({
@@ -489,6 +534,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     onClickPanel: handleClickPanel,
     onUncombinePanel: handleUncombinePanel,
     onUpdatePanel: handleUpdatePanel,
+    onDropInsert: (panelId, insertId) => handleUpdatePanel(panelId, { insertId }),
     isCombineMode: view.isCombineMode,
     combineSelection: view.combineSelection.filter(s => s.pageNumber === pageNumber).map(s => s.slotIndex),
     getCombineRectangle: view.getCombineRectangle,
@@ -501,7 +547,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         view.exitCombineMode();
         return;
       }
-      setShowCombineConfirm(rect);
+      handleConfirmCombine(rect);
     },
   });
 
@@ -532,6 +578,8 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         isCombineMode={view.isCombineMode}
         onEnterCombineMode={view.enterCombineMode}
         onExitCombineMode={view.exitCombineMode}
+        isLibraryPanelOpen={isLibraryPanelOpen}
+        onToggleLibraryPanel={() => setIsLibraryPanelOpen(v => !v)}
         showCardInfo={showCardInfo}
         onToggleCardInfo={toggleCardInfo}
       />
@@ -651,6 +699,14 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         />
       )}
 
+      {isLibraryPanelOpen && (
+        <InsertLibraryPanel
+          binderInserts={binderInserts}
+          toast={toast}
+          onClose={() => setIsLibraryPanelOpen(false)}
+        />
+      )}
+
       {view.viewingCardDef && (
         <CardDetailModal
           card={view.viewingCardDef}
@@ -663,40 +719,6 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           onEdit={handleUpdateCard}
           onDelete={() => view.closeCardDetail()}
           onClose={view.closeCardDetail}
-        />
-      )}
-
-
-      {showCombineConfirm && (
-        <CombineSlotsModal
-          rectangle={showCombineConfirm}
-          binderId={binder.id}
-          cardDefinitions={cardDefinitions}
-          binderSlots={allBinderSlots}
-          binderPanels={allBinderPanels}
-          binderInserts={binderInserts}
-          onConfirm={({ newInsert, panelType, cardDefId, insertId }) => {
-            if (newInsert) dispatch({ type: ACTIONS.BINDER_INSERT_ADD, payload: newInsert });
-
-            const { panel, errors } = createBinderPanel({
-              binderId: binder.id,
-              pageNumber: showCombineConfirm.pageNumber,
-              startSlotIndex: showCombineConfirm.startSlotIndex,
-              spanCols: showCombineConfirm.spanCols,
-              spanRows: showCombineConfirm.spanRows,
-              panelType,
-              cardDefId,
-              insertId,
-              userId: binder.userId,
-            });
-            if (!panel) { console.error('Panel creation failed:', errors); return; }
-
-            dispatch({ type: ACTIONS.BINDER_PANEL_ADD, payload: panel });
-            toast('Slots combined');
-            setShowCombineConfirm(null);
-            view.exitCombineMode();
-          }}
-          onClose={() => setShowCombineConfirm(null)}
         />
       )}
 

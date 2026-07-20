@@ -14,6 +14,7 @@ export const ACTIONS = Object.freeze({
   BIN_RESTORE_BINDER:     'BIN_RESTORE_BINDER',
   BIN_RESTORE_COLLECTION: 'BIN_RESTORE_COLLECTION',
   BIN_RESTORE_CARD:       'BIN_RESTORE_CARD',
+  BIN_RESTORE_INSERT:     'BIN_RESTORE_INSERT',
   BIN_DELETE_ITEM:        'BIN_DELETE_ITEM',
   BIN_EMPTY:              'BIN_EMPTY',
   NAV_SET:  'NAV_SET',
@@ -43,7 +44,9 @@ export const ACTIONS = Object.freeze({
   BINDER_SLOT_MOVE:   'BINDER_SLOT_MOVE',
   // === Michi Method support: combined slots ===
   BINDER_INSERT_ADD:    'BINDER_INSERT_ADD',
+  BINDER_INSERT_BULK_ADD: 'BINDER_INSERT_BULK_ADD',
   BINDER_INSERT_DELETE: 'BINDER_INSERT_DELETE',
+  BINDER_INSERT_BULK_DELETE: 'BINDER_INSERT_BULK_DELETE',
   BINDER_PANEL_ADD:     'BINDER_PANEL_ADD',
   BINDER_PANEL_UPDATE:  'BINDER_PANEL_UPDATE',
   BINDER_PANEL_REMOVE:  'BINDER_PANEL_REMOVE',
@@ -173,6 +176,24 @@ export function reducer(state, action) {
     // INVENTORY_DELETE is back to a direct hard delete (see that
     // case's own comment for why). Nothing ever dispatches this
     // action anymore. ===
+
+    // === Michi Method support: restore a decluttered/deleted library
+    // image. Panels that had their insertId cleared when this image
+    // was soft-deleted (see BINDER_INSERT_DELETE below) stay blank —
+    // same reasoning as card declutter not attempting to recreate old
+    // binder placements: there's no reliable way to know which panel
+    // used to show this image once that link is gone.
+    case ACTIONS.BIN_RESTORE_INSERT: {
+      const { itemId } = action.payload;
+      const item = state.bin.find(i => i.id === itemId && i._type === 'insert');
+      if (!item) return state;
+      const { _type, deletedAt, ...insert } = item;
+      return {
+        ...state,
+        binderInserts: [...state.binderInserts, insert],
+        bin: state.bin.filter(i => i.id !== itemId),
+      };
+    }
 
     case ACTIONS.BIN_DELETE_ITEM: {
       // === FIX (real gap): this used to only clear state.bin itself,
@@ -798,16 +819,48 @@ export function reducer(state, action) {
     case ACTIONS.BINDER_INSERT_ADD:
       return { ...state, binderInserts: [...state.binderInserts, action.payload] };
 
-    case ACTIONS.BINDER_INSERT_DELETE:
+    // === New: batch upload into the image library — requested
+    // directly ("add in a batch like multiselect, not one at a
+    // time"). Same shape as CARD_DEFINITION_BULK_ADD.
+    case ACTIONS.BINDER_INSERT_BULK_ADD:
+      return { ...state, binderInserts: [...state.binderInserts, ...action.payload] };
+
+    // === CHANGED: soft delete, matching every other deletable entity
+    // in this app (binders, collections, cards) instead of being the
+    // one thing that destroys itself immediately. Moves to state.bin,
+    // restorable via BIN_RESTORE_INSERT, permanently removed only via
+    // BIN_DELETE_ITEM/BIN_EMPTY from Trash.
+    //
+    // Panels using this image get insertId CLEARED (blank, still
+    // combined) rather than being removed outright — an insert-type
+    // panel with no image is exactly as legitimate a state as a
+    // regular slot with no owner (see BinderSlot's own placeholder
+    // handling), so there's no reason to destroy the combined space
+    // itself just because its picture went to Trash.
+    case ACTIONS.BINDER_INSERT_DELETE: {
+      const { insertId } = action.payload;
+      const insert = state.binderInserts.find(i => i.id === insertId);
+      if (!insert) return state;
       return {
         ...state,
-        binderInserts: state.binderInserts.filter(i => i.id !== action.payload.insertId),
-        // Any panel using this insert loses its image source — remove
-        // those panels too rather than leaving a broken reference.
-        // Removing the panel just returns those slot positions to
-        // normal, empty, individually-placeable slots.
-        binderPanels: state.binderPanels.filter(p => p.insertId !== action.payload.insertId),
+        binderInserts: state.binderInserts.filter(i => i.id !== insertId),
+        binderPanels: state.binderPanels.map(p =>
+          p.insertId === insertId ? { ...p, insertId: null } : p
+        ),
+        bin: [...state.bin, { ...insert, _type: 'insert', deletedAt: Date.now() }],
       };
+    }
+
+    // === New: bulk soft-delete for the library's multiselect. Folds
+    // the single-item case over each id — same reasoning as
+    // INVENTORY_BULK_ADD/DELETE above (reuse tested single-item
+    // logic rather than re-deriving it).
+    case ACTIONS.BINDER_INSERT_BULK_DELETE: {
+      return (action.payload?.insertIds ?? []).reduce(
+        (accState, insertId) => reducer(accState, { type: ACTIONS.BINDER_INSERT_DELETE, payload: { insertId } }),
+        state
+      );
+    }
 
     case ACTIONS.BINDER_PANEL_ADD: {
       const panel = action.payload;

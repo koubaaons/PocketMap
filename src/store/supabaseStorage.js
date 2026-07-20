@@ -58,6 +58,7 @@ function rowToBinderInsert(row) {
     userId:    row.user_id,
     name:      row.name,
     image_url: row.image_url,
+    deletedAt: row.deleted_at ? new Date(row.deleted_at).getTime() : null,
     createdAt: new Date(row.created_at).getTime(),
   };
 }
@@ -187,7 +188,7 @@ export async function loadStateFromSupabase() {
     ] = await Promise.all([
       supabase.from('binders').select('*').is('deleted_at', null),
       supabase.from('binder_slots').select('*'),
-      supabase.from('binder_inserts').select('*'),
+      supabase.from('binder_inserts').select('*').is('deleted_at', null),
       supabase.from('binder_panels').select('*'),
       supabase.from('collections').select('*').is('deleted_at', null),
       supabase.from('template_fields').select('*'),

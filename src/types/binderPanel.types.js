@@ -32,7 +32,17 @@ export function validateBinderPanel(data) {
   if (data.spanCols === 1 && data.spanRows === 1) errors.push('a panel must span more than one slot (spanCols and spanRows are both 1 — that\'s just a normal slot)');
   if (!['card', 'insert'].includes(data.panelType)) errors.push('panelType must be "card" or "insert"');
   if (data.panelType === 'card' && !data.cardDefId) errors.push('cardDefId is required when panelType is "card"');
-  if (data.panelType === 'insert' && !data.insertId) errors.push('insertId is required when panelType is "insert"');
+  // insertId is intentionally OPTIONAL for panelType 'insert' — a
+  // combined space with no image yet is a legitimate state, both
+  // right after choosing "Decorative Image" (before dragging one
+  // onto it via InsertLibraryPanel.jsx) and after its image is
+  // soft-deleted from the library (see reducer.js's
+  // BINDER_INSERT_DELETE, which blanks the panel rather than
+  // destroying it). BinderPanelSlot.jsx already renders this state
+  // as "Click to add an image".
+  if (data.panelType === 'insert' && data.insertId !== null && data.insertId !== undefined && typeof data.insertId !== 'string') {
+    errors.push('insertId must be a string or null');
+  }
   if (data.inventoryItemId !== null && data.inventoryItemId !== undefined && typeof data.inventoryItemId !== 'string') {
     errors.push('inventoryItemId must be a string or null');
   }

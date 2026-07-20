@@ -135,6 +135,10 @@ export function useBinderView(binder, binderSlots) {
     setCombineSelection([]);
   }, []);
 
+  const clearCombineSelection = useCallback(() => {
+    setCombineSelection([]);
+  }, []);
+
   const toggleSlotForCombine = useCallback((pageNumber, slotIndex) => {
     setCombineSelection(prev => {
       const exists = prev.some(s => s.pageNumber === pageNumber && s.slotIndex === slotIndex);
@@ -210,6 +214,7 @@ export function useBinderView(binder, binderSlots) {
     enterCombineMode,
     exitCombineMode,
     toggleSlotForCombine,
+    clearCombineSelection,
     getCombineRectangle,
   };
 }

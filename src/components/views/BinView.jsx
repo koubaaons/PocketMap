@@ -19,7 +19,7 @@ import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
 import { useBinActions } from '../../hooks/useBinActions.js';
 // === REFACTOR7d END ===
 
-const SECTIONS = ['Binders', 'Collections', 'Cards'];
+const SECTIONS = ['Binders', 'Collections', 'Cards', 'Images'];
 
 export function BinView({ toast }) {
   const bin = useStore(s => s.bin);
@@ -34,14 +34,15 @@ export function BinView({ toast }) {
   const binders     = useMemo(() => bin.filter(i => i._type === 'binder'),     [bin]);
   const collections = useMemo(() => bin.filter(i => i._type === 'collection'), [bin]);
   const cards       = useMemo(() => bin.filter(i => i._type === 'cardDef'),    [bin]);
+  const images      = useMemo(() => bin.filter(i => i._type === 'insert'),     [bin]);
 
-  const sectionItems = { Binders: binders, Collections: collections, Cards: cards };
+  const sectionItems = { Binders: binders, Collections: collections, Cards: cards, Images: images };
 
   if (bin.length === 0) {
     return (
       <div className="view">
         <EmptyState icon="🗑" title="Trash is empty"
-          subtitle="Deleted binders, collections, and cards appear here." />
+          subtitle="Deleted binders, collections, cards, and library images appear here." />
       </div>
     );
   }
@@ -74,6 +75,9 @@ export function BinView({ toast }) {
         <div className="bin-list">
           {currentItems.map(item => (
             <div key={item.id} className="bin-row">
+              {item._type === 'insert' && item.image_url && (
+                <img src={item.image_url} alt={item.name} className="bin-row-thumbnail" />
+              )}
               <div className="bin-info">
                 <span className="bin-name">{item.name}</span>
                 <span className="bin-meta">

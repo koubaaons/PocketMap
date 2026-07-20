@@ -41,11 +41,46 @@ export function BinderPanelSlot({
   onClick,
   onUncombine,
   onUpdatePosition,
+  onDropInsert,
 }) {
   const isCardPanel = panel.panelType === 'card';
   const name      = isCardPanel ? cardDef?.name : insert?.name;
   const imageUrl  = isCardPanel ? cardDef?.image_url : insert?.image_url;
   const showGrey  = isCardPanel && !isOwned;
+
+  // === New: drag a library image (see InsertLibraryPanel.jsx) onto
+  // a blank insert-type panel to fill it. Only meaningful for
+  // exactly that case — a card panel or an already-filled insert
+  // panel just ignores drag events entirely (onDropInsert itself is
+  // only ever passed down while combine mode is on, same pattern as
+  // BinderSlot.jsx's onDropCard).
+  const isBlankInsertPanel = panel.panelType === 'insert' && !imageUrl;
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e) => {
+    if (!isBlankInsertPanel || !onDropInsert) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    if (isDragOver) setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    if (!isBlankInsertPanel || !onDropInsert) return;
+    e.preventDefault();
+    setIsDragOver(false);
+    const raw = e.dataTransfer.getData('application/json');
+    if (!raw) return;
+    try {
+      const payload = JSON.parse(raw);
+      if (payload.insertId) onDropInsert(payload.insertId);
+    } catch {
+      // Malformed/foreign drag payload — silently ignore.
+    }
+  };
 
   const [isAdjusting, setIsAdjusting] = useState(false);
   const containerRef = useRef(null);
@@ -84,7 +119,7 @@ export function BinderPanelSlot({
   return (
     <div
       ref={containerRef}
-      className={`binder-slot binder-panel-slot ${showGrey ? 'binder-slot-placeholder' : 'binder-slot-filled'} ${isAdjusting ? 'binder-panel-slot-adjusting' : ''}`}
+      className={`binder-slot binder-panel-slot ${showGrey ? 'binder-slot-placeholder' : 'binder-slot-filled'} ${isAdjusting ? 'binder-panel-slot-adjusting' : ''} ${isDragOver ? 'binder-slot-drag-over' : ''}`}
       style={{
         gridColumnStart,
         gridRowStart,
@@ -98,6 +133,9 @@ export function BinderPanelSlot({
       role={isAdjusting ? undefined : 'button'}
       tabIndex={isAdjusting ? undefined : 0}
       aria-label={name ? `${name} (combined slot, ${panel.spanCols}x${panel.spanRows})` : 'Combined slot'}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <span className="binder-panel-slot-badge">
         {panel.spanCols}×{panel.spanRows}

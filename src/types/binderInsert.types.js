@@ -19,6 +19,12 @@ export function validateBinderInsert(data) {
   if (!data.name || typeof data.name !== 'string' || !data.name.trim()) errors.push('name must be a non-empty string');
   if (!data.image_url || typeof data.image_url !== 'string') errors.push('image_url must be a non-empty string');
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
+  // Optional — undefined/null both mean "not deleted" (see BinderSlot/
+  // library usages of `insert.deletedAt ?? null`), matching the same
+  // pattern already used for holoType/isDecluttered elsewhere.
+  if (data.deletedAt !== undefined && data.deletedAt !== null && typeof data.deletedAt !== 'number') {
+    errors.push('deletedAt must be a timestamp or null');
+  }
   return { valid: errors.length === 0, errors };
 }
 

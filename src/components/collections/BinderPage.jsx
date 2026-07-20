@@ -37,6 +37,7 @@ export function BinderPage({
   onClickPanel,
   onUncombinePanel,
   onUpdatePanel,
+  onDropInsert,
   isCombineMode = false,
   combineSelection = [],
   getCombineRectangle,
@@ -109,6 +110,7 @@ export function BinderPage({
                 onClick={() => onClickPanel(panel)}
                 onUncombine={!isPreviewMode ? () => onUncombinePanel(panel) : undefined}
                 onUpdatePosition={(patch) => onUpdatePanel(panel.id, patch)}
+                onDropInsert={onDropInsert ? (insertId) => onDropInsert(panel.id, insertId) : undefined}
               />
             );
           }

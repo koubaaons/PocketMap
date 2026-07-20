@@ -8,6 +8,7 @@
  *   Binders
  *   Collections
  *   Favorites
+ *   Library
  *   Search
  *   ── account ──
  *   Statistics
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { view: 'binders',     label: 'Binders',     icon: 'ti-books',      group: 'menu' },
   { view: 'collections', label: 'Collections', icon: 'ti-cards',      group: 'menu' },
   { view: 'favorites',   label: 'Favorites',   icon: 'ti-heart',      group: 'menu' },
+  { view: 'library',     label: 'Library',     icon: 'ti-photo',      group: 'menu' },
   { view: 'search',      label: 'Search',      icon: 'ti-search',     group: 'menu' },
   { view: 'statistics',  label: 'Statistics',  icon: 'ti-chart-bar',  group: 'account' },
   { view: 'bin',         label: 'Trash Bin',   icon: 'ti-trash',      group: 'account' },

@@ -303,15 +303,15 @@ export function AddCardsPanel({
       .map(c => ({ collection: c, cards: byCollection[c.id] }));
   }, [cardDefinitions, collections, collectionMap, fullyPlacedIds, query, selectedCollectionId]);
 
-  // Only offer collections that actually have something left to place
-  // at all (ignoring the search query) — no point showing a pill for
-  // a collection that's fully placed already.
-  const collectionsWithAvailableCards = useMemo(() => {
-    const availableCardDefIds = new Set(
-      cardDefinitions.filter(cd => !cd.isDecluttered && !fullyPlacedIds.has(cd.id)).map(cd => cd.collectionId)
-    );
-    return collections.filter(c => availableCardDefIds.has(c.id));
-  }, [cardDefinitions, collections, fullyPlacedIds]);
+  // === CHANGED: this used to hide a collection's pill entirely once
+  // every one of its cards already had a spot in THIS binder (owned
+  // ones placed, unowned ones already sitting there as grey
+  // placeholders) — reasonable in theory, but confusing in practice:
+  // a collection's pill would just silently vanish with no
+  // explanation. Always showing every collection is more predictable;
+  // if a collection genuinely has nothing left, selecting it just
+  // shows an empty grid, which is a much clearer signal than a pill
+  // that's simply not there.
 
   const handleDragStart = (e, card) => {
     e.dataTransfer.setData('application/json', JSON.stringify({
@@ -373,7 +373,7 @@ export function AddCardsPanel({
         <Button variant="primary" size="sm" onClick={onClose}>Done</Button>
       </div>
 
-      {collectionsWithAvailableCards.length > 1 && (
+      {collections.length > 1 && (
         <div className="add-cards-panel-collection-tabs" role="tablist" aria-label="Filter by collection">
           <button
             type="button"
@@ -384,7 +384,7 @@ export function AddCardsPanel({
           >
             All
           </button>
-          {collectionsWithAvailableCards.map(c => (
+          {collections.map(c => (
             <button
               key={c.id}
               type="button"

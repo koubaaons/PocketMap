@@ -1,15 +1,21 @@
 /**
  * @fileoverview CombineSlotsModal — confirms what goes in a newly
  * combined-slot group (Michi Method): either a real card that just
- * needs more space, or a decorative art insert.
+ * needs more space, or a blank spot for a decorative art insert.
+ *
+ * === CHANGED: the "Decorative Image" tab used to have its own
+ * embedded upload button + library grid, picking an image right here
+ * as part of confirming the combine. That's now handled by a
+ * dedicated, persistent library — InsertLibraryPanel.jsx (a floating,
+ * draggable/resizable panel, shown only in Combine Mode) plus
+ * LibraryView.jsx (the sidebar's full "Library" page for managing it,
+ * batch uploads included). Confirming here just creates the panel
+ * blank; BinderView.jsx opens the library panel immediately after,
+ * so dragging an image onto it is the very next thing the user does. ===
  */
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Modal, ModalActions, Button, Input } from '../ui/index.jsx';
-import { createBinderPanel, createBinderInsert } from '../../types/index.js';
-import { compressImage } from '../../utils/imageCompression.js';
-import { uploadImageToStorage } from '../../utils/supabaseImageUpload.js';
-import { useAuth } from '../../hooks/useAuth.js';
 
 export function CombineSlotsModal({
   rectangle, // { pageNumber, startSlotIndex, spanCols, spanRows }
@@ -17,18 +23,12 @@ export function CombineSlotsModal({
   cardDefinitions,
   binderSlots,
   binderPanels,
-  binderInserts,
   onConfirm,
   onClose,
 }) {
-  const { user } = useAuth();
   const [tab, setTab] = useState('card'); // 'card' | 'insert'
   const [cardQuery, setCardQuery] = useState('');
   const [selectedCardId, setSelectedCardId] = useState(null);
-  const [selectedInsertId, setSelectedInsertId] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const fileInputRef = useRef(null);
 
   // A card already placed in THIS binder (a slot or another panel)
   // can't be placed again — same scope as the existing "card already
@@ -39,41 +39,17 @@ export function CombineSlotsModal({
   ]);
 
   const availableCards = cardDefinitions
+    .filter(cd => !cd.isDecluttered)
     .filter(cd => !alreadyPlacedCardIds.has(cd.id))
     .filter(cd => cd.name.toLowerCase().includes(cardQuery.trim().toLowerCase()));
-
-  const handleUploadInsert = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsUploading(true);
-    setUploadError('');
-    try {
-      const compressed = await compressImage(file);
-      const path = `${user.id}/inserts/${crypto.randomUUID()}.jpg`;
-      const image_url = await uploadImageToStorage(compressed, path);
-      const { insert, errors } = createBinderInsert({
-        name: file.name.replace(/\.[^.]+$/, '') || 'Insert',
-        image_url,
-        userId: user.id,
-      });
-      if (!insert) { setUploadError(errors.join(', ')); return; }
-      onConfirm({ newInsert: insert, panelType: 'insert', insertId: insert.id });
-    } catch (err) {
-      console.error('Insert upload failed:', err);
-      setUploadError('Could not upload that image. Try a different file.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   const handleConfirmCard = () => {
     if (!selectedCardId) return;
     onConfirm({ panelType: 'card', cardDefId: selectedCardId });
   };
 
-  const handleConfirmExistingInsert = () => {
-    if (!selectedInsertId) return;
-    onConfirm({ panelType: 'insert', insertId: selectedInsertId });
+  const handleConfirmBlankInsert = () => {
+    onConfirm({ panelType: 'insert', insertId: null, openLibrary: true });
   };
 
   return (
@@ -121,45 +97,11 @@ export function CombineSlotsModal({
       )}
 
       {tab === 'insert' && (
-        <>
-          <p className="modal-step-note">
-            A decorative image — art, a themed background, a placeholder. Not a card: no rarity, no ownership, doesn't affect collection stats.
-          </p>
-
-          <Button
-            variant="ghost"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-          >
-            {isUploading ? 'Uploading…' : '+ Upload New Image'}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            style={{ display: 'none' }}
-            onChange={handleUploadInsert}
-          />
-          {uploadError && <p className="modal-step-error">{uploadError}</p>}
-
-          {binderInserts.length > 0 && (
-            <>
-              <p className="modal-step-note">Or reuse one already in your library:</p>
-              <div className="combine-card-grid">
-                {binderInserts.map(ins => (
-                  <button
-                    key={ins.id}
-                    className={`combine-card-option ${selectedInsertId === ins.id ? 'combine-card-option-selected' : ''}`}
-                    onClick={() => setSelectedInsertId(ins.id)}
-                  >
-                    <img src={ins.image_url} alt={ins.name} />
-                    <span>{ins.name}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </>
+        <p className="modal-step-note">
+          A decorative image — art, a themed background, a placeholder. Not a card: no rarity, no ownership,
+          doesn't affect collection stats. Confirming creates the combined space blank — the image library
+          opens right after so you can drag one onto it (or upload new ones, including several at once).
+        </p>
       )}
 
       <ModalActions>
@@ -169,8 +111,8 @@ export function CombineSlotsModal({
             Combine
           </Button>
         )}
-        {tab === 'insert' && selectedInsertId && (
-          <Button variant="primary" onClick={handleConfirmExistingInsert}>
+        {tab === 'insert' && (
+          <Button variant="primary" onClick={handleConfirmBlankInsert}>
             Combine
           </Button>
         )}
