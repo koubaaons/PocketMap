@@ -39,6 +39,7 @@ import { AddCardsPanel } from '../collections/AddCardsPanel.jsx';
 import { InsertLibraryPanel } from '../collections/InsertLibraryPanel.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { SwapPagesModal } from '../modals/BinderModals.jsx';
+import { ExportBinderModal } from '../modals/ExportBinderModal.jsx';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useBinderCoverEditor } from '../../hooks/useBinderCoverEditor.js';
 import { BinderCoverStickers } from './BinderCover.jsx';
@@ -93,6 +94,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isSwapPagesOpen, setIsSwapPagesOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
   // === Michi Method support: combine mode — holds the computed
   // rectangle {pageNumber, startSlotIndex, spanCols, spanRows} once
   // "Combine" is clicked, until the confirmation modal resolves it
@@ -572,6 +574,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         onSaveLayout={handleSaveLayout}
         onAddPage={() => handleAddPage(binder.id)}
         onSwapPages={() => setIsSwapPagesOpen(true)}
+        onExportBinder={() => setIsExportOpen(true)}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
         onCloseBinder={handleCloseBinder}
@@ -738,6 +741,19 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           binder={binder}
           onSubmit={(pageA, pageB) => handleSwapPages(binder.id, pageA, pageB)}
           onClose={() => setIsSwapPagesOpen(false)}
+        />
+      )}
+
+      {isExportOpen && (
+        <ExportBinderModal
+          binder={binder}
+          allBinderSlots={allBinderSlots}
+          allBinderPanels={allBinderPanels}
+          cardDefMap={cardDefMap}
+          binderInsertMap={binderInsertMap}
+          inventoryGroupMap={inventoryGroupMap}
+          toast={toast}
+          onClose={() => setIsExportOpen(false)}
         />
       )}
 

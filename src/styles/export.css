@@ -1,0 +1,132 @@
+/* ── Binder export (ExportPageRenderer.jsx) ──────────────────────────────────
+   Fixed pixel sizing throughout, deliberately not using the app's own
+   --space-,--radius-* custom properties — export quality needs to be
+   predictable and high-resolution regardless of the page's current
+   zoom level or root font size, neither of which should leak into a
+   file someone downloads. */
+
+.export-page-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 1200px;
+  padding: 32px;
+  background: #f5f0e8;
+  border-radius: 16px;
+  box-sizing: border-box;
+}
+
+.export-page-wrapper-plain {
+  background: #ffffff;
+}
+
+.export-page-wrapper-transparent {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.export-page-label {
+  font-size: 14px;
+  color: #8a8378;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.export-page-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.export-cell {
+  position: relative;
+  aspect-ratio: 2.5 / 3.5;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.export-cell-empty {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 8px;
+}
+
+.export-cell-filled {
+  background: #e5e0d8;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.export-cell-cardsonly {
+  background: transparent;
+  border: none;
+}
+
+.export-cell-placeholder {
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.export-cell-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.export-cell-image-grey {
+  filter: grayscale(1) brightness(0.9);
+}
+
+.export-cell-index {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.export-cell-quantity {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Export Binder modal ─────────────────────────────────────────────────── */
+
+.export-range-options,
+.export-toggle-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.export-radio-option,
+.export-checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.export-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: var(--space-5);
+}
+
+.export-range-inputs input {
+  width: 70px;
+}

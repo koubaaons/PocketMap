@@ -32,6 +32,7 @@ export function BinderTopbar({
   onToggleLibraryPanel,
   showCardInfo,
   onToggleCardInfo,
+  onExportBinder,
 }) {
   const percentComplete = capacity > 0 ? Math.round((filled / capacity) * 100) : 0;
 
@@ -95,6 +96,10 @@ export function BinderTopbar({
             {showCardInfo ? 'Hide Card Info' : 'Show Card Info'}
           </Button>
         )}
+
+        <Button variant="ghost" size="sm" onClick={onExportBinder}>
+          Export
+        </Button>
 
         {/* Fullscreen — the one control that stays live while closed,
             deliberately outside the greyed-out treatment above. */}
