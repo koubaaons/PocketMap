@@ -19,7 +19,7 @@ import { CollectionDataProvider } from '../../contexts/CollectionDataContext.jsx
 import { CardDefinitionForm } from '../collections/CardDefinitionForm.jsx';
 import { CollectionSummary } from '../collections/CollectionSummary.jsx';
 import { TabToolbar } from '../collections/TabToolbar.jsx';
-import { applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
+import { applyCardDefinitionFilters, getFilterGroupsForCollection } from '../../selectors/cardDefinitionSelectors.js';
 import { buildOwnershipMap, buildInventoryGroupMap, buildCollectionSummary } from '../../selectors/inventorySelectors.js';
 import { getOrganisedCardDefIds } from '../../selectors/binderSelectors.js';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
@@ -58,6 +58,8 @@ export function CollectionDetailView({ toast, onBack }) {
     [cardDefinitions, collection?.id]
   );
 
+  const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection?.id);
+
   const ownershipMap = useMemo(() => buildOwnershipMap(inventory), [inventory]);
   const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
 
@@ -66,9 +68,14 @@ export function CollectionDetailView({ toast, onBack }) {
     [collectionCards, ownershipMap, binderSlots, binderPanels]
   );
 
+  const cardFilterGroups = useMemo(
+    () => getFilterGroupsForCollection(collectionCards, collectionTemplateFields),
+    [collectionCards, collectionTemplateFields]
+  );
+
   const filteredCards = useMemo(
-    () => applyCardDefinitionFilters(collectionCards, editor.query, editor.sortBy),
-    [collectionCards, editor.query, editor.sortBy]
+    () => applyCardDefinitionFilters(collectionCards, editor.query, editor.sortBy, editor.filters),
+    [collectionCards, editor.query, editor.sortBy, editor.filters]
   );
 
   const { handleCreate, handleUpdate, handleDelete } = useCardDefinitionActions(toast, {
@@ -92,8 +99,6 @@ export function CollectionDetailView({ toast, onBack }) {
       // close the whole modal, and CardDetailModal now decides that
       // itself based on remaining quantity. ===
     });
-
-  const collectionTemplateFields = templateFields.filter(f => f.collectionId === collection?.id);
 
   // === FIX (own/unown flow — quick-toggle from the grid): reused by
   // the Cards tab below AND by sharedTabProps, so Missing/Owned get
@@ -185,6 +190,7 @@ export function CollectionDetailView({ toast, onBack }) {
               sort={editor.sortBy} setSort={editor.setSortBy}
               showAdd onAdd={editor.openCreate}
               showCardInfo={showCardInfo} onToggleCardInfo={toggleCardInfo}
+              filterGroups={cardFilterGroups} filters={editor.filters} setFilters={editor.setFilters}
             />
             <CardDefinitionList
               cards={filteredCards}

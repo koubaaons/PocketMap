@@ -21,6 +21,7 @@ import { useState } from 'react';
 export function useCardEditor() {
   const [query, setQuery]               = useState('');
   const [sortBy, setSortBy]             = useState('newest');
+  const [filters, setFilters]           = useState({});
   const [showCreate, setShowCreate]     = useState(false);
   const [editingCard, setEditingCard]   = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -40,6 +41,8 @@ export function useCardEditor() {
     clearQuery,
     sortBy,
     setSortBy,
+    filters,
+    setFilters,
 
     // Modal state
     showCreate,

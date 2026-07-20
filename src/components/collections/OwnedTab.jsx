@@ -7,22 +7,37 @@
 
 import { useState, useMemo } from 'react';
 import { CardDefinitionList } from './CardDefinitionList.jsx';
-import { CARD_SORT_OPTIONS, applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
+import { applyCardDefinitionFilters, getFilterGroupsForCollection } from '../../selectors/cardDefinitionSelectors.js';
 import { getOwnedCards } from '../../selectors/inventorySelectors.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
 export function OwnedTab({ collectionCards, collectionTemplateFields, ownershipMap, showCardInfo, onToggleCardInfo, summary, onView, onEdit, onDelete, onToggleOwned, onToggleFavorite }) {
-  const [query, setQuery] = useState('');
-  const [sort,  setSort]  = useState('newest');
+  const [query, setQuery]     = useState('');
+  const [sort,  setSort]      = useState('newest');
+  const [filters, setFilters] = useState({});
+
+  const ownedCards = useMemo(
+    () => getOwnedCards(collectionCards, ownershipMap),
+    [collectionCards, ownershipMap]
+  );
+
+  const filterGroups = useMemo(
+    () => getFilterGroupsForCollection(ownedCards, collectionTemplateFields),
+    [ownedCards, collectionTemplateFields]
+  );
 
   const cards = useMemo(
-    () => applyCardDefinitionFilters(getOwnedCards(collectionCards, ownershipMap), query, sort),
-    [collectionCards, ownershipMap, query, sort]
+    () => applyCardDefinitionFilters(ownedCards, query, sort, filters),
+    [ownedCards, query, sort, filters]
   );
 
   return (
     <div className="tab-content">
-      <TabToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} showCardInfo={showCardInfo} onToggleCardInfo={onToggleCardInfo} />
+      <TabToolbar
+        query={query} setQuery={setQuery} sort={sort} setSort={setSort}
+        showCardInfo={showCardInfo} onToggleCardInfo={onToggleCardInfo}
+        filterGroups={filterGroups} filters={filters} setFilters={setFilters}
+      />
       <CardDefinitionList
         cards={cards}
         templateFields={collectionTemplateFields}

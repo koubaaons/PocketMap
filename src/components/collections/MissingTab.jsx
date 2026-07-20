@@ -7,22 +7,37 @@
 
 import { useState, useMemo } from 'react';
 import { CardDefinitionList } from './CardDefinitionList.jsx';
-import { applyCardDefinitionFilters } from '../../selectors/cardDefinitionSelectors.js';
+import { applyCardDefinitionFilters, getFilterGroupsForCollection } from '../../selectors/cardDefinitionSelectors.js';
 import { getMissingCards } from '../../selectors/inventorySelectors.js';
 import { TabToolbar } from './TabToolbar.jsx';
 
 export function MissingTab({ collectionCards, collectionTemplateFields, ownershipMap, showCardInfo, onToggleCardInfo, summary, onView, onEdit, onDelete, onToggleOwned }) {
-  const [query, setQuery] = useState('');
-  const [sort,  setSort]  = useState('newest');
+  const [query, setQuery]     = useState('');
+  const [sort,  setSort]      = useState('newest');
+  const [filters, setFilters] = useState({});
+
+  const missingCards = useMemo(
+    () => getMissingCards(collectionCards, ownershipMap),
+    [collectionCards, ownershipMap]
+  );
+
+  const filterGroups = useMemo(
+    () => getFilterGroupsForCollection(missingCards, collectionTemplateFields),
+    [missingCards, collectionTemplateFields]
+  );
 
   const cards = useMemo(
-    () => applyCardDefinitionFilters(getMissingCards(collectionCards, ownershipMap), query, sort),
-    [collectionCards, ownershipMap, query, sort]
+    () => applyCardDefinitionFilters(missingCards, query, sort, filters),
+    [missingCards, query, sort, filters]
   );
 
   return (
     <div className="tab-content">
-      <TabToolbar query={query} setQuery={setQuery} sort={sort} setSort={setSort} showCardInfo={showCardInfo} onToggleCardInfo={onToggleCardInfo} />
+      <TabToolbar
+        query={query} setQuery={setQuery} sort={sort} setSort={setSort}
+        showCardInfo={showCardInfo} onToggleCardInfo={onToggleCardInfo}
+        filterGroups={filterGroups} filters={filters} setFilters={setFilters}
+      />
       <CardDefinitionList
         cards={cards}
         templateFields={collectionTemplateFields}
