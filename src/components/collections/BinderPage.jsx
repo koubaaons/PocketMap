@@ -41,6 +41,7 @@ export function BinderPage({
   isCombineMode = false,
   combineSelection = [],
   getCombineRectangle,
+  onClearCombineSelection,
   onConfirmCombine,
 }) {
   const { cardDefMap, inventoryGroupMap, allBinderSlots, allBinderPanels } = useBinderData();
@@ -108,7 +109,7 @@ export function BinderPage({
                 gridColumnStart={gridColumnStart}
                 gridRowStart={gridRowStart}
                 onClick={() => onClickPanel(panel)}
-                onUncombine={!isPreviewMode ? () => onUncombinePanel(panel) : undefined}
+                onUncombine={() => onUncombinePanel(panel)}
                 onUpdatePosition={(patch) => onUpdatePanel(panel.id, patch)}
                 onDropInsert={onDropInsert ? (insertId) => onDropInsert(panel.id, insertId) : undefined}
               />
@@ -197,25 +198,49 @@ export function BinderPage({
             hidden behind whatever UI comes after the binder (bottom
             nav, page indicator, etc). Now flips to sit ABOVE the
             selection instead whenever it touches the bottom row, so
-            it's always actually visible. === */}
+            it's always actually visible.
+            === FIX (real bug reported directly by the user): the same
+            problem existed on the horizontal axis — centering the
+            button on the selection meant a selection near the left or
+            right edge of the page pushed half the button's width past
+            that edge, clipping it. Now anchors to whichever edge the
+            selection is actually touching instead of always
+            centering, computed as a single inline transform (both
+            axes at once) rather than juggling a combinatorial set of
+            CSS classes for every left/right × above/below pairing. === */}
         {isCombineMode && combineSelection.length > 0 && (() => {
           const rows = combineSelection.map(i => Math.floor(i / cols));
           const colsSel = combineSelection.map(i => i % cols);
           const minRow = Math.min(...rows), maxRow = Math.max(...rows);
           const minCol = Math.min(...colsSel), maxCol = Math.max(...colsSel);
-          const leftPct = ((minCol + maxCol + 2) / 2 / cols) * 100;
 
           const touchesBottomRow = maxRow >= binder.rows - 1;
+          const touchesLastCol   = maxCol >= cols - 1;
+          const touchesFirstCol  = minCol <= 0;
+
+          let leftPct, translateX;
+          if (touchesLastCol && !touchesFirstCol) {
+            leftPct = ((maxCol + 1) / cols) * 100; // right edge of selection
+            translateX = '-100%'; // anchor the button's own right edge here
+          } else if (touchesFirstCol && !touchesLastCol) {
+            leftPct = (minCol / cols) * 100; // left edge of selection
+            translateX = '0%'; // anchor the button's own left edge here
+          } else {
+            leftPct = ((minCol + maxCol + 2) / 2 / cols) * 100; // centered, as before
+            translateX = '-50%';
+          }
+
           const topPct = touchesBottomRow
             ? (minRow / binder.rows) * 100   // sit above the selection's top edge
             : ((maxRow + 1) / binder.rows) * 100; // sit below the selection's bottom edge (original behavior)
+          const translateY = touchesBottomRow ? 'calc(-100% - var(--space-2))' : 'var(--space-2)';
 
           const rect = getCombineRectangle(cols);
 
           return (
             <div
-              className={`binder-combine-floating ${touchesBottomRow ? 'binder-combine-floating-above' : ''}`}
-              style={{ left: `${leftPct}%`, top: `${topPct}%` }}
+              className="binder-combine-floating"
+              style={{ left: `${leftPct}%`, top: `${topPct}%`, transform: `translate(${translateX}, ${translateY})` }}
             >
               {rect ? (
                 <button
@@ -229,6 +254,14 @@ export function BinderPage({
                   Please select a rectangle to combine
                 </div>
               )}
+              <button
+                className="binder-combine-floating-cancel"
+                onClick={onClearCombineSelection}
+                aria-label="Cancel selection"
+                title="Cancel selection"
+              >
+                ✕
+              </button>
             </div>
           );
         })()}

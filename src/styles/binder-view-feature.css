@@ -560,18 +560,11 @@
 
 .binder-combine-floating {
   position: absolute;
-  transform: translate(-50%, var(--space-2));
   z-index: 10;
   white-space: nowrap;
-}
-
-/* === Fix: when the selection touches the bottom row, the button
-   flips to sit above it instead of below (see BinderPage.jsx) — this
-   pushes it UP by its own full height plus a small gap, instead of
-   down, so it lands above the selected cells rather than overlapping
-   them. === */
-.binder-combine-floating-above {
-  transform: translate(-50%, calc(-100% - var(--space-2)));
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .binder-combine-floating-btn {
@@ -591,6 +584,26 @@
 .binder-combine-floating-btn:hover {
   background: rgba(255, 107, 157, 0.28);
   transform: scale(1.03);
+}
+
+.binder-combine-floating-cancel {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all var(--transition-fast);
+}
+
+.binder-combine-floating-cancel:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.05);
 }
 
 .binder-combine-floating-bubble {

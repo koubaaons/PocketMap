@@ -266,12 +266,12 @@ export function AddCardsPanel({
   const ownershipMap      = useMemo(() => buildOwnershipMap(inventory), [inventory]);
   const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
 
-  // Same "every owned copy already placed somewhere" check the old
-  // modal used — a card with nothing left to place has no business
-  // showing up in the picker at all.
+  // A card — owned or not — that already has a slot/panel anywhere
+  // (any binder) has nothing left to place; it's limited to one
+  // binder total now, not one-per-owned-copy.
   const fullyPlacedIds = useMemo(
-    () => new Set(getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, inventory, binder.id)),
-    [allBinderSlots, allBinderPanels, inventory, binder.id]
+    () => getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels),
+    [allBinderSlots, allBinderPanels]
   );
 
   const collectionMap = useMemo(() => {

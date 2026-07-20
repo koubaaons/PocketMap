@@ -538,6 +538,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     isCombineMode: view.isCombineMode,
     combineSelection: view.combineSelection.filter(s => s.pageNumber === pageNumber).map(s => s.slotIndex),
     getCombineRectangle: view.getCombineRectangle,
+    onClearCombineSelection: view.clearCombineSelection,
     onConfirmCombine: (rect) => {
       const stillAllEmpty = view.combineSelection.every(({ pageNumber: pn, slotIndex: si }) =>
         !allBinderSlots.some(s => s.binderId === binder.id && s.pageNumber === pn && s.slotIndex === si && s.cardDefId)

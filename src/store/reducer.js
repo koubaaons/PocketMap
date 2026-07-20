@@ -634,118 +634,56 @@ export function reducer(state, action) {
         }
         console.warn('[BinderVault] BINDER_SLOT_ADD: replacing orphaned slot (card no longer exists)', existingAtPosition.id);
       }
-      // === FIX (real regression): placing a card you don't own at
-      // all used to always work — a grey placeholder, for organising
-      // a wishlist/planned layout before you actually have the card.
-      // The quantity-tracking logic below (find an unplaced OWNED
-      // copy) accidentally required at least one copy to exist before
-      // ANY placement was allowed — quantityOwned=0 made
-      // totalPlacedCount >= quantityOwned (0 >= 0) always true,
-      // rejecting every attempt to place an unowned card at all. The
-      // quantity limit only makes sense once a card is actually
-      // owned; for zero-owned cards, this restores the original
-      // behavior instead (same per-binder duplicate check as before
-      // quantity tracking existed — no inventoryItemId to link, since
-      // there's no physical copy at all yet).
-      const quantityOwned = state.inventory.filter(inv => inv.cardDefId === slot.cardDefId).length;
-      if (quantityOwned === 0) {
-        const alreadyPlacedUnowned = state.binderSlots.some(
-          s => s.binderId === slot.binderId && s.cardDefId === slot.cardDefId && s.id !== existingAtPosition?.id
-        );
-        if (alreadyPlacedUnowned) {
-          console.warn('[BinderVault] BINDER_SLOT_ADD: this unowned card is already placed in this binder', slot.cardDefId);
-          return state;
-        }
-        return {
-          ...state,
-          binderSlots: [
-            ...state.binderSlots.filter(s => s.id !== existingAtPosition?.id),
-            { ...slot, inventoryItemId: null },
-          ],
-        };
-      }
 
-      // === CHANGED (quantity tracking): this used to block placing
-      // the same card twice in the same binder at all, treating
-      // ownership as purely boolean. Now that owning multiple copies
-      // of a card is real (see inventorySelectors.js's
-      // buildInventoryGroupMap), the same card CAN be placed more
-      // than once — even within the same binder — as long as enough
-      // physical copies are actually owned. The real limit isn't
-      // "already in this binder", it's "already placed everywhere
-      // you own a copy of it" — counted globally, across every
-      // binder, plus card-type combined-slot panels (a card sitting
-      // in a Michi Method panel is still physically placed
-      // somewhere, same as a normal slot).
-      // === CHANGED (quantity tracking, now with a real per-copy link):
-      // this used to only compare total owned vs total placed as
-      // numbers, with no link from a slot to which specific copy it
-      // held — meaning removing or restoring one particular copy
-      // could only act on "any slot for this card", not the exact
-      // right one. Now finds the actual unplaced inventory row and
-      // links the new slot to it directly (inventoryItemId).
-      //
-      // Backward compatibility: slots created before this field
-      // existed have inventoryItemId === null/undefined, not a
-      // missing placement — they still occupy a copy, just not a
-      // specifically identified one. The safety check below counts
-      // ALL slots for this card (linked or not) so it can't
-      // under-count and allow over-placing; only the second step
-      // (picking which copy to link the NEW slot to) cares about
-      // which ones are already linked.
-      const totalPlacedCount =
-        state.binderSlots.filter(s => s.cardDefId === slot.cardDefId && s.id !== existingAtPosition?.id).length +
-        state.binderPanels.filter(p => p.panelType === 'card' && p.cardDefId === slot.cardDefId).length;
-      if (totalPlacedCount >= quantityOwned) {
-        console.warn(`[BinderVault] BINDER_SLOT_ADD: no unplaced copies left (own ${quantityOwned}, ${totalPlacedCount} already placed)`, slot.cardDefId);
+      // === CHANGED: a card — owned or not, regardless of how many
+      // physical copies exist — can now only ever be placed in ONE
+      // binder at a time, period. Requested directly. Previously,
+      // owning multiple copies let the same card sit in several
+      // different binders simultaneously (up to quantityOwned
+      // placements, counted globally); now the very first placement
+      // anywhere blocks any other. Extra copies beyond that one
+      // placement just stay in inventory/Unorganised — they don't
+      // need a slot of their own. This replaces the old
+      // quantity-vs-placed-count comparison entirely; see
+      // binderSelectors.js's getFullyPlacedCardDefIds for the
+      // matching UI-side simplification.
+      const alreadyPlacedAnywhere =
+        state.binderSlots.some(s => s.id !== existingAtPosition?.id && s.cardDefId === slot.cardDefId) ||
+        state.binderPanels.some(p => p.panelType === 'card' && p.cardDefId === slot.cardDefId);
+      if (alreadyPlacedAnywhere) {
+        console.warn('[BinderVault] BINDER_SLOT_ADD: this card is already placed in a binder', slot.cardDefId);
         return state;
       }
 
-      const placedInventoryIds = new Set([
-        ...state.binderSlots.filter(s => s.id !== existingAtPosition?.id && s.inventoryItemId).map(s => s.inventoryItemId),
-        ...state.binderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
-      ]);
-
-      // === New: respects a specific, user-chosen copy (e.g. from the
-      // Add Card modal's copy picker — "place the English one, not the
-      // Chinese one") instead of always silently auto-picking
-      // whichever unplaced copy happens to come first. Still
-      // validated here (must actually belong to this card and not
-      // already be placed elsewhere) rather than trusted blindly, in
-      // case of a stale UI state. Falls back to auto-picking only when
-      // the caller didn't request a specific one. ===
-      let unplacedCopy;
+      // Not placed anywhere yet. If owned, link the new slot to
+      // whichever copy the caller explicitly requested (e.g. "place
+      // the English one, not the Chinese one" from a copy picker) —
+      // validated here rather than trusted blindly, in case of stale
+      // UI state. Otherwise just use the first owned copy: since a
+      // card is only ever placed once in total now, there's no
+      // meaningful "which unplaced copy" choice to make beyond that.
+      let inventoryItemId = null;
       if (slot.inventoryItemId) {
         const requested = state.inventory.find(inv => inv.id === slot.inventoryItemId && inv.cardDefId === slot.cardDefId);
         if (!requested) {
           console.warn('[BinderVault] BINDER_SLOT_ADD: requested inventoryItemId is not a valid, owned copy of this card', slot.inventoryItemId);
           return state;
         }
-        if (placedInventoryIds.has(requested.id)) {
-          console.warn('[BinderVault] BINDER_SLOT_ADD: requested copy is already placed elsewhere', slot.inventoryItemId);
-          return state;
-        }
-        unplacedCopy = requested;
+        inventoryItemId = requested.id;
       } else {
-        // Falls back to null (old, less-precise behavior) only in the
-        // rare edge case where the count check above passed but every
-        // copy happens to already be referenced by a linked
-        // slot/panel — meaning the "extra room" is coming from
-        // pre-migration unlinked slots, which have no specific copy to
-        // exclude in the first place.
-        unplacedCopy = state.inventory.find(
-          inv => inv.cardDefId === slot.cardDefId && !placedInventoryIds.has(inv.id)
-        );
+        const anyOwnedCopy = state.inventory.find(inv => inv.cardDefId === slot.cardDefId);
+        inventoryItemId = anyOwnedCopy?.id ?? null;
       }
 
       return {
         ...state,
         binderSlots: [
           ...state.binderSlots.filter(s => s.id !== existingAtPosition?.id),
-          { ...slot, inventoryItemId: unplacedCopy?.id ?? null },
+          { ...slot, inventoryItemId },
         ],
       };
     }
+
 
     // === New action: links a slot to a specific inventory item —
     // needed so marking an unowned placeholder slot as owned (the

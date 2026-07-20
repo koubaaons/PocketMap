@@ -12,62 +12,27 @@ export function buildPageSlotMap(binderSlots, binderId, pageNumber) {
 }
 
 /**
- * === CHANGED (quantity tracking): this used to return every card
- * placed in just this one binder, and filterCardsForBinder used it to
- * hide those cards from the "add a card" search entirely. That was
- * actually already a latent bug even before quantity tracking was
- * real: it only checked THIS binder, so the same physical card could
- * be "added" to a second, different binder too, even though only one
- * copy exists — physically impossible. Now returns only cards where
- * EVERY owned copy is already placed somewhere (any binder, any
- * card-type panel) — the actual real-world limit, not a per-binder
- * approximation of it.
+ * === CHANGED: a card, owned or not, can now only ever be placed in
+ * ONE binder at a time — requested directly. Previously, owning
+ * multiple copies let the same card sit in several different binders
+ * simultaneously (up to quantityOwned placements, counted globally);
+ * now the first placement anywhere blocks any other, regardless of
+ * how many physical copies exist. This made the whole function much
+ * simpler: "already placed anywhere" no longer needs to compare
+ * against owned quantity, or treat owned/unowned cards differently,
+ * or take a currentBinderId at all.
  */
 /**
  * @param {object[]} allBinderSlots
  * @param {object[]} allBinderPanels
- * @param {object[]} inventory
- * @param {string} [currentBinderId] - needed to also exclude an
- *   UNOWNED card already placed as a grey placeholder in THIS
- *   specific binder. Owned cards are limited globally by quantity
- *   (handled below regardless of binder), but unowned cards have no
- *   quantity concept — they're limited per-binder instead (can't
- *   place the same unowned card twice in the same binder, but CAN in
- *   a different one — see reducer.js's BINDER_SLOT_ADD). Without this
- *   param, an unowned card already placed in the current binder would
- *   still show as "available to add" in search, only to be silently
- *   rejected by the reducer if actually selected.
  */
-export function getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, inventory, currentBinderId = null) {
-  const quantityByCard = {};
-  inventory.forEach(inv => { quantityByCard[inv.cardDefId] = (quantityByCard[inv.cardDefId] ?? 0) + 1; });
-
-  const placedByCard = {};
-  allBinderSlots.forEach(s => { placedByCard[s.cardDefId] = (placedByCard[s.cardDefId] ?? 0) + 1; });
+export function getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels) {
+  const placed = new Set();
+  allBinderSlots.forEach(s => placed.add(s.cardDefId));
   allBinderPanels
     .filter(p => p.panelType === 'card')
-    .forEach(p => { placedByCard[p.cardDefId] = (placedByCard[p.cardDefId] ?? 0) + 1; });
-
-  const fullyPlaced = new Set();
-  Object.entries(quantityByCard).forEach(([cardDefId, qty]) => {
-    if ((placedByCard[cardDefId] ?? 0) >= qty) fullyPlaced.add(cardDefId);
-  });
-
-  // Unowned cards (quantity 0) never appear in quantityByCard above at
-  // all, so the loop never considers them — handled separately here.
-  if (currentBinderId) {
-    const unownedCardIdsInThisBinder = new Set([
-      ...allBinderSlots
-        .filter(s => s.binderId === currentBinderId && !quantityByCard[s.cardDefId])
-        .map(s => s.cardDefId),
-      ...allBinderPanels
-        .filter(p => p.binderId === currentBinderId && p.panelType === 'card' && !quantityByCard[p.cardDefId])
-        .map(p => p.cardDefId),
-    ]);
-    unownedCardIdsInThisBinder.forEach(cardDefId => fullyPlaced.add(cardDefId));
-  }
-
-  return fullyPlaced;
+    .forEach(p => placed.add(p.cardDefId));
+  return placed;
 }
 
 export function getOrganisedCardDefIds(binderSlots, binderPanels = []) {

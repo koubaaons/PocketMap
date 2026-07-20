@@ -54,40 +54,29 @@ export function BinderTopbar({
         </div>
       </div>
       <div className="binder-topbar-right">
-        <div className="binder-mode-toggle">
-          <button
-            className={`mode-btn ${!isPreviewMode ? 'mode-btn-active' : ''}`}
-            onClick={onExitPreviewMode}
-            disabled={isClosed}
-          >
-            Edit Mode
-          </button>
-          <button
-            className={`mode-btn ${isPreviewMode ? 'mode-btn-active' : ''}`}
-            onClick={onEnterPreviewMode}
-            disabled={isClosed}
-          >
-            Preview Mode
-          </button>
-        </div>
-
-        {isPreviewMode && (
-          <Button variant="primary" size="sm" onClick={onSaveLayout} disabled={isClosed}>
-            Save Layout
+        {isPreviewMode ? (
+          <div className="binder-plan-layout-banner">
+            <span className="binder-plan-layout-label">
+              Planning layout — showing every card as if owned. Nothing is saved yet.
+            </span>
+            <Button variant="ghost" size="sm" onClick={onExitPreviewMode}>Discard</Button>
+            <Button variant="primary" size="sm" onClick={onSaveLayout}>Save Layout</Button>
+          </div>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={onEnterPreviewMode} disabled={isClosed}>
+            Plan Layout
           </Button>
         )}
 
-        {!isPreviewMode && (
-          <Button variant="ghost" size="sm" onClick={onAddPage} disabled={isClosed}>+ Page</Button>
-        )}
+        <Button variant="ghost" size="sm" onClick={onAddPage} disabled={isClosed}>+ Page</Button>
 
-        {!isPreviewMode && !isCombineMode && (
+        {!isCombineMode && (
           <Button variant="ghost" size="sm" onClick={onSwapPages} disabled={isClosed}>
             Swap Pages
           </Button>
         )}
 
-        {!isPreviewMode && !isCombineMode && (
+        {!isCombineMode && (
           <Button variant="ghost" size="sm" onClick={onEnterCombineMode} disabled={isClosed}>
             Combine Slots
           </Button>
@@ -97,13 +86,11 @@ export function BinderTopbar({
             Exit Combine Mode
           </Button>
         )}
-        {!isPreviewMode && (
-          <Button variant={isLibraryPanelOpen ? 'primary' : 'ghost'} size="sm" onClick={onToggleLibraryPanel} disabled={isClosed}>
-            Library
-          </Button>
-        )}
+        <Button variant={isLibraryPanelOpen ? 'primary' : 'ghost'} size="sm" onClick={onToggleLibraryPanel} disabled={isClosed}>
+          Library
+        </Button>
 
-        {!isPreviewMode && !isClosed && (
+        {!isClosed && (
           <Button variant="ghost" size="sm" onClick={onToggleCardInfo}>
             {showCardInfo ? 'Hide Card Info' : 'Show Card Info'}
           </Button>
