@@ -286,6 +286,7 @@ export function AddCardsPanel({
     const q = query.trim().toLowerCase();
 
     const available = cardDefinitions.filter(cd => {
+      if (cd.isDecluttered) return false;
       if (fullyPlacedIds.has(cd.id)) return false;
       if (!q) return true;
       if (cd.name.toLowerCase().includes(q)) return true;
@@ -307,7 +308,7 @@ export function AddCardsPanel({
   // a collection that's fully placed already.
   const collectionsWithAvailableCards = useMemo(() => {
     const availableCardDefIds = new Set(
-      cardDefinitions.filter(cd => !fullyPlacedIds.has(cd.id)).map(cd => cd.collectionId)
+      cardDefinitions.filter(cd => !cd.isDecluttered && !fullyPlacedIds.has(cd.id)).map(cd => cd.collectionId)
     );
     return collections.filter(c => availableCardDefIds.has(c.id));
   }, [cardDefinitions, collections, fullyPlacedIds]);

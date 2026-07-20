@@ -60,6 +60,7 @@ export function SearchView({
 
   // Each result type is computed separately so tabs filter correctly
   const cardResults       = useMemo(() => searchCardResults(cardDefinitions, query),                         [cardDefinitions, query]);
+  const activeCardCount   = useMemo(() => cardDefinitions.filter(cd => !cd.isDecluttered).length,            [cardDefinitions]);
   const collectionResults = useMemo(() => searchCollectionResults(collections, cardDefinitions, query),       [collections, cardDefinitions, query]);
   const binderResults     = useMemo(() => searchBinderResults(binders, activeBinderSlots, cardDefinitions, query), [binders, activeBinderSlots, cardDefinitions, query]);
 
@@ -178,10 +179,10 @@ export function SearchView({
 
   const renderCollectionRow = (result) => {
     const { collection, matchedCardCount } = result;
-    const totalCards  = cardDefinitions.filter(cd => cd.collectionId === collection.id).length;
+    const totalCards  = cardDefinitions.filter(cd => cd.collectionId === collection.id && !cd.isDecluttered).length;
     const ownedCards  = inventory.filter(i => {
       const cd = cardDefinitions.find(c => c.id === i.cardDefId);
-      return cd?.collectionId === collection.id;
+      return cd?.collectionId === collection.id && !cd.isDecluttered;
     }).length;
 
     return (
@@ -329,7 +330,7 @@ export function SearchView({
         </div>
       )}
 
-      {!query && cardDefinitions.length === 0 && (
+      {!query && activeCardCount === 0 && (
         <EmptyState
           icon="◎"
           title="Nothing to search yet"
@@ -337,9 +338,9 @@ export function SearchView({
         />
       )}
 
-      {!query && cardDefinitions.length > 0 && (
+      {!query && activeCardCount > 0 && (
         <p className="search-count" style={{ textAlign: 'center', marginTop: 'var(--space-8)' }}>
-          Start typing to search across all {cardDefinitions.length} cards, {collections.length} collections, and {binders.length} binders…
+          Start typing to search across all {activeCardCount} cards, {collections.length} collections, and {binders.length} binders…
         </p>
       )}
 

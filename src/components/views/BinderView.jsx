@@ -471,7 +471,10 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     // keeps its own separate click behavior — that's for selecting
     // slots to move cards between, a different workflow entirely. ===
     onClickSlot: (slot, cardDef) => {
-      if (view.isCombineMode) { view.toggleSlotForCombine(pageNumber, slot.slotIndex); return; }
+      if (view.isCombineMode) {
+        toast('Please select empty slots — a slot with a card in it can\'t be combined', 'error');
+        return;
+      }
       return view.isPreviewMode
         ? handleSlotClickInPreview(slot, cardDef)
         : view.openCardDetail(cardDef);
@@ -489,7 +492,17 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     isCombineMode: view.isCombineMode,
     combineSelection: view.combineSelection.filter(s => s.pageNumber === pageNumber).map(s => s.slotIndex),
     getCombineRectangle: view.getCombineRectangle,
-    onConfirmCombine: (rect) => setShowCombineConfirm(rect),
+    onConfirmCombine: (rect) => {
+      const stillAllEmpty = view.combineSelection.every(({ pageNumber: pn, slotIndex: si }) =>
+        !allBinderSlots.some(s => s.binderId === binder.id && s.pageNumber === pn && s.slotIndex === si && s.cardDefId)
+      );
+      if (!stillAllEmpty) {
+        toast('One of the selected slots now has a card in it — please reselect empty slots', 'error');
+        view.exitCombineMode();
+        return;
+      }
+      setShowCombineConfirm(rect);
+    },
   });
 
   // Cover content passed into BinderBookFlip's cover pair. "Not yet

@@ -24,7 +24,7 @@ export function searchCardResults(cardDefinitions, query) {
   const q = norm(query.trim());
   if (!q) return [];
   return cardDefinitions
-    .filter(card => cardMatchesQuery(card, q))
+    .filter(card => !card.isDecluttered && cardMatchesQuery(card, q))
     .map(card => ({ type: 'card', card }));
 }
 
@@ -38,7 +38,7 @@ export function searchCollectionResults(collections, cardDefinitions, query) {
   return collections
     .map(collection => {
       const nameMatches = collection.name.toLowerCase().includes(q);
-      const collectionCards = cardDefinitions.filter(cd => cd.collectionId === collection.id);
+      const collectionCards = cardDefinitions.filter(cd => cd.collectionId === collection.id && !cd.isDecluttered);
       const matchedCards = collectionCards.filter(card => cardMatchesQuery(card, q));
 
       if (!nameMatches && matchedCards.length === 0) return null;
@@ -63,7 +63,12 @@ export function searchBinderResults(binders, binderSlots, cardDefinitions, query
       const placedCards = binderSlots
         .filter(s => s.binderId === binder.id)
         .map(s => cardDefMap[s.cardDefId])
-        .filter(Boolean);
+        .filter(Boolean)
+        // Safety net — decluttering already removes the slot itself
+        // (see reducer.js's CARD_DEFINITION_BULK_SET_DECLUTTERED), so
+        // this shouldn't normally find anything, but a stale slot
+        // from before that fix shouldn't surface a "hidden" card either.
+        .filter(card => !card.isDecluttered);
       const matchedCards = placedCards.filter(card => cardMatchesQuery(card, q));
 
       if (!nameMatches && matchedCards.length === 0) return null;
