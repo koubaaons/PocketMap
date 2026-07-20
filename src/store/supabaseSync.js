@@ -271,6 +271,29 @@ export function syncToSupabase(action, nextState, prevState) {
       }
       break;
     }
+    // === New: Swap Pages — could touch a full page's worth of slots
+    // and panels at once, same "don't fire a burst of simultaneous
+    // writes" reasoning as CARD_DEFINITION_BULK_ADD above (see that
+    // case's own comment for the full explanation of why sequential,
+    // not parallel).
+    case ACTIONS.BINDER_SWAP_PAGES: {
+      const { binderId, pageA, pageB } = action.payload ?? {};
+      if (!binderId || pageA == null || pageB == null || pageA === pageB) break;
+
+      const affectedSlots = nextState.binderSlots.filter(
+        s => s.binderId === binderId && (s.pageNumber === pageA || s.pageNumber === pageB)
+      );
+      const affectedPanels = nextState.binderPanels.filter(
+        p => p.binderId === binderId && (p.pageNumber === pageA || p.pageNumber === pageB)
+      );
+
+      pending.push((async () => {
+        for (const slot of affectedSlots) await upsertBinderSlot(slot);
+        for (const panel of affectedPanels) await upsertBinderPanel(panel);
+      })());
+      break;
+    }
+
     case ACTIONS.BINDER_DELETE: {
       const { binderId } = action.payload ?? {};
       if (binderId) {

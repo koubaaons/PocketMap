@@ -63,7 +63,21 @@ export function useBinderSlotActions(toast, callbacks = {}) {
     toast('Page added');
   }, [dispatch, toast]);
 
-  return { handleAddToSlot, handleRemoveFromSlot, handleMoveSlot, handleAddPage };
+  /**
+   * Swaps everything on page A with everything on page B — cards
+   * some users have asked for after seeing it on other card-tracking
+   * sites. pageA/pageB are 1-based physical page numbers.
+   */
+  const handleSwapPages = useCallback((binderId, pageA, pageB) => {
+    if (pageA === pageB) {
+      toast('Choose two different pages to swap', 'error');
+      return;
+    }
+    dispatch({ type: ACTIONS.BINDER_SWAP_PAGES, payload: { binderId, pageA, pageB } });
+    toast(`Swapped page ${pageA} and page ${pageB}`);
+  }, [dispatch, toast]);
+
+  return { handleAddToSlot, handleRemoveFromSlot, handleMoveSlot, handleAddPage, handleSwapPages };
 }
 
 // === ISSUE #54 END: Add Card to Binder ===

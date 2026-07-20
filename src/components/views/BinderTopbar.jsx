@@ -20,6 +20,7 @@ export function BinderTopbar({
   onEnterPreviewMode,
   onSaveLayout,
   onAddPage,
+  onSwapPages,
   isFullscreen,
   onToggleFullscreen,
   onCloseBinder,
@@ -76,6 +77,12 @@ export function BinderTopbar({
 
         {!isPreviewMode && (
           <Button variant="ghost" size="sm" onClick={onAddPage} disabled={isClosed}>+ Page</Button>
+        )}
+
+        {!isPreviewMode && !isCombineMode && (
+          <Button variant="ghost" size="sm" onClick={onSwapPages} disabled={isClosed}>
+            Swap Pages
+          </Button>
         )}
 
         {!isPreviewMode && !isCombineMode && (

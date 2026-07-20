@@ -115,3 +115,75 @@ export function CreateBinderModal({ onSubmit, onClose }) {
     </Modal>
   );
 }
+
+/**
+ * @fileoverview SwapPagesModal — exchanges everything on one page
+ * with everything on another, within the same binder. Requested
+ * directly by a user citing other card-tracking sites that already
+ * offer this.
+ */
+export function SwapPagesModal({ binder, onSubmit, onClose }) {
+  const [pageA, setPageA] = useState('');
+  const [pageB, setPageB] = useState('');
+  const [error, setError] = useState('');
+
+  const parsedA = parseInt(pageA, 10);
+  const parsedB = parseInt(pageB, 10);
+
+  const validate = () => {
+    if (!pageA || !pageB) return 'Enter both page numbers';
+    if (!Number.isInteger(parsedA) || !Number.isInteger(parsedB)) return 'Enter valid page numbers';
+    if (parsedA < 1 || parsedA > binder.pages || parsedB < 1 || parsedB > binder.pages) {
+      return `Pages must be between 1 and ${binder.pages}`;
+    }
+    if (parsedA === parsedB) return 'Choose two different pages';
+    return '';
+  };
+
+  const handleSubmit = () => {
+    const err = validate();
+    if (err) { setError(err); return; }
+    setError('');
+    onSubmit(parsedA, parsedB);
+    onClose();
+  };
+
+  return (
+    <Modal title="Swap Pages" onClose={onClose} size="sm">
+      <p className="modal-step-note">
+        Exchange everything on one page with everything on another — every
+        card keeps its same row/column position, just on the other page.
+      </p>
+
+      <div className="form-row">
+        <Input
+          id="swap-page-a"
+          label="Page"
+          type="number"
+          min={1}
+          max={binder.pages}
+          placeholder="e.g. 3"
+          value={pageA}
+          onChange={e => setPageA(e.target.value)}
+          autoFocus
+        />
+        <Input
+          id="swap-page-b"
+          label="Swap with page"
+          type="number"
+          min={1}
+          max={binder.pages}
+          placeholder="e.g. 7"
+          value={pageB}
+          onChange={e => setPageB(e.target.value)}
+        />
+      </div>
+      {error && <span className="field-error-msg">{error}</span>}
+
+      <ModalActions>
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" onClick={handleSubmit}>Swap Pages</Button>
+      </ModalActions>
+    </Modal>
+  );
+}

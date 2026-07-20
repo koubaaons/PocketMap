@@ -38,6 +38,7 @@ import { BinderDataProvider } from '../../contexts/BinderDataContext.jsx';
 import { AddCardsPanel } from '../collections/AddCardsPanel.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { CombineSlotsModal } from '../modals/CombineSlotsModal.jsx';
+import { SwapPagesModal } from '../modals/BinderModals.jsx';
 import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.js';
 import { useBinderCoverEditor } from '../../hooks/useBinderCoverEditor.js';
 import { BinderCoverStickers } from './BinderCover.jsx';
@@ -91,6 +92,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isSwapPagesOpen, setIsSwapPagesOpen] = useState(false);
   // === Michi Method support: combine mode — holds the computed
   // rectangle {pageNumber, startSlotIndex, spanCols, spanRows} once
   // "Combine" is clicked, until the confirmation modal resolves it
@@ -224,7 +226,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const filled   = getOwnedFilledSlotCount(binderSlots, binder.id, inventory, binderPanels);
   const capacity = binderCapacity(binder, binderPanels);
 
-  const { handleAddToSlot, handleRemoveFromSlot, handleAddPage } =
+  const { handleAddToSlot, handleRemoveFromSlot, handleAddPage, handleSwapPages } =
     useBinderSlotActions(toast, {
       onRemoveSuccess: view.closeSlotAction,
     });
@@ -509,6 +511,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         onEnterPreviewMode={view.enterPreviewMode}
         onSaveLayout={handleSaveLayout}
         onAddPage={() => handleAddPage(binder.id)}
+        onSwapPages={() => setIsSwapPagesOpen(true)}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
         onCloseBinder={handleCloseBinder}
@@ -691,6 +694,14 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           confirmLabel="Delete Binder"
           onConfirm={handleDeleteBinder}
           onClose={() => setConfirmDelete(false)}
+        />
+      )}
+
+      {isSwapPagesOpen && (
+        <SwapPagesModal
+          binder={binder}
+          onSubmit={(pageA, pageB) => handleSwapPages(binder.id, pageA, pageB)}
+          onClose={() => setIsSwapPagesOpen(false)}
         />
       )}
 

@@ -10,6 +10,7 @@ export const ACTIONS = Object.freeze({
   BINDER_UPDATE:   'BINDER_UPDATE',
   BINDER_DELETE:   'BINDER_DELETE',
   BINDER_ADD_PAGE: 'BINDER_ADD_PAGE',
+  BINDER_SWAP_PAGES: 'BINDER_SWAP_PAGES',
   BIN_RESTORE_BINDER:     'BIN_RESTORE_BINDER',
   BIN_RESTORE_COLLECTION: 'BIN_RESTORE_COLLECTION',
   BIN_RESTORE_CARD:       'BIN_RESTORE_CARD',
@@ -81,6 +82,37 @@ export function reducer(state, action) {
           b.id === action.payload.binderId ? { ...b, pages: b.pages + 1 } : b
         ),
       };
+
+    // === New: Swap Pages — exchanges everything on page A with
+    // everything on page B within one binder (cards a user has
+    // requested, seen on other card-tracking sites). Just flips
+    // pageNumber on whatever's currently sitting on either page —
+    // slotIndex is left untouched, so each card keeps its same
+    // row/column position, just on the other page. Covers both plain
+    // slots and card-type combined panels (Michi Method); insert-type
+    // panels (decorative art, not tied to a specific card) swap the
+    // same way, since they're just as much "what's on this page" as
+    // an actual card is.
+    case ACTIONS.BINDER_SWAP_PAGES: {
+      const { binderId, pageA, pageB } = action.payload;
+      if (pageA === pageB || !Number.isInteger(pageA) || !Number.isInteger(pageB)) return state;
+
+      const swapPage = (p) => (p === pageA ? pageB : p === pageB ? pageA : p);
+
+      return {
+        ...state,
+        binderSlots: state.binderSlots.map(s =>
+          s.binderId === binderId && (s.pageNumber === pageA || s.pageNumber === pageB)
+            ? { ...s, pageNumber: swapPage(s.pageNumber) }
+            : s
+        ),
+        binderPanels: state.binderPanels.map(p =>
+          p.binderId === binderId && (p.pageNumber === pageA || p.pageNumber === pageB)
+            ? { ...p, pageNumber: swapPage(p.pageNumber) }
+            : p
+        ),
+      };
+    }
 
     // ── Bin ───────────────────────────────────────────────────────────────────
 
