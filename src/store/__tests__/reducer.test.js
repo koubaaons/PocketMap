@@ -91,14 +91,18 @@ describe('BINDER_SLOT_ADD', () => {
     expect(next.binderSlots[0].inventoryItemId).toBe('inv-1');
   });
 
-  it('allows placing the SAME card more than once when multiple copies are owned', () => {
+  it('rejects placing the SAME card a second time even when multiple copies are owned — "one binder per card" (#153)', () => {
+    // Previously, owning 2 copies allowed 2 simultaneous placements
+    // (one per copy). That's deliberately no longer true: the first
+    // placement anywhere blocks any other, regardless of how many
+    // copies exist — extra copies just stay unplaced.
     const state = baseState({ inventory: [makeInventoryItem('inv-1'), makeInventoryItem('inv-2')] });
     let next = reducer(state, { type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: makeSlotPayload({ id: 'slot-a', slotIndex: 0 }) } });
+    expect(next.binderSlots).toHaveLength(1);
+    expect(next.binderSlots[0].inventoryItemId).toBe('inv-1'); // first owned copy, auto-picked
+
     next = reducer(next, { type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: makeSlotPayload({ id: 'slot-b', slotIndex: 1 }) } });
-    expect(next.binderSlots).toHaveLength(2);
-    // each linked to a DIFFERENT copy
-    const linkedIds = next.binderSlots.map(s => s.inventoryItemId).sort();
-    expect(linkedIds).toEqual(['inv-1', 'inv-2']);
+    expect(next.binderSlots).toHaveLength(1); // unchanged — second placement rejected outright
   });
 
   it('rejects placing an owned card once every copy is already placed', () => {
@@ -628,7 +632,7 @@ describe('simple CRUD actions', () => {
     expect(next.binderInserts).toHaveLength(1);
   });
 
-  it('BINDER_INSERT_DELETE removes the insert AND any panel using it (would otherwise be a broken image reference)', () => {
+  it('BINDER_INSERT_DELETE soft-deletes the insert (moves to bin) and blanks any panel using it, rather than destroying the panel', () => {
     const state = baseState({
       binderInserts: [{ id: 'insert-1', name: 'Art' }],
       binderPanels: [
@@ -637,9 +641,16 @@ describe('simple CRUD actions', () => {
       ],
     });
     const next = reducer(state, { type: ACTIONS.BINDER_INSERT_DELETE, payload: { insertId: 'insert-1' } });
-    expect(next.binderInserts).toHaveLength(0);
-    expect(next.binderPanels).toHaveLength(1); // only panel-2 (using a different insert) survives
-    expect(next.binderPanels[0].id).toBe('panel-2');
+    expect(next.binderInserts).toHaveLength(0); // removed from the active library...
+    expect(next.bin.some(b => b.id === 'insert-1' && b._type === 'insert')).toBe(true); // ...but recoverable from Trash
+
+    // Both panels still exist — the combined space itself isn't
+    // destroyed just because its image was deleted.
+    expect(next.binderPanels).toHaveLength(2);
+    const panel1 = next.binderPanels.find(p => p.id === 'panel-1');
+    const panel2 = next.binderPanels.find(p => p.id === 'panel-2');
+    expect(panel1.insertId).toBe(null); // blanked — "Click to add an image"
+    expect(panel2.insertId).toBe('other-insert'); // untouched — different insert, unaffected
   });
 
   it('BINDER_PANEL_UPDATE merges changes (e.g. drag/resize position) into the matching panel', () => {

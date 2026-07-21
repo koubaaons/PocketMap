@@ -1,6 +1,6 @@
 /* ── Binder export (ExportPageRenderer.jsx) ──────────────────────────────────
    Fixed pixel sizing throughout, deliberately not using the app's own
-   --space-,--radius-* custom properties — export quality needs to be
+   --space-N / --radius-N custom properties — export quality needs to be
    predictable and high-resolution regardless of the page's current
    zoom level or root font size, neither of which should leak into a
    file someone downloads. */

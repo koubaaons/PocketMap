@@ -3,14 +3,12 @@
 // === ISSUE #86 START: Search View Polish ===
 
 import { useStore } from '../../hooks/useStore.js';
-import { useDispatch } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { EmptyState } from '../ui/index.jsx';
 import { CardDetailModal } from '../modals/CardDetailModal.jsx';
 import { buildOwnershipMap, buildInventoryGroupMap, getQuantityOwned } from '../../selectors/inventorySelectors.js';
 import { getAllSlotsForCard } from '../../selectors/binderSelectors.js';
 import { useInventoryActions } from '../../hooks/useInventoryActions.js';
-import { ACTIONS } from '../../store/index.js';
 import {
   searchCardResults,
   searchCollectionResults,

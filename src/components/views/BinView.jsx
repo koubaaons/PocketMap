@@ -12,7 +12,7 @@
 // === ISSUE #57 START: Redesigned Trash Bin ===
 
 import { useState, useMemo } from 'react';
-import { useStore, useDispatch } from '../../hooks/useStore.js';
+import { useStore } from '../../hooks/useStore.js';
 import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
 
 // === REFACTOR7d START: use useBinActions hook ===

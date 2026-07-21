@@ -17,7 +17,7 @@
 import { useStore } from '../../hooks/useStore.js';
 import { useState, useMemo } from 'react';
 import { Button, EmptyState, ConfirmModal } from '../ui/index.jsx';
-import { CreateCollectionModal, EditCollectionModal } from '../modals/index.js';
+import { CreateCollectionModal, EditCollectionModal } from '../modals/CollectionModals.jsx';
 import { CollectionList } from '../collections/CollectionList.jsx';
 import { PokemonSetsBrowser } from '../collections/PokemonSetsBrowser.jsx';
 import { buildCollectionStatsMap } from '../../selectors/collectionStats.js';

@@ -32,7 +32,7 @@ const NAV_ITEMS = [
   { view: 'settings',    label: 'Settings',    icon: 'ti-settings',   group: 'account' },
 ];
 
-export function Sidebar({ nav, binders, bin, onNavigate }) {
+export function Sidebar({ nav, bin, onNavigate }) {
   const currentView = nav.currentView;
 
   const menuItems   = NAV_ITEMS.filter(i => i.group === 'menu');

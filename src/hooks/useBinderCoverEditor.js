@@ -129,7 +129,7 @@ export function useBinderCoverEditor({ binder, toast }) {
       }
       setDraftStickers(prev => [...prev, sticker]);
       setSelectedStickerId(sticker.id);
-    } catch (err) {
+    } catch {
       setStickerUploadError('Could not read that image. Try a different file.');
     } finally {
       setIsUploadingSticker(false);

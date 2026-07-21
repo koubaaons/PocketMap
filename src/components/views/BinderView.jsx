@@ -29,8 +29,8 @@
  * slot math (2.5/3.5 ratio × binder.rows/cols) the page grid uses.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ConfirmModal, Button } from '../ui/index.jsx';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ConfirmModal } from '../ui/index.jsx';
 import { BinderTopbar } from './BinderTopbar.jsx';
 import { BinderPageNav } from './BinderPageNav.jsx';
 import { BinderBookFlip } from './BinderBookFlip.jsx';
@@ -355,7 +355,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
   // ── Preview mode handlers ───────────────────────────────────────────────
 
-  const handleSlotClickInPreview = (slot, cardDef) => {
+  const handleSlotClickInPreview = (slot) => {
     if (!view.selectedSlot) {
       view.selectSlotForMove(slot);
     } else if (view.selectedSlot.id === slot.id) {
@@ -693,7 +693,6 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       {/* Modals */}
       {view.addingToSlot && (
         <AddCardsPanel
-          binder={binder}
           cardDefinitions={cardDefinitions}
           collections={collections}
           inventory={inventory}

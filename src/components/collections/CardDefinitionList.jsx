@@ -16,12 +16,9 @@ import { useCollectionData } from '../../contexts/CollectionDataContext.jsx';
 
 export function CardDefinitionList({
   cards,
-  templateFields,
   ownershipMap = {},
   totalCount,
   onView,
-  onEdit,
-  onDelete,
   onToggleFavorite,
   onToggleOwned,
   emptyTitle = 'No cards yet',

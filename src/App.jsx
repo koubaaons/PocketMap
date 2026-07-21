@@ -239,7 +239,7 @@ export default function App() {
   return (
     <Suspense fallback={<div className="sync-loading"><div className="sync-loading-inner"><div className="sync-spinner" /></div></div>}>
     <div className="app-shell">
-      <Sidebar nav={nav} binders={binders} bin={bin} onNavigate={navigate} />
+      <Sidebar nav={nav} bin={bin} onNavigate={navigate} />
       <div className="main-area">
         <header className="topbar">
           <div>

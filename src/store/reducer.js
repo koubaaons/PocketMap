@@ -127,7 +127,7 @@ export function reducer(state, action) {
       const { itemId } = action.payload;
       const item = state.bin.find(b => b.id === itemId && b._type === 'binder');
       if (!item) return state;
-      const { _type, deletedAt, ...binder } = item;
+      const { _type, deletedAt: _deletedAt, ...binder } = item;
       return {
         ...state,
         binders: [...state.binders, binder],
@@ -140,7 +140,7 @@ export function reducer(state, action) {
       const { itemId } = action.payload;
       const item = state.bin.find(c => c.id === itemId && c._type === 'collection');
       if (!item) return state;
-      const { _type, deletedAt, _cardDefs, _templateFields, _inventoryItems, ...collection } = item;
+      const { _type, deletedAt: _deletedAt, _cardDefs, _templateFields, _inventoryItems, ...collection } = item;
       return {
         ...state,
         collections:     [...state.collections, collection],
@@ -160,7 +160,7 @@ export function reducer(state, action) {
       const { itemId } = action.payload;
       const item = state.bin.find(c => c.id === itemId && c._type === 'cardDef');
       if (!item) return state;
-      const { _type, deletedAt, _inventoryItems, ...cardDef } = item;
+      const { _type, deletedAt: _deletedAt, _inventoryItems, ...cardDef } = item;
       return {
         ...state,
         cardDefinitions: [...state.cardDefinitions, cardDef],
@@ -187,7 +187,7 @@ export function reducer(state, action) {
       const { itemId } = action.payload;
       const item = state.bin.find(i => i.id === itemId && i._type === 'insert');
       if (!item) return state;
-      const { _type, deletedAt, ...insert } = item;
+      const { _type, deletedAt: _deletedAt, ...insert } = item;
       return {
         ...state,
         binderInserts: [...state.binderInserts, insert],
@@ -321,9 +321,9 @@ export function reducer(state, action) {
 
     case ACTIONS.TEMPLATE_FIELD_BULK_ADD: {
       const collectionId = action.payload[0]?.collectionId;
-      if (!collectionId) { console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD: missing collectionId'); return state; }
+      if (!collectionId) { console.warn('[Pinder] TEMPLATE_FIELD_BULK_ADD: missing collectionId'); return state; }
       const { valid, error } = validateOneTemplatePerCollection(collectionId, state.templateFields);
-      if (!valid) { console.warn('[BinderVault] TEMPLATE_FIELD_BULK_ADD rejected:', error); return state; }
+      if (!valid) { console.warn('[Pinder] TEMPLATE_FIELD_BULK_ADD rejected:', error); return state; }
       return { ...state, templateFields: [...state.templateFields, ...action.payload] };
     }
 
@@ -463,10 +463,6 @@ export function reducer(state, action) {
       const newItem = action.payload;
       const newInventory = [...state.inventory, newItem];
 
-      const linkedIds = new Set([
-        ...state.binderSlots.filter(s => s.inventoryItemId).map(s => s.inventoryItemId),
-        ...state.binderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
-      ]);
       const unlinkedSlot = state.binderSlots.find(s => s.cardDefId === newItem.cardDefId && !s.inventoryItemId);
       const unlinkedPanel = !unlinkedSlot
         ? state.binderPanels.find(p => p.panelType === 'card' && p.cardDefId === newItem.cardDefId && !p.inventoryItemId)
@@ -629,10 +625,10 @@ export function reducer(state, action) {
       if (existingAtPosition) {
         const cardStillExists = state.cardDefinitions.some(cd => cd.id === existingAtPosition.cardDefId);
         if (cardStillExists) {
-          console.warn('[BinderVault] BINDER_SLOT_ADD: slot already occupied', slot);
+          console.warn('[Pinder] BINDER_SLOT_ADD: slot already occupied', slot);
           return state;
         }
-        console.warn('[BinderVault] BINDER_SLOT_ADD: replacing orphaned slot (card no longer exists)', existingAtPosition.id);
+        console.warn('[Pinder] BINDER_SLOT_ADD: replacing orphaned slot (card no longer exists)', existingAtPosition.id);
       }
 
       // === CHANGED: a card — owned or not, regardless of how many
@@ -651,7 +647,7 @@ export function reducer(state, action) {
         state.binderSlots.some(s => s.id !== existingAtPosition?.id && s.cardDefId === slot.cardDefId) ||
         state.binderPanels.some(p => p.panelType === 'card' && p.cardDefId === slot.cardDefId);
       if (alreadyPlacedAnywhere) {
-        console.warn('[BinderVault] BINDER_SLOT_ADD: this card is already placed in a binder', slot.cardDefId);
+        console.warn('[Pinder] BINDER_SLOT_ADD: this card is already placed in a binder', slot.cardDefId);
         return state;
       }
 
@@ -662,11 +658,11 @@ export function reducer(state, action) {
       // UI state. Otherwise just use the first owned copy: since a
       // card is only ever placed once in total now, there's no
       // meaningful "which unplaced copy" choice to make beyond that.
-      let inventoryItemId = null;
+      let inventoryItemId;
       if (slot.inventoryItemId) {
         const requested = state.inventory.find(inv => inv.id === slot.inventoryItemId && inv.cardDefId === slot.cardDefId);
         if (!requested) {
-          console.warn('[BinderVault] BINDER_SLOT_ADD: requested inventoryItemId is not a valid, owned copy of this card', slot.inventoryItemId);
+          console.warn('[Pinder] BINDER_SLOT_ADD: requested inventoryItemId is not a valid, owned copy of this card', slot.inventoryItemId);
           return state;
         }
         inventoryItemId = requested.id;
@@ -803,7 +799,7 @@ export function reducer(state, action) {
     case ACTIONS.BINDER_PANEL_ADD: {
       const panel = action.payload;
       const binder = state.binders.find(b => b.id === panel.binderId);
-      if (!binder) { console.warn('[BinderVault] BINDER_PANEL_ADD: binder not found', panel.binderId); return state; }
+      if (!binder) { console.warn('[Pinder] BINDER_PANEL_ADD: binder not found', panel.binderId); return state; }
 
       const newIndices = getSlotIndicesForPanel(panel.startSlotIndex, panel.spanCols, panel.spanRows, binder.cols);
 
@@ -814,7 +810,7 @@ export function reducer(state, action) {
         s => s.binderId === panel.binderId && s.pageNumber === panel.pageNumber && newIndices.includes(s.slotIndex)
       );
       if (conflictingSlot) {
-        console.warn('[BinderVault] BINDER_PANEL_ADD: a slot in this range already has a card placed — remove it first', conflictingSlot);
+        console.warn('[Pinder] BINDER_PANEL_ADD: a slot in this range already has a card placed — remove it first', conflictingSlot);
         return state;
       }
 
@@ -826,7 +822,7 @@ export function reducer(state, action) {
         return existingIndices.some(i => newIndices.includes(i));
       });
       if (overlappingPanel) {
-        console.warn('[BinderVault] BINDER_PANEL_ADD: overlaps an existing panel', overlappingPanel.id);
+        console.warn('[Pinder] BINDER_PANEL_ADD: overlaps an existing panel', overlappingPanel.id);
         return state;
       }
 
@@ -851,7 +847,7 @@ export function reducer(state, action) {
             inv => inv.cardDefId === panel.cardDefId && !placedInventoryIds.has(inv.id)
           );
           if (!unplacedCopy) {
-            console.warn('[BinderVault] BINDER_PANEL_ADD: no unplaced copies left for this card', panel.cardDefId);
+            console.warn('[Pinder] BINDER_PANEL_ADD: no unplaced copies left for this card', panel.cardDefId);
             return state;
           }
           finalPanel = { ...panel, inventoryItemId: unplacedCopy.id };
@@ -880,7 +876,7 @@ export function reducer(state, action) {
       };
 
     default:
-      console.warn('[BinderVault] Unknown action type:', action.type);
+      console.warn('[Pinder] Unknown action type:', action.type);
       return state;
   }
 }

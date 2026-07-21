@@ -156,35 +156,10 @@ function upsertBinItem(item, entityType) {
 
 // ── Delete helpers ────────────────────────────────────────────────────────────
 
-function deleteCollection(collectionId) {
-  return supabase.from('collections').delete().eq('id', collectionId)
-    .then(({ error }) => { if (error) console.error('[Sync] collection delete failed:', error); })
-    .catch(err => console.error('[Sync] collection delete error:', err));
-}
-
-function deleteTemplateField(fieldId) {
-  return supabase.from('template_fields').delete().eq('id', fieldId)
-    .then(({ error }) => { if (error) console.error('[Sync] template field delete failed:', error); })
-    .catch(err => console.error('[Sync] template field delete error:', err));
-}
-
-function deleteCardDefinition(cardDefId) {
-  return supabase.from('card_definitions').delete().eq('id', cardDefId)
-    .then(({ error }) => { if (error) console.error('[Sync] card definition delete failed:', error); })
-    .catch(err => console.error('[Sync] card definition delete error:', err));
-}
-
 function deleteBinderSlot(slotId) {
   return supabase.from('binder_slots').delete().eq('id', slotId)
     .then(({ error }) => { if (error) console.error('[Sync] binder slot delete failed:', error); })
     .catch(err => console.error('[Sync] binder slot delete error:', err));
-}
-
-// === Michi Method support: combined slots ===
-function deleteBinderInsert(insertId) {
-  return supabase.from('binder_inserts').delete().eq('id', insertId)
-    .then(({ error }) => { if (error) console.error('[Sync] binder insert delete failed:', error); })
-    .catch(err => console.error('[Sync] binder insert delete error:', err));
 }
 
 function deleteBinderPanel(panelId) {

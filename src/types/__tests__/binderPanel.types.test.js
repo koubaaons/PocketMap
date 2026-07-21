@@ -48,8 +48,12 @@ describe('validateBinderPanel', () => {
     expect(validateBinderPanel(validCardPanel({ cardDefId: null })).valid).toBe(false);
   });
 
-  it('requires insertId when panelType is "insert"', () => {
-    expect(validateBinderPanel(validInsertPanel({ insertId: null })).valid).toBe(false);
+  it('allows a null insertId when panelType is "insert" — a blank combined panel is legitimate (fresh, or its image was soft-deleted from the library)', () => {
+    expect(validateBinderPanel(validInsertPanel({ insertId: null })).valid).toBe(true);
+  });
+
+  it('still rejects a non-string, non-null insertId', () => {
+    expect(validateBinderPanel(validInsertPanel({ insertId: 42 })).valid).toBe(false);
   });
 
   it('rejects an invalid panelType', () => {

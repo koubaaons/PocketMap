@@ -8,13 +8,13 @@
 //   - "View All" link for binders
 // === ISSUE #92 START: Customize Cover — hover-revealed button on BinderCard ===
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button, EmptyState, StatCard, useCountUp } from '../ui/index.jsx';
-import { CreateBinderModal } from '../modals/index.js';
+import { CreateBinderModal } from '../modals/BinderModals.jsx';
 import { ACTIONS } from '../../store/index.js';
 import { useStore, useDispatch } from '../../hooks/useStore.js';
 import { binderCapacity, relativeDate } from '../../utils/index.js';
-import { getFilledSlotCount, getOwnedFilledSlotCount } from '../../selectors/binderSelectors.js';
+import { getOwnedFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { buildHomeStats, getRecentlyAddedCards, getRecentActivity } from '../../selectors/homeStats.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 
@@ -33,7 +33,6 @@ export function HomeView({ toast, onNavigate, mode = 'dashboard' }) {
   const inventory       = useStore(s => s.inventory);
   const cardDefinitions = useStore(s => s.cardDefinitions);
   const collections     = useStore(s => s.collections);
-  const bin             = useStore(s => s.bin);
   const dispatch = useDispatch();
   const [showCreate, setShowCreate] = useState(false);
 

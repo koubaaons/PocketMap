@@ -46,7 +46,6 @@ import { buildOwnershipMap, buildInventoryGroupMap, getQuantityOwned } from '../
 import { getFullyPlacedCardDefIds } from '../../selectors/binderSelectors.js';
 
 export function AddCardsPanel({
-  binder,
   cardDefinitions,
   collections,
   inventory,
