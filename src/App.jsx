@@ -80,11 +80,11 @@ export default function App() {
   // Done in useEffect to avoid calling dispatch during render
   useEffect(() => {
     if (nav.currentView === 'binder' && !currentBinder) navigate('home');
-  }, [nav.currentView, currentBinder]);
+  }, [nav.currentView, currentBinder, navigate]);
 
   useEffect(() => {
     if (nav.currentView === 'collection' && !currentCollection) navigate('collections');
-  }, [nav.currentView, currentCollection]);
+  }, [nav.currentView, currentCollection, navigate]);
 
   const pageTitle = nav.currentView === 'binder'
     ? (currentBinder?.name ?? 'Binder')

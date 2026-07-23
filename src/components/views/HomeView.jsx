@@ -9,7 +9,8 @@
 // === ISSUE #92 START: Customize Cover — hover-revealed button on BinderCard ===
 
 import { useState, useCallback, useMemo } from 'react';
-import { Button, EmptyState, StatCard, useCountUp } from '../ui/index.jsx';
+import { Button, EmptyState, StatCard } from '../ui/index.jsx';
+import { useCountUp } from '../ui/useCountUp.js';
 import { CreateBinderModal } from '../modals/BinderModals.jsx';
 import { ACTIONS } from '../../store/index.js';
 import { useStore, useDispatch } from '../../hooks/useStore.js';

@@ -54,7 +54,10 @@ export function useDraggable({
   const resizeState = useRef(null);
 
   const clampPercent = (n) => Math.max(0, Math.min(100, n));
-  const clampScale = (n) => Math.max(scaleBounds.min, Math.min(scaleBounds.max, n));
+  const clampScale = useCallback(
+    (n) => Math.max(scaleBounds.min, Math.min(scaleBounds.max, n)),
+    [scaleBounds.min, scaleBounds.max]
+  );
 
   // ── Position dragging ────────────────────────────────────────────────────
 
@@ -200,7 +203,7 @@ export function useDraggable({
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleUp);
     };
-  }, [isResizing, onScaleChange]);
+  }, [isResizing, onScaleChange, clampScale]);
 
   return {
     isDragging,

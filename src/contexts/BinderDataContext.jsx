@@ -18,9 +18,7 @@
  * using.
  */
 
-import { createContext, useContext } from 'react';
-
-const BinderDataContext = createContext(null);
+import { BinderDataContext } from './useBinderData.js';
 
 export function BinderDataProvider({ value, children }) {
   return (
@@ -28,12 +26,4 @@ export function BinderDataProvider({ value, children }) {
       {children}
     </BinderDataContext.Provider>
   );
-}
-
-export function useBinderData() {
-  const ctx = useContext(BinderDataContext);
-  if (!ctx) {
-    throw new Error('useBinderData must be used within a BinderDataProvider (BinderView mounts this — check the component tree if you see this error).');
-  }
-  return ctx;
 }

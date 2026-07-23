@@ -182,6 +182,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const PRE_OPEN_SLIDE_MS = 400;
   const [isPreOpenSliding, setIsPreOpenSliding] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- closes over view.goToPage, which isn't itself memoized in useBinderView.js; wrapping just this one in useCallback wouldn't stop it being recreated every render, since its real dependency isn't stable either. Net effect is harmless listener churn in the keydown effect below (removed + re-added each render, not incorrect), not worth a larger useBinderView refactor to fully resolve.
   const handleOpenBinder = () => {
     if (view.page !== 0 || isPreOpenSliding) return;
     setIsPreOpenSliding(true);
@@ -191,6 +192,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     }, PRE_OPEN_SLIDE_MS);
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning as handleOpenBinder above
   const handleCloseBinder = () => {
     view.goToPage(0);
   };

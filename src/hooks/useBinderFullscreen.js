@@ -48,6 +48,7 @@ export function useBinderFullscreen({ rows, cols }) {
 
   useEffect(() => {
     if (!isFullscreen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- tied to the real DOM remeasurement below, not derivable during render
       setFullscreenMaxBookWidth(null);
       return;
     }
@@ -97,6 +98,7 @@ export function useBinderFullscreen({ rows, cols }) {
   const [measuredAspectRatio, setMeasuredAspectRatio] = useState(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset tied to the real DOM remeasurement immediately below, not derivable during render
     setMeasuredAspectRatio(null); // reset to re-measure fresh
 
     const recalc = () => {

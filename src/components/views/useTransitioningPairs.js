@@ -150,6 +150,7 @@ export function useTransitioningPairs(pairSpreadIndices, isFlipped, spread) {
   useEffect(() => {
     return () => {
       timeoutsRef.current.forEach(t => clearTimeout(t));
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- timeoutsRef is a Map populated/mutated by the effect above across this component's whole lifetime, not a per-render snapshot. Capturing .current into a local variable here (the lint's usual suggested fix) would only ever clean up whatever was in the Map at mount — almost always empty — silently missing everything added afterward, which defeats the entire point of this cleanup: clearing whatever's actually accumulated by the time the component unmounts.
       timeoutsRef.current.clear();
     };
   }, []);

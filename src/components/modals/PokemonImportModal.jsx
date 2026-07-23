@@ -72,6 +72,7 @@ export function PokemonImportModal({ set, onSubmit, onClose }) {
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard "mark loading before an async fetch starts" pattern
     setIsLoadingPreview(true);
     setLoadError('');
     // Small, fast request — just enough for the preview grid, not

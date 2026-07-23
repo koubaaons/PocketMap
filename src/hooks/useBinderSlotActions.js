@@ -28,14 +28,14 @@ export function useBinderSlotActions(toast, callbacks = {}) {
       inventoryItemId: chosenCopyId,
     });
     if (!slot) {
-      console.error('[BinderVault] Failed to create binder slot:', errors);
+      console.error('[Pinder] Failed to create binder slot:', errors);
       toast('Failed to add card to binder', 'error');
       return;
     }
     dispatch({ type: ACTIONS.BINDER_SLOT_ADD, payload: { slot } });
     toast(`Added to page ${pageNumber}, slot ${slotIndex + 1}`);
     callbacks.onAddSuccess?.();
-  }, [dispatch, toast, callbacks.onAddSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   /**
    * Removes a card from a binder slot.
@@ -44,7 +44,7 @@ export function useBinderSlotActions(toast, callbacks = {}) {
     dispatch({ type: ACTIONS.BINDER_SLOT_REMOVE, payload: { slotId } });
     toast('Card removed from binder');
     callbacks.onRemoveSuccess?.();
-  }, [dispatch, toast, callbacks.onRemoveSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   /**
    * Moves a card to a different page/slot in the same binder.
@@ -53,7 +53,7 @@ export function useBinderSlotActions(toast, callbacks = {}) {
     dispatch({ type: ACTIONS.BINDER_SLOT_MOVE, payload: { slotId, pageNumber, slotIndex } });
     toast('Card moved');
     callbacks.onMoveSuccess?.();
-  }, [dispatch, toast, callbacks.onMoveSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   /**
    * Adds a page to a binder.

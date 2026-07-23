@@ -31,7 +31,7 @@ export function useInventoryActions(toast, callbacks = {}) {
   const handleOwn = useCallback(({ cardDefId, collectionId, linkToSlotId }) => {
     const { item, errors } = createInventoryItem({ cardDefId, collectionId });
     if (!item) {
-      console.error('[BinderVault] Failed to create inventory item:', errors);
+      console.error('[Pinder] Failed to create inventory item:', errors);
       toast('Failed to mark card as owned', 'error');
       return;
     }
@@ -41,7 +41,7 @@ export function useInventoryActions(toast, callbacks = {}) {
     }
     toast('Card marked as owned');
     callbacks.onOwnSuccess?.();
-  }, [dispatch, toast, callbacks.onOwnSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   /**
    * Removes ownership — deletes the inventory entry.
@@ -51,7 +51,7 @@ export function useInventoryActions(toast, callbacks = {}) {
     dispatch({ type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId } });
     toast('Ownership removed');
     callbacks.onUnownSuccess?.();
-  }, [dispatch, toast, callbacks.onUnownSuccess]);
+  }, [dispatch, toast, callbacks]);
   /**
    * Updates acquisition information on an owned card.
    * @param {object} updatedItem - partial inventory item with id

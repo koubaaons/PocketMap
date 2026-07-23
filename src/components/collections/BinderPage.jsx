@@ -19,7 +19,7 @@ import { BinderSlot } from './BinderSlot.jsx';
 import { BinderPanelSlot } from './BinderPanelSlot.jsx';
 import { getQuantityOwned } from '../../selectors/inventorySelectors.js';
 import { getTotalPlacedCount } from '../../selectors/binderSelectors.js';
-import { useBinderData } from '../../contexts/BinderDataContext.jsx';
+import { useBinderData } from '../../contexts/useBinderData.js';
 
 export function BinderPage({
   binder,

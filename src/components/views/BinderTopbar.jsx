@@ -7,7 +7,8 @@
  * a single file.
  */
 
-import { Button, useCountUp } from '../ui/index.jsx';
+import { Button } from '../ui/index.jsx';
+import { useCountUp } from '../ui/useCountUp.js';
 
 export function BinderTopbar({
   binder,

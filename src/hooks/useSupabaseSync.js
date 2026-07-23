@@ -30,6 +30,7 @@ export function useSupabaseSync() {
   // ── Effect 1: Initial load ───────────────────────────────────────────────────
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- nothing to sync without a user; this is the terminal state for this effect, not derivable during render
       setSyncing(false);
       return;
     }
@@ -55,7 +56,8 @@ export function useSupabaseSync() {
 
     sync();
     return () => { cancelled = true; };
-  }, [user?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately user?.id, not the whole user object: a token refresh gives a new user object for the same logical user, and re-running this full reload + realtime-subscription effect for that would be wrong, not just wasteful
+  }, [user?.id, dispatch]);
 
   // ── Effect 2: Realtime subscription ─────────────────────────────────────────
   useEffect(() => {
@@ -110,7 +112,8 @@ export function useSupabaseSync() {
       clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately user?.id, not the whole user object — same reasoning as the effect above
+  }, [user?.id, dispatch]);
 
   return { syncing, lastSynced };
 }

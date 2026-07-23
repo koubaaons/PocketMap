@@ -12,7 +12,7 @@ import { CardGridItem } from './CardGridItem.jsx';
 import { EmptyState } from '../ui/index.jsx';
 import { buildInventoryGroupMap, getQuantityOwned } from '../../selectors/inventorySelectors.js';
 import { getTotalPlacedCount } from '../../selectors/binderSelectors.js';
-import { useCollectionData } from '../../contexts/CollectionDataContext.jsx';
+import { useCollectionData } from '../../contexts/useCollectionData.js';
 
 export function CardDefinitionList({
   cards,

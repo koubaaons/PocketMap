@@ -24,13 +24,13 @@ export function useBinActions(toast, callbacks = {}) {
     dispatch({ type: action, payload: { itemId: item.id } });
     toast(`"${item.name}" restored`);
     callbacks.onRestoreSuccess?.();
-  }, [dispatch, toast, callbacks.onRestoreSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   const handlePermDelete = useCallback((item) => {
     dispatch({ type: ACTIONS.BIN_DELETE_ITEM, payload: { itemId: item.id } });
     toast('Deleted permanently');
     callbacks.onDeleteSuccess?.();
-  }, [dispatch, toast, callbacks.onDeleteSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   const handleEmptyAll = useCallback((onSuccess) => {
     dispatch({ type: ACTIONS.BIN_EMPTY });

@@ -25,7 +25,8 @@
 export { PlaceholderTab } from './PlaceholderTab.jsx';
 // === REFACTOR4c END ===
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { useCountUp } from './useCountUp.js';
 
 // ─── Button ───────────────────────────────────────────────────────────────────
 
@@ -178,36 +179,6 @@ export function EmptyState({ icon, title, subtitle, action }) {
 // identical gray boxes. Falls back to the original plain look when no
 // tone is passed, so this is additive, not a breaking change for any
 // other place StatCard might be used.
-//
-// useCountUp animates numeric values from 0 up to their target over
-// ~900ms using requestAnimationFrame, re-triggering whenever the
-// target itself changes (so it also plays if stats update live, not
-// just on first mount). Non-numeric values pass through untouched.
-export function useCountUp(target, duration = 900) {
-  const [display, setDisplay] = useState(target);
-
-  useEffect(() => {
-    if (typeof target !== 'number') {
-      setDisplay(target);
-      return;
-    }
-
-    let raf;
-    const start = performance.now();
-
-    function tick(now) {
-      const progress = Math.min((now - start) / duration, 1);
-      setDisplay(Math.round(target * progress));
-      if (progress < 1) raf = requestAnimationFrame(tick);
-    }
-
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, duration]);
-
-  return display;
-}
 
 export function StatCard({ value, label, icon, tone }) {
   const displayValue = useCountUp(value);

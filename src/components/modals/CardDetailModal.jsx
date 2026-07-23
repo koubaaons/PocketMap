@@ -191,6 +191,16 @@ export function CardDetailModal({
   const GROUP_OPEN_SHIFT_X = 160;
 
   useLayoutEffect(() => {
+    // Resetting here is tied to the real DOM measurement/observer
+    // work below, not a pure "derive state from a prop" case — this
+    // whole effect exists specifically to interact with the DOM
+    // (ResizeObserver, window resize), which can't happen during
+    // render. Left as an effect deliberately rather than restructured,
+    // since this positioning logic already went through several
+    // rounds of real, hard-won debugging (see this file's own
+    // comments above) and isn't worth risking further without the
+    // ability to verify visually against a live browser.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!isOpen) { setPanelLeft(null); return; }
     const el = firstFocusRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;

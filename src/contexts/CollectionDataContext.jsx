@@ -13,9 +13,7 @@
  * recomputing them per-tab or per-card.
  */
 
-import { createContext, useContext } from 'react';
-
-const CollectionDataContext = createContext(null);
+import { CollectionDataContext } from './useCollectionData.js';
 
 export function CollectionDataProvider({ value, children }) {
   return (
@@ -23,12 +21,4 @@ export function CollectionDataProvider({ value, children }) {
       {children}
     </CollectionDataContext.Provider>
   );
-}
-
-export function useCollectionData() {
-  const ctx = useContext(CollectionDataContext);
-  if (!ctx) {
-    throw new Error('useCollectionData must be used within a CollectionDataProvider (CollectionDetailView mounts this — check the component tree if you see this error).');
-  }
-  return ctx;
 }

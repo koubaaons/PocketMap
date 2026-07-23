@@ -23,7 +23,7 @@
  * it, though it does offer the same batch upload for convenience.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/index.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBinderInsertActions } from '../../hooks/useBinderInsertActions.js';
@@ -106,10 +106,10 @@ export function InsertLibraryPanel({ binderInserts, toast, onClose }) {
   const maxWidth  = () => Math.min(900, window.innerWidth * 0.9);
   const maxHeight = () => window.innerHeight - 16;
 
-  const clampSize = (width, height) => ({
+  const clampSize = useCallback((width, height) => ({
     width:  Math.min(Math.max(width,  MIN_WIDTH),  maxWidth()),
     height: Math.min(Math.max(height, MIN_HEIGHT), maxHeight()),
-  });
+  }), []);
 
   const startResize = (e, axis) => {
     if (window.innerWidth <= 768) return;
@@ -147,14 +147,14 @@ export function InsertLibraryPanel({ binderInserts, toast, onClose }) {
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleUp);
     };
-  }, [isResizing]);
+  }, [isResizing, clampSize]);
 
   useEffect(() => {
     if (!size) return;
     const handleWindowResize = () => setSize(s => s ? clampSize(s.width, s.height) : s);
     window.addEventListener('resize', handleWindowResize);
     return () => window.removeEventListener('resize', handleWindowResize);
-  }, [size]);
+  }, [size, clampSize]);
 
   const [measuredWidth, setMeasuredWidth] = useState(380);
   useEffect(() => {

@@ -12,7 +12,7 @@
  * stored — HSL is only used internally, for the picker's own math.
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 function hexToHsl(hex) {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -49,14 +49,20 @@ export function ColorWheelPicker({ value, onChange }) {
   const boxRef = useRef(null);
   const [hsl, setHsl] = useState(() => hexToHsl(value));
 
-  // If the incoming value changes from OUTSIDE this component (e.g.
-  // opening the panel on a different binder), re-sync — but don't
-  // fight our own onChange calls, which already keep hsl and value
-  // in lockstep.
-  useEffect(() => {
+  // Adjust state during render when `value` changes from outside
+  // (e.g. opening the panel on a different binder) — React's own
+  // recommended pattern for exactly this "sync internal state with an
+  // external prop, but don't fight our own onChange updates" case
+  // (see "Adjusting some state when a prop changes" in the React
+  // docs). Comparing against a tracked previous value here, rather
+  // than resetting in an effect, means React can incorporate the
+  // change into this same render pass instead of committing a
+  // stale frame and then correcting it a tick later.
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     setHsl(hexToHsl(value));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+  }
 
   const updateFromPointer = useCallback((clientX, clientY) => {
     const rect = boxRef.current.getBoundingClientRect();

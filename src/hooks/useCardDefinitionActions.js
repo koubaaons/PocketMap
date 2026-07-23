@@ -24,7 +24,7 @@ export function useCardDefinitionActions(toast, callbacks = {}) {
     dispatch({ type: ACTIONS.CARD_DEFINITION_ADD, payload: cardDef });
     toast(`"${cardDef.name}" added`);
     callbacks.onCreateSuccess?.();
-  }, [dispatch, toast, callbacks.onCreateSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   /**
    * Updates an existing card definition.
@@ -34,7 +34,7 @@ export function useCardDefinitionActions(toast, callbacks = {}) {
     dispatch({ type: ACTIONS.CARD_DEFINITION_UPDATE, payload: updated });
     toast(`"${updated.name}" updated`);
     callbacks.onUpdateSuccess?.();
-  }, [dispatch, toast, callbacks.onUpdateSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   /**
    * Deletes a card definition.
@@ -46,7 +46,7 @@ export function useCardDefinitionActions(toast, callbacks = {}) {
     dispatch({ type: ACTIONS.CARD_DEFINITION_DELETE, payload: { cardDefId } });
     toast(`"${cardName}" deleted`);
     callbacks.onDeleteSuccess?.();
-  }, [dispatch, toast, callbacks.onDeleteSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   return { handleCreate, handleUpdate, handleDelete };
 }

@@ -7,7 +7,10 @@
 import { useState } from 'react';
 
 export function useTemplateEditor(initialFields = []) {
-  const [fields, setFields] = useState(() => initialFields.map(f => ({ ...f })));
+  const [fields, setFields] = useState(() => {
+    const resolved = typeof initialFields === 'function' ? initialFields() : initialFields;
+    return resolved.map(f => ({ ...f }));
+  });
   const [errors, setErrors] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
 

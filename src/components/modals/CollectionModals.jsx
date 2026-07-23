@@ -58,7 +58,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     handleRemove,
     validate: validateFields,
     clearErrors,
-  } = useTemplateEditor([
+  } = useTemplateEditor(() => [
     { id: `new-${Date.now()}`, field_name: '', field_type: 'text', is_required: false, order: 0, options: [], _isNew: true },
   ]);
   // === REFACTOR3a END ===

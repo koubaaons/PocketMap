@@ -65,10 +65,11 @@ export function BinderBookFlip({
 
   const isFlipped = (pairSpreadIndex) => pairSpreadIndex < spread;
 
-  const allPairSpreadIndices = useMemo(
-    () => [0, ...pagePairs.map(p => p.spreadIndex)],
-    [pagePairs.map(p => p.spreadIndex).join(',')]
-  );
+  const allPairSpreadIndices = useMemo(() => {
+    const indices = [0];
+    for (let n = 1; (n * 2 - 1) <= binder.pages; n++) indices.push(n);
+    return indices;
+  }, [binder.pages]);
   const { transitioning, snapInstantly } = useTransitioningPairs(allPairSpreadIndices, isFlipped, spread);
   const getZIndexFor = (pairSpreadIndex) =>
     getEffectiveZIndex(pairSpreadIndex, totalSpreads, isFlipped(pairSpreadIndex), transitioning.has(pairSpreadIndex));

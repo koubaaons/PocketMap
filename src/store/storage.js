@@ -51,7 +51,7 @@ function applyMigrations(state) {
   let current = state;
   let v = current.version ?? 1;
   while (MIGRATIONS[v + 1]) {
-    DEBUG && console.info(`[BinderVault] Migrating storage from v${v} → v${v + 1}`);
+    DEBUG && console.info(`[Pinder] Migrating storage from v${v} → v${v + 1}`);
     current = MIGRATIONS[v + 1](current);
     v = current.version;
   }
@@ -70,7 +70,7 @@ export function sanitizeState(raw) {
     b.stickers = b.stickers.map(s => (typeof s.scale === 'number' ? s : { ...s, scale: 1 }));
     b.stickers = b.stickers.map(s => (typeof s.size  === 'number' ? s : { ...s, size: 17.5 }));
     const { valid, errors } = validateBinder(b);
-    if (!valid) DEBUG && console.warn('[BinderVault] Dropping corrupt binder:', errors, b);
+    if (!valid) DEBUG && console.warn('[Pinder] Dropping corrupt binder:', errors, b);
     return valid;
   });
 
@@ -78,7 +78,7 @@ export function sanitizeState(raw) {
 
   const collections = (raw.collections ?? []).filter(c => {
     const { valid, errors } = validateCollection(c);
-    if (!valid) DEBUG && console.warn('[BinderVault] Dropping corrupt collection:', errors, c);
+    if (!valid) DEBUG && console.warn('[Pinder] Dropping corrupt collection:', errors, c);
     return valid;
   });
 
@@ -86,15 +86,15 @@ export function sanitizeState(raw) {
 
   const templateFields = (raw.templateFields ?? []).filter(f => {
     const { valid, errors } = validateTemplateField(f);
-    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt template field:', errors, f); return false; }
-    if (!collectionIds.has(f.collectionId)) { DEBUG && console.warn('[BinderVault] Dropping orphan template field:', f.id); return false; }
+    if (!valid) { DEBUG && console.warn('[Pinder] Dropping corrupt template field:', errors, f); return false; }
+    if (!collectionIds.has(f.collectionId)) { DEBUG && console.warn('[Pinder] Dropping orphan template field:', f.id); return false; }
     return true;
   });
 
   const cardDefinitions = (raw.cardDefinitions ?? []).filter(cd => {
     const { valid, errors } = validateCardDefinition(cd);
-    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt card definition:', errors, cd); return false; }
-    if (!collectionIds.has(cd.collectionId)) { DEBUG && console.warn('[BinderVault] Dropping orphan card definition:', cd.id); return false; }
+    if (!valid) { DEBUG && console.warn('[Pinder] Dropping corrupt card definition:', errors, cd); return false; }
+    if (!collectionIds.has(cd.collectionId)) { DEBUG && console.warn('[Pinder] Dropping orphan card definition:', cd.id); return false; }
     return true;
   });
 
@@ -102,23 +102,23 @@ export function sanitizeState(raw) {
 
   const inventory = (raw.inventory ?? []).filter(inv => {
     const { valid, errors } = validateInventoryItem(inv);
-    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt inventory item:', errors, inv); return false; }
-    if (!cardDefIds.has(inv.cardDefId)) { DEBUG && console.warn('[BinderVault] Dropping orphan inventory item:', inv.id); return false; }
+    if (!valid) { DEBUG && console.warn('[Pinder] Dropping corrupt inventory item:', errors, inv); return false; }
+    if (!cardDefIds.has(inv.cardDefId)) { DEBUG && console.warn('[Pinder] Dropping orphan inventory item:', inv.id); return false; }
     return true;
   });
 
   const binderSlots = (raw.binderSlots ?? []).filter(s => {
     const { valid, errors } = validateBinderSlot(s);
-    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt binder slot:', errors, s); return false; }
-    if (!binderIds.has(s.binderId))    { DEBUG && console.warn('[BinderVault] Dropping orphan binder slot (no binder):', s.id); return false; }
-    if (!cardDefIds.has(s.cardDefId))  { DEBUG && console.warn('[BinderVault] Dropping orphan binder slot (no card def):', s.id); return false; }
+    if (!valid) { DEBUG && console.warn('[Pinder] Dropping corrupt binder slot:', errors, s); return false; }
+    if (!binderIds.has(s.binderId))    { DEBUG && console.warn('[Pinder] Dropping orphan binder slot (no binder):', s.id); return false; }
+    if (!cardDefIds.has(s.cardDefId))  { DEBUG && console.warn('[Pinder] Dropping orphan binder slot (no card def):', s.id); return false; }
     return true;
   });
 
   // === Michi Method support: combined slots ===
   const binderInserts = (raw.binderInserts ?? []).filter(i => {
     const { valid, errors } = validateBinderInsert(i);
-    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt binder insert:', errors, i); return false; }
+    if (!valid) { DEBUG && console.warn('[Pinder] Dropping corrupt binder insert:', errors, i); return false; }
     return true;
   });
 
@@ -126,10 +126,10 @@ export function sanitizeState(raw) {
 
   const binderPanels = (raw.binderPanels ?? []).filter(p => {
     const { valid, errors } = validateBinderPanel(p);
-    if (!valid) { DEBUG && console.warn('[BinderVault] Dropping corrupt binder panel:', errors, p); return false; }
-    if (!binderIds.has(p.binderId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder panel (no binder):', p.id); return false; }
-    if (p.panelType === 'card' && !cardDefIds.has(p.cardDefId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder panel (no card def):', p.id); return false; }
-    if (p.panelType === 'insert' && !binderInsertIds.has(p.insertId)) { DEBUG && console.warn('[BinderVault] Dropping orphan binder panel (no insert):', p.id); return false; }
+    if (!valid) { DEBUG && console.warn('[Pinder] Dropping corrupt binder panel:', errors, p); return false; }
+    if (!binderIds.has(p.binderId)) { DEBUG && console.warn('[Pinder] Dropping orphan binder panel (no binder):', p.id); return false; }
+    if (p.panelType === 'card' && !cardDefIds.has(p.cardDefId)) { DEBUG && console.warn('[Pinder] Dropping orphan binder panel (no card def):', p.id); return false; }
+    if (p.panelType === 'insert' && !binderInsertIds.has(p.insertId)) { DEBUG && console.warn('[Pinder] Dropping orphan binder panel (no insert):', p.id); return false; }
     return true;
   });
 
@@ -166,7 +166,7 @@ export function loadState() {
     const migrated = applyMigrations(parsed);
     return sanitizeState(migrated);
   } catch (err) {
-    console.error('[BinderVault] Failed to load state, using defaults:', err);
+    console.error('[Pinder] Failed to load state, using defaults:', err);
     return { ...DEFAULT_STATE };
   }
 }
@@ -176,7 +176,7 @@ export function saveState(state) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, version: SCHEMA_VERSION }));
     return { success: true };
   } catch (err) {
-    console.error('[BinderVault] Failed to save state:', err);
+    console.error('[Pinder] Failed to save state:', err);
     return { success: false, error: err };
   }
 }

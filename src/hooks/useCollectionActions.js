@@ -48,7 +48,7 @@ export function useCollectionActions(toast, callbacks = {}) {
 
     toast(`Collection "${payload.collection.name}" created`);
     callbacks.onCreateSuccess?.();
-  }, [dispatch, toast, callbacks.onCreateSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   /**
    * Updates a collection's name and metadata.
@@ -68,7 +68,7 @@ export function useCollectionActions(toast, callbacks = {}) {
     dispatch({ type: ACTIONS.COLLECTION_DELETE, payload: { collectionId } });
     toast('Collection deleted');
     callbacks.onDeleteSuccess?.();
-  }, [dispatch, toast, callbacks.onDeleteSuccess]);
+  }, [dispatch, toast, callbacks]);
 
   return { handleCreate, handleEdit, handleDelete };
 }
