@@ -49,32 +49,55 @@ export function binderPanelReducer(state, action) {
         return state;
       }
 
-      // === FIX (same regression as BINDER_SLOT_ADD, caught by a test
-      // before ever being reported): a card-type panel for a card
-      // that isn't owned at all used to be rejected outright — the
-      // quantity-tracking logic below required finding an unplaced
-      // OWNED copy before allowing ANY placement. An unowned card
-      // should still be placeable as a grey placeholder here too,
-      // same as a normal slot. ===
+      // === CHANGED (#157): same hybrid rule as BINDER_SLOT_ADD —
+      // an owned copy is restricted by its own inventoryItemId (two
+      // different copies of the same card can live in different
+      // binders), while an unowned "missing" placeholder is
+      // restricted by cardDefId instead, since it has no copy
+      // identity to check against. This also brings this branch back
+      // in sync with BINDER_SLOT_ADD's rule — the two had drifted
+      // apart, since this one still had the older per-copy-counting
+      // approach from before #153's brief "one binder per card" rule,
+      // while BINDER_SLOT_ADD had already moved to that stricter rule.
       let finalPanel = panel;
       if (panel.panelType === 'card') {
-        const quantityOwned = state.inventory.filter(inv => inv.cardDefId === panel.cardDefId).length;
-        if (quantityOwned === 0) {
-          finalPanel = { ...panel, inventoryItemId: null };
-        } else {
-          const placedInventoryIds = new Set([
-            ...state.binderSlots.filter(s => s.inventoryItemId).map(s => s.inventoryItemId),
-            ...state.binderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
-          ]);
-          const unplacedCopy = state.inventory.find(
-            inv => inv.cardDefId === panel.cardDefId && !placedInventoryIds.has(inv.id)
-          );
-          if (!unplacedCopy) {
-            console.warn('[Pinder] BINDER_PANEL_ADD: no unplaced copies left for this card', panel.cardDefId);
+        const placedInventoryIds = new Set([
+          ...state.binderSlots.filter(s => s.inventoryItemId).map(s => s.inventoryItemId),
+          ...state.binderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
+        ]);
+        const isOwnedAtAll = state.inventory.some(inv => inv.cardDefId === panel.cardDefId);
+
+        let inventoryItemId;
+        if (panel.inventoryItemId) {
+          const requested = state.inventory.find(inv => inv.id === panel.inventoryItemId && inv.cardDefId === panel.cardDefId);
+          if (!requested) {
+            console.warn('[Pinder] BINDER_PANEL_ADD: requested inventoryItemId is not a valid, owned copy of this card', panel.inventoryItemId);
             return state;
           }
-          finalPanel = { ...panel, inventoryItemId: unplacedCopy.id };
+          if (placedInventoryIds.has(requested.id)) {
+            console.warn('[Pinder] BINDER_PANEL_ADD: this copy is already placed in a binder', requested.id);
+            return state;
+          }
+          inventoryItemId = requested.id;
+        } else if (isOwnedAtAll) {
+          const unplacedCopy = state.inventory.find(inv => inv.cardDefId === panel.cardDefId && !placedInventoryIds.has(inv.id));
+          if (!unplacedCopy) {
+            console.warn('[Pinder] BINDER_PANEL_ADD: every owned copy of this card is already placed', panel.cardDefId);
+            return state;
+          }
+          inventoryItemId = unplacedCopy.id;
+        } else {
+          const alreadyHasMissingPlaceholder =
+            state.binderSlots.some(s => s.cardDefId === panel.cardDefId && !s.inventoryItemId) ||
+            state.binderPanels.some(p => p.panelType === 'card' && p.cardDefId === panel.cardDefId && !p.inventoryItemId);
+          if (alreadyHasMissingPlaceholder) {
+            console.warn('[Pinder] BINDER_PANEL_ADD: this card already has a missing placeholder in a binder', panel.cardDefId);
+            return state;
+          }
+          inventoryItemId = null;
         }
+
+        finalPanel = { ...panel, inventoryItemId };
       }
 
       return { ...state, binderPanels: [...state.binderPanels, finalPanel] };

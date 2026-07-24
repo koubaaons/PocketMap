@@ -91,18 +91,34 @@ describe('BINDER_SLOT_ADD', () => {
     expect(next.binderSlots[0].inventoryItemId).toBe('inv-1');
   });
 
-  it('rejects placing the SAME card a second time even when multiple copies are owned — "one binder per card" (#153)', () => {
-    // Previously, owning 2 copies allowed 2 simultaneous placements
-    // (one per copy). That's deliberately no longer true: the first
-    // placement anywhere blocks any other, regardless of how many
-    // copies exist — extra copies just stay unplaced.
+  it('allows placing the SAME card twice when 2 copies are owned — each placement auto-picks a genuinely unplaced copy (#157)', () => {
     const state = baseState({ inventory: [makeInventoryItem('inv-1'), makeInventoryItem('inv-2')] });
     let next = reducer(state, { type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: makeSlotPayload({ id: 'slot-a', slotIndex: 0 }) } });
     expect(next.binderSlots).toHaveLength(1);
     expect(next.binderSlots[0].inventoryItemId).toBe('inv-1'); // first owned copy, auto-picked
 
     next = reducer(next, { type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: makeSlotPayload({ id: 'slot-b', slotIndex: 1 }) } });
-    expect(next.binderSlots).toHaveLength(1); // unchanged — second placement rejected outright
+    expect(next.binderSlots).toHaveLength(2); // second copy still available — placed too
+    expect(next.binderSlots.find(s => s.id === 'slot-b').inventoryItemId).toBe('inv-2');
+  });
+
+  it('rejects a third placement attempt once both owned copies are already placed', () => {
+    const state = baseState({ inventory: [makeInventoryItem('inv-1'), makeInventoryItem('inv-2')] });
+    let next = reducer(state, { type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: makeSlotPayload({ id: 'slot-a', slotIndex: 0 }) } });
+    next = reducer(next, { type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: makeSlotPayload({ id: 'slot-b', slotIndex: 1 }) } });
+
+    next = reducer(next, { type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: makeSlotPayload({ id: 'slot-c', slotIndex: 2 }) } });
+    expect(next.binderSlots).toHaveLength(2); // unchanged — nothing left to place
+  });
+
+  it('a missing (unowned) placeholder for a card can only exist once, even though owned copies can be placed multiple times', () => {
+    const state = baseState({ inventory: [] });
+    let next = reducer(state, { type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: makeSlotPayload({ id: 'slot-a', slotIndex: 0 }) } });
+    expect(next.binderSlots).toHaveLength(1);
+    expect(next.binderSlots[0].inventoryItemId).toBe(null);
+
+    next = reducer(next, { type: ACTIONS.BINDER_SLOT_ADD, payload: { slot: makeSlotPayload({ id: 'slot-b', slotIndex: 1 }) } });
+    expect(next.binderSlots).toHaveLength(1); // rejected — already has a missing placeholder
   });
 
   it('rejects placing an owned card once every copy is already placed', () => {
@@ -354,6 +370,16 @@ describe('BINDER_PANEL_ADD (Michi Method combined slots)', () => {  function mak
     const next = reducer(state, { type: ACTIONS.BINDER_PANEL_ADD, payload: makePanelPayload() });
     expect(next.binderPanels).toHaveLength(1);
     expect(next.binderPanels[0].inventoryItemId).toBeNull();
+  });
+
+  it('places a card-type panel using a second, still-unplaced copy when the first copy is already placed via a normal slot elsewhere (#157)', () => {
+    const state = baseState({
+      inventory: [makeInventoryItem('inv-1'), makeInventoryItem('inv-2')],
+      binderSlots: [makeSlotPayload({ id: 'slot-existing', binderId: 'binder-other', inventoryItemId: 'inv-1' })],
+    });
+    const next = reducer(state, { type: ACTIONS.BINDER_PANEL_ADD, payload: makePanelPayload() });
+    expect(next.binderPanels).toHaveLength(1);
+    expect(next.binderPanels[0].inventoryItemId).toBe('inv-2'); // the still-unplaced copy, not the one already in binder-other
   });
 
   it('rejects a card-type panel once every copy is already placed elsewhere', () => {

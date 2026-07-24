@@ -265,12 +265,13 @@ export function AddCardsPanel({
   const ownershipMap      = useMemo(() => buildOwnershipMap(inventory), [inventory]);
   const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
 
-  // A card — owned or not — that already has a slot/panel anywhere
-  // (any binder) has nothing left to place; it's limited to one
-  // binder total now, not one-per-owned-copy.
+  // A card is only unavailable once every owned copy already has a
+  // slot/panel of its own (or, for an unowned card, once its one
+  // allowed missing placeholder already exists somewhere) — different
+  // copies of the same card can live in different binders now (#157).
   const fullyPlacedIds = useMemo(
-    () => getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels),
-    [allBinderSlots, allBinderPanels]
+    () => getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, inventory),
+    [allBinderSlots, allBinderPanels, inventory]
   );
 
   const collectionMap = useMemo(() => {

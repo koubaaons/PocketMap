@@ -22,55 +22,59 @@ function makeInv(id, cardDefId) {
 }
 
 describe('getFullyPlacedCardDefIds', () => {
-  // === CHANGED: this function used to compare owned quantity against
-  // placed count (a card was only "fully placed" once every owned
-  // copy had a slot somewhere), and took an optional currentBinderId
-  // to separately handle unowned placeholders per-binder. Both of
-  // those were replaced by the "one binder per card" rule (#153):
-  // a card is either placed somewhere (any slot or card-type panel,
-  // anywhere) or it isn't — quantity owned is irrelevant, and there's
-  // no per-binder distinction anymore, since a card can only ever be
-  // placed in one binder, period. These tests describe that current,
-  // simpler behavior; the old quantity/currentBinderId-based tests
-  // that lived here are gone along with the behavior they covered.
-  it('a card with a slot referencing it anywhere IS in the fully-placed set', () => {
-    const result = getFullyPlacedCardDefIds([makeSlot({ cardDefId: 'card-1' })], []);
+  // === CHANGED (#157): restricting by copy for owned cards (instead
+  // of by the whole card, #153's brief rule) means "fully placed" now
+  // has to be copy-aware again — a card with unplaced copies left
+  // still has something to offer in the Add Cards panel, even though
+  // one of its copies is already sitting in a binder somewhere.
+  // Unowned cards keep the simpler by-card check, since a missing
+  // placeholder has no copy identity to be aware of.
+  it('an owned card with 1 copy, placed, IS fully placed', () => {
+    const result = getFullyPlacedCardDefIds(
+      [makeSlot({ cardDefId: 'card-1', inventoryItemId: 'inv-1' })], [], [makeInv('inv-1', 'card-1')]
+    );
     expect(result.has('card-1')).toBe(true);
   });
 
-  it('owning multiple copies no longer matters — one placed slot is enough, regardless of quantity', () => {
-    // Previously this specific case ("2 owned, only 1 placed") was
-    // NOT fully placed, since a second copy could still go somewhere
-    // else. Now a card is limited to one binder total regardless of
-    // how many copies exist, so a single placed slot is already the
-    // whole story.
-    const result = getFullyPlacedCardDefIds([makeSlot({ cardDefId: 'card-1' })], []);
-    expect(result.has('card-1')).toBe(true);
-  });
-
-  it('a card with no slot or panel referencing it anywhere is NOT in the fully-placed set', () => {
-    const result = getFullyPlacedCardDefIds([makeSlot({ cardDefId: 'other-card' })], []);
+  it('an owned card with 2 copies but only 1 placed is NOT fully placed — the other copy could still go somewhere', () => {
+    const result = getFullyPlacedCardDefIds(
+      [makeSlot({ cardDefId: 'card-1', inventoryItemId: 'inv-1' })], [],
+      [makeInv('inv-1', 'card-1'), makeInv('inv-2', 'card-1')]
+    );
     expect(result.has('card-1')).toBe(false);
   });
 
-  it('an unowned "missing" placeholder slot still counts as placed — ownership isn\'t part of this check at all anymore', () => {
-    const result = getFullyPlacedCardDefIds([makeSlot({ cardDefId: 'card-1' })], []);
+  it('an owned card with 2 copies, BOTH placed (in different binders), IS fully placed', () => {
+    const slots = [
+      makeSlot({ id: 's1', cardDefId: 'card-1', inventoryItemId: 'inv-1', binderId: 'binder-a' }),
+      makeSlot({ id: 's2', cardDefId: 'card-1', inventoryItemId: 'inv-2', binderId: 'binder-b' }),
+    ];
+    const result = getFullyPlacedCardDefIds(slots, [], [makeInv('inv-1', 'card-1'), makeInv('inv-2', 'card-1')]);
     expect(result.has('card-1')).toBe(true);
   });
 
-  it('counts card-type panels toward placed, but never insert-type panels', () => {
-    const cardPanel = makePanel({ cardDefId: 'card-1', panelType: 'card' });
+  it('an unowned card with no missing placeholder anywhere is NOT fully placed', () => {
+    const result = getFullyPlacedCardDefIds([], [], []);
+    expect(result.has('card-1')).toBe(false);
+  });
+
+  it('an unowned card that already has a missing placeholder somewhere IS fully placed — only one is ever allowed', () => {
+    const result = getFullyPlacedCardDefIds([makeSlot({ cardDefId: 'card-1', inventoryItemId: null })], [], []);
+    expect(result.has('card-1')).toBe(true);
+  });
+
+  it('counts card-type panels toward placed (matching the owning copy), but never insert-type panels', () => {
+    const cardPanel = makePanel({ cardDefId: 'card-1', panelType: 'card', inventoryItemId: 'inv-1' });
     const insertPanel = makePanel({ id: 'p2', cardDefId: null, panelType: 'insert' });
-    const result = getFullyPlacedCardDefIds([], [cardPanel, insertPanel]);
+    const result = getFullyPlacedCardDefIds([], [cardPanel, insertPanel], [makeInv('inv-1', 'card-1')]);
     expect(result.has('card-1')).toBe(true);
     expect(result.has(null)).toBe(false); // the insert panel's null cardDefId must never leak in
   });
 
-  it('a card placed in one binder is excluded from being offered in a completely different binder too — the whole point of "one binder per card"', () => {
-    const slotInBinderA = makeSlot({ cardDefId: 'card-1', binderId: 'binder-a' });
-    const result = getFullyPlacedCardDefIds([slotInBinderA], []);
-    // No currentBinderId distinction anymore — placed anywhere means
-    // placed, full stop, regardless of which binder is asking.
+  it('a card owned twice, with one copy placed via a slot and the other via a panel, IS fully placed', () => {
+    const slot = makeSlot({ cardDefId: 'card-1', inventoryItemId: 'inv-1' });
+    const panel = makePanel({ cardDefId: 'card-1', panelType: 'card', inventoryItemId: 'inv-2' });
+    const result = getFullyPlacedCardDefIds([slot], [panel], [makeInv('inv-1', 'card-1'), makeInv('inv-2', 'card-1')]);
     expect(result.has('card-1')).toBe(true);
   });
 });

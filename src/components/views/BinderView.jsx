@@ -507,52 +507,58 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   };
 
   const makePageHandlers = (pageNumber) => ({
-    onClickEmpty: (slotIndex) => {
-      if (view.isCombineMode) { view.toggleSlotForCombine(pageNumber, slotIndex); return; }
-      return view.isPreviewMode
-        ? handleEmptyClickInPreview(slotIndex, pageNumber)
-        : view.openAddToSlot(slotIndex, pageNumber);
+    interactions: {
+      onClickEmpty: (slotIndex) => {
+        if (view.isCombineMode) { view.toggleSlotForCombine(pageNumber, slotIndex); return; }
+        return view.isPreviewMode
+          ? handleEmptyClickInPreview(slotIndex, pageNumber)
+          : view.openAddToSlot(slotIndex, pageNumber);
+      },
+      // === Clicking a card in a binder now goes straight to the same
+      // card-detail experience Collections uses (card floats, details
+      // slide out beside it) instead of first opening SlotActionModal
+      // and requiring an extra "View Card Details" click. Preview mode
+      // keeps its own separate click behavior — that's for selecting
+      // slots to move cards between, a different workflow entirely. ===
+      onClickSlot: (slot, cardDef) => {
+        if (view.isCombineMode) {
+          toast('Please select empty slots — a slot with a card in it can\'t be combined', 'error');
+          return;
+        }
+        return view.isPreviewMode
+          ? handleSlotClickInPreview(slot, cardDef)
+          : view.openCardDetail(cardDef);
+      },
+      onToggleOwned: handleToggleOwnedInSlot,
+      onRemove: (slot) => handleRemoveFromSlot(slot.id),
+      onDropEmpty: (view.addingToSlot && !view.isCombineMode)
+        ? (slotIndex, payload) => handleDropCardOnSlot(pageNumber, slotIndex, payload)
+        : undefined,
     },
-    // === Clicking a card in a binder now goes straight to the same
-    // card-detail experience Collections uses (card floats, details
-    // slide out beside it) instead of first opening SlotActionModal
-    // and requiring an extra "View Card Details" click. Preview mode
-    // keeps its own separate click behavior — that's for selecting
-    // slots to move cards between, a different workflow entirely. ===
-    onClickSlot: (slot, cardDef) => {
-      if (view.isCombineMode) {
-        toast('Please select empty slots — a slot with a card in it can\'t be combined', 'error');
-        return;
-      }
-      return view.isPreviewMode
-        ? handleSlotClickInPreview(slot, cardDef)
-        : view.openCardDetail(cardDef);
+    panels: {
+      pagePanels: binderPanels.filter(p => p.pageNumber === pageNumber),
+      binderInsertMap,
+      onClickPanel: handleClickPanel,
+      onUncombinePanel: handleUncombinePanel,
+      onUpdatePanel: handleUpdatePanel,
+      onDropInsert: (panelId, insertId) => handleUpdatePanel(panelId, { insertId }),
     },
-    onToggleOwned: handleToggleOwnedInSlot,
-    onRemove: (slot) => handleRemoveFromSlot(slot.id),
-    onDropEmpty: (view.addingToSlot && !view.isCombineMode)
-      ? (slotIndex, payload) => handleDropCardOnSlot(pageNumber, slotIndex, payload)
-      : undefined,
-    pagePanels: binderPanels.filter(p => p.pageNumber === pageNumber),
-    binderInsertMap,
-    onClickPanel: handleClickPanel,
-    onUncombinePanel: handleUncombinePanel,
-    onUpdatePanel: handleUpdatePanel,
-    onDropInsert: (panelId, insertId) => handleUpdatePanel(panelId, { insertId }),
-    isCombineMode: view.isCombineMode,
-    combineSelection: view.combineSelection.filter(s => s.pageNumber === pageNumber).map(s => s.slotIndex),
-    getCombineRectangle: view.getCombineRectangle,
-    onClearCombineSelection: view.clearCombineSelection,
-    onConfirmCombine: (rect) => {
-      const stillAllEmpty = view.combineSelection.every(({ pageNumber: pn, slotIndex: si }) =>
-        !allBinderSlots.some(s => s.binderId === binder.id && s.pageNumber === pn && s.slotIndex === si && s.cardDefId)
-      );
-      if (!stillAllEmpty) {
-        toast('One of the selected slots now has a card in it — please reselect empty slots', 'error');
-        view.exitCombineMode();
-        return;
-      }
-      handleConfirmCombine(rect);
+    combine: {
+      isCombineMode: view.isCombineMode,
+      combineSelection: view.combineSelection.filter(s => s.pageNumber === pageNumber).map(s => s.slotIndex),
+      getCombineRectangle: view.getCombineRectangle,
+      onClearCombineSelection: view.clearCombineSelection,
+      onConfirmCombine: (rect) => {
+        const stillAllEmpty = view.combineSelection.every(({ pageNumber: pn, slotIndex: si }) =>
+          !allBinderSlots.some(s => s.binderId === binder.id && s.pageNumber === pn && s.slotIndex === si && s.cardDefId)
+        );
+        if (!stillAllEmpty) {
+          toast('One of the selected slots now has a card in it — please reselect empty slots', 'error');
+          view.exitCombineMode();
+          return;
+        }
+        handleConfirmCombine(rect);
+      },
     },
   });
 

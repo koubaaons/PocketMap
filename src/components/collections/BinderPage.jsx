@@ -25,25 +25,35 @@ export function BinderPage({
   binder,
   pageNumber,
   pageSlotMap,
-  pagePanels = [],
-  binderInsertMap = {},
   isPreviewMode = false,
   selectedSlot = null,
-  onClickEmpty,
-  onClickSlot,
-  onToggleOwned,
-  onRemove,
-  onDropEmpty,
-  onClickPanel,
-  onUncombinePanel,
-  onUpdatePanel,
-  onDropInsert,
-  isCombineMode = false,
-  combineSelection = [],
-  getCombineRectangle,
-  onClearCombineSelection,
-  onConfirmCombine,
+  interactions,
+  panels: panelProps,
+  combine,
 }) {
+  const {
+    onClickEmpty,
+    onClickSlot,
+    onToggleOwned,
+    onRemove,
+    onDropEmpty,
+  } = interactions;
+  const {
+    pagePanels = [],
+    binderInsertMap = {},
+    onClickPanel,
+    onUncombinePanel,
+    onUpdatePanel,
+    onDropInsert,
+  } = panelProps;
+  const {
+    isCombineMode = false,
+    combineSelection = [],
+    getCombineRectangle,
+    onClearCombineSelection,
+    onConfirmCombine,
+  } = combine;
+
   const { cardDefMap, inventoryGroupMap, allBinderSlots, allBinderPanels } = useBinderData();
   const totalSlots = binder.rows * binder.cols;
   const cols = binder.cols;

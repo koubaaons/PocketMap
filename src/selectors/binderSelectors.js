@@ -26,13 +26,37 @@ export function buildPageSlotMap(binderSlots, binderId, pageNumber) {
  * @param {object[]} allBinderSlots
  * @param {object[]} allBinderPanels
  */
-export function getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels) {
-  const placed = new Set();
-  allBinderSlots.forEach(s => placed.add(s.cardDefId));
-  allBinderPanels
-    .filter(p => p.panelType === 'card')
-    .forEach(p => placed.add(p.cardDefId));
-  return placed;
+export function getFullyPlacedCardDefIds(allBinderSlots, allBinderPanels, inventory) {
+  const placedInventoryIds = new Set([
+    ...allBinderSlots.filter(s => s.inventoryItemId).map(s => s.inventoryItemId),
+    ...allBinderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
+  ]);
+  const cardDefIdsWithMissingPlaceholder = new Set([
+    ...allBinderSlots.filter(s => !s.inventoryItemId).map(s => s.cardDefId),
+    ...allBinderPanels.filter(p => p.panelType === 'card' && !p.inventoryItemId).map(p => p.cardDefId),
+  ]);
+
+  const ownedCopyIdsByCard = new Map();
+  inventory.forEach(inv => {
+    if (!ownedCopyIdsByCard.has(inv.cardDefId)) ownedCopyIdsByCard.set(inv.cardDefId, []);
+    ownedCopyIdsByCard.get(inv.cardDefId).push(inv.id);
+  });
+
+  const fullyPlaced = new Set();
+  // Owned cards: fully placed once every owned copy already has a
+  // slot/panel of its own — mirrors exactly what the reducer would
+  // do (auto-pick the first unplaced copy; nothing left to pick once
+  // all are placed).
+  for (const [cardDefId, copyIds] of ownedCopyIdsByCard) {
+    if (copyIds.every(id => placedInventoryIds.has(id))) fullyPlaced.add(cardDefId);
+  }
+  // Unowned cards: fully placed once a missing placeholder already
+  // exists for them — only one is ever allowed, since it has no copy
+  // identity to distinguish a second one from.
+  for (const cardDefId of cardDefIdsWithMissingPlaceholder) {
+    if (!ownedCopyIdsByCard.has(cardDefId)) fullyPlaced.add(cardDefId);
+  }
+  return fullyPlaced;
 }
 
 export function getOrganisedCardDefIds(binderSlots, binderPanels = []) {

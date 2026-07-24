@@ -45,33 +45,24 @@ export function binderSlotReducer(state, action) {
         console.warn('[Pinder] BINDER_SLOT_ADD: replacing orphaned slot (card no longer exists)', existingAtPosition.id);
       }
 
-      // === CHANGED: a card — owned or not, regardless of how many
-      // physical copies exist — can now only ever be placed in ONE
-      // binder at a time, period. Requested directly. Previously,
-      // owning multiple copies let the same card sit in several
-      // different binders simultaneously (up to quantityOwned
-      // placements, counted globally); now the very first placement
-      // anywhere blocks any other. Extra copies beyond that one
-      // placement just stay in inventory/Unorganised — they don't
-      // need a slot of their own. This replaces the old
-      // quantity-vs-placed-count comparison entirely; see
-      // binderSelectors.js's getFullyPlacedCardDefIds for the
-      // matching UI-side simplification.
-      const alreadyPlacedAnywhere =
-        state.binderSlots.some(s => s.id !== existingAtPosition?.id && s.cardDefId === slot.cardDefId) ||
-        state.binderPanels.some(p => p.panelType === 'card' && p.cardDefId === slot.cardDefId);
-      if (alreadyPlacedAnywhere) {
-        console.warn('[Pinder] BINDER_SLOT_ADD: this card is already placed in a binder', slot.cardDefId);
-        return state;
-      }
+      // === CHANGED (#157): restrict by COPY for an owned card, not by
+      // the card as a whole — two independent physical copies
+      // (different language/condition/label) can now live in two
+      // different binders at once; only the exact same copy can't be
+      // in two places. An unowned "missing" placeholder has no copy
+      // identity to restrict by at all, so it keeps the old
+      // card-wide restriction: only one such placeholder can exist
+      // anywhere, which is what gives INVENTORY_ADD's auto-link logic
+      // an unambiguous single slot to attach the new copy to once the
+      // card is actually acquired. This replaces the brief "one
+      // binder per card, full stop" rule (#153), which turned out to
+      // be stricter than intended.
+      const placedInventoryIds = new Set([
+        ...state.binderSlots.filter(s => s.id !== existingAtPosition?.id && s.inventoryItemId).map(s => s.inventoryItemId),
+        ...state.binderPanels.filter(p => p.panelType === 'card' && p.inventoryItemId).map(p => p.inventoryItemId),
+      ]);
+      const isOwnedAtAll = state.inventory.some(inv => inv.cardDefId === slot.cardDefId);
 
-      // Not placed anywhere yet. If owned, link the new slot to
-      // whichever copy the caller explicitly requested (e.g. "place
-      // the English one, not the Chinese one" from a copy picker) —
-      // validated here rather than trusted blindly, in case of stale
-      // UI state. Otherwise just use the first owned copy: since a
-      // card is only ever placed once in total now, there's no
-      // meaningful "which unplaced copy" choice to make beyond that.
       let inventoryItemId;
       if (slot.inventoryItemId) {
         const requested = state.inventory.find(inv => inv.id === slot.inventoryItemId && inv.cardDefId === slot.cardDefId);
@@ -79,10 +70,37 @@ export function binderSlotReducer(state, action) {
           console.warn('[Pinder] BINDER_SLOT_ADD: requested inventoryItemId is not a valid, owned copy of this card', slot.inventoryItemId);
           return state;
         }
+        if (placedInventoryIds.has(requested.id)) {
+          console.warn('[Pinder] BINDER_SLOT_ADD: this copy is already placed in a binder', requested.id);
+          return state;
+        }
         inventoryItemId = requested.id;
+      } else if (isOwnedAtAll) {
+        // Owned, but no specific copy requested — auto-pick
+        // specifically an UNPLACED one, not just the first owned copy
+        // by array order (which could easily already be the one
+        // sitting in another binder, incorrectly making a genuinely-
+        // available second copy look unavailable). If every owned
+        // copy is already placed, there's nothing left to place —
+        // this must reject outright, NOT fall through to the
+        // missing-placeholder path below as if the card were unowned.
+        const unplacedCopy = state.inventory.find(inv => inv.cardDefId === slot.cardDefId && !placedInventoryIds.has(inv.id));
+        if (!unplacedCopy) {
+          console.warn('[Pinder] BINDER_SLOT_ADD: every owned copy of this card is already placed', slot.cardDefId);
+          return state;
+        }
+        inventoryItemId = unplacedCopy.id;
       } else {
-        const anyOwnedCopy = state.inventory.find(inv => inv.cardDefId === slot.cardDefId);
-        inventoryItemId = anyOwnedCopy?.id ?? null;
+        // Genuinely unowned — a "missing" placeholder, restricted by
+        // cardDefId since it has no copy identity of its own.
+        const alreadyHasMissingPlaceholder =
+          state.binderSlots.some(s => s.id !== existingAtPosition?.id && s.cardDefId === slot.cardDefId && !s.inventoryItemId) ||
+          state.binderPanels.some(p => p.panelType === 'card' && p.cardDefId === slot.cardDefId && !p.inventoryItemId);
+        if (alreadyHasMissingPlaceholder) {
+          console.warn('[Pinder] BINDER_SLOT_ADD: this card already has a missing placeholder in a binder', slot.cardDefId);
+          return state;
+        }
+        inventoryItemId = null;
       }
 
       return {
