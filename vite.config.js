@@ -5,11 +5,22 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   test: {
-    // Node environment is enough for now — reducer/selector/type
-    // tests are pure logic, no DOM needed. Add 'jsdom' + React
-    // Testing Library later if/when component-level tests start.
+    // node is the default and is enough for pure-logic tests
+    // (reducer/selector/type tests) — no DOM needed there. A hook or
+    // component test that actually needs a DOM should add
+    // `// @vitest-environment jsdom` as the very first line of that
+    // test file instead of changing this default — see
+    // src/hooks/__tests__/useBinderView.test.js for an example.
+    // (environmentMatchGlobs was tried first, to avoid needing a
+    // per-file directive at all, but wasn't actually being honored in
+    // this Vitest version/config combination — confirmed by testing
+    // directly, a --environment=jsdom CLI override worked
+    // immediately while the equivalent matchGlobs entry silently
+    // didn't apply. The per-file directive is Vitest's own documented
+    // mechanism and reliably works.)
     environment: 'node',
     globals: true, // describe/it/expect available without importing them in every file
+    setupFiles: ['./vitest.setup.js'],
   },
   server: {
     proxy: {
