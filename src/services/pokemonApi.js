@@ -125,37 +125,6 @@ export async function fetchAllSets() {
 }
 
 /**
- * Searches sets by name. Returns the raw set objects from the API
- * (id, name, series, images.symbol/logo, releaseDate, total, etc).
- *
- * Uses a wildcard substring match (name:*query*), not an exact
- * phrase match — the API's actual set names don't always match what
- * a user might guess (e.g. "Scarlet & Violet Base" isn't necessarily
- * the literal stored name), so requiring an exact phrase was
- * returning zero results for perfectly reasonable searches.
- * @param {string} query - e.g. "Scarlet"
- */
-export async function searchSets(query) {
-  const q = encodeURIComponent(`name:*${query}*`);
-  const res = await fetchWithRetry(`${API_BASE}/sets?q=${q}&orderBy=-releaseDate`, { headers: getHeaders() });
-  if (!res.ok) throw new Error(`Pokemon TCG API: set search failed (${res.status})`);
-  const { data } = await res.json();
-  return data;
-}
-
-/**
- * Returns the most recent sets with no search filter at all — for a
- * "browse all" option so users aren't purely dependent on guessing
- * an exact or partial set name.
- */
-export async function browseSets() {
-  const res = await fetchWithRetry(`${API_BASE}/sets?orderBy=-releaseDate&pageSize=50`, { headers: getHeaders() });
-  if (!res.ok) throw new Error(`Pokemon TCG API: browse sets failed (${res.status})`);
-  const { data } = await res.json();
-  return data;
-}
-
-/**
  * Fetches one page of cards for a given set id. Pagination is
  * required, not optional — a full base set can be 100-250+ cards,
  * and the API caps pageSize (250 max) regardless of what's asked for.

@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 const mockFetchAllSets = vi.fn();
-vi.mock('../../../services/pokemonApi.js', () => ({
+vi.mock('../../../services/activeProvider.js', () => ({
   fetchAllSets: (...args) => mockFetchAllSets(...args),
 }));
 

@@ -1,0 +1,107 @@
+/**
+ * @fileoverview Tests for userPreferences.js.
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mockMaybeSingle = vi.fn();
+const mockUpsert = vi.fn();
+const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+const mockSelect = vi.fn(() => ({ eq: mockEq }));
+const mockFrom = vi.fn(() => ({ select: mockSelect, upsert: mockUpsert }));
+
+vi.mock('../supabase.js', () => ({
+  supabase: { from: (...args) => mockFrom(...args) },
+}));
+
+describe('getUserPreferences', () => {
+  beforeEach(() => {
+    mockMaybeSingle.mockReset();
+    mockUpsert.mockReset();
+  });
+
+  it('returns defaults when no row exists yet (brand new account)', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+    const { getUserPreferences } = await import('../userPreferences.js');
+
+    const prefs = await getUserPreferences('user-1');
+
+    expect(prefs).toEqual({ seededStarterCollection: false, lastNewSetCheckAt: null, knownSetIds: [] });
+  });
+
+  it('maps the real row correctly when one exists', async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: { seeded_starter_collection: true, last_new_set_check_at: '2026-01-01T00:00:00Z', known_set_ids: ['set-1', 'set-2'] },
+      error: null,
+    });
+    const { getUserPreferences } = await import('../userPreferences.js');
+
+    const prefs = await getUserPreferences('user-1');
+
+    expect(prefs).toEqual({
+      seededStarterCollection: true,
+      lastNewSetCheckAt: '2026-01-01T00:00:00Z',
+      knownSetIds: ['set-1', 'set-2'],
+    });
+  });
+
+  it('falls back to defaults (not a throw) if the fetch itself errors', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockMaybeSingle.mockResolvedValue({ data: null, error: new Error('network down') });
+    const { getUserPreferences } = await import('../userPreferences.js');
+
+    const prefs = await getUserPreferences('user-1');
+
+    expect(prefs).toEqual({ seededStarterCollection: false, lastNewSetCheckAt: null, knownSetIds: [] });
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('defaults known_set_ids to an empty array if the column is somehow null', async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: { seeded_starter_collection: false, last_new_set_check_at: null, known_set_ids: null },
+      error: null,
+    });
+    const { getUserPreferences } = await import('../userPreferences.js');
+
+    const prefs = await getUserPreferences('user-1');
+
+    expect(prefs.knownSetIds).toEqual([]);
+  });
+});
+
+describe('markStarterCollectionSeeded', () => {
+  beforeEach(() => {
+    mockUpsert.mockReset().mockResolvedValue({ error: null });
+  });
+
+  it('upserts seeded_starter_collection: true for the given user', async () => {
+    const { markStarterCollectionSeeded } = await import('../userPreferences.js');
+
+    await markStarterCollectionSeeded('user-1');
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      { user_id: 'user-1', seeded_starter_collection: true },
+      { onConflict: 'user_id' }
+    );
+  });
+});
+
+describe('recordNewSetCheck', () => {
+  beforeEach(() => {
+    mockUpsert.mockReset().mockResolvedValue({ error: null });
+  });
+
+  it('upserts the current timestamp and the given known set ids', async () => {
+    const { recordNewSetCheck } = await import('../userPreferences.js');
+
+    await recordNewSetCheck('user-1', ['set-1', 'set-2']);
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: 'user-1', known_set_ids: ['set-1', 'set-2'] }),
+      { onConflict: 'user_id' }
+    );
+    const call = mockUpsert.mock.calls[0][0];
+    expect(typeof call.last_new_set_check_at).toBe('string');
+  });
+});

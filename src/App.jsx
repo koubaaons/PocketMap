@@ -8,6 +8,8 @@ import { useCallback, lazy, Suspense, useEffect } from 'react';
 import { useStore, useDispatch } from './hooks/useStore.js';
 import { useToast } from './hooks/useToast.js';
 import { useSupabaseSync } from './hooks/useSupabaseSync.js';
+import { useSeedLoader } from './hooks/useSeedLoader.js';
+import { useNewSetCheck } from './hooks/useNewSetCheck.js';
 import { useTheme } from './hooks/useTheme.js';
 import { ACTIONS } from './store/index.js';
 import { Sidebar } from './components/Sidebar.jsx';
@@ -53,6 +55,16 @@ export default function App() {
   const cardDefinitions = useStore(s => s.cardDefinitions);
   const templateFields  = useStore(s => s.templateFields);
   const inventory       = useStore(s => s.inventory);
+  useSeedLoader({ syncing, collections, toast });
+  const { newSets: newlyDetectedSets, dismiss: dismissNewSets } = useNewSetCheck();
+
+  useEffect(() => {
+    if (newlyDetectedSets.length === 0) return;
+    const names = newlyDetectedSets.slice(0, 3).map(s => s.name).join(', ');
+    const extra = newlyDetectedSets.length > 3 ? `, and ${newlyDetectedSets.length - 3} more` : '';
+    toast(`New set${newlyDetectedSets.length > 1 ? 's' : ''} available: ${names}${extra}`, 'success', 6000);
+    dismissNewSets();
+  }, [newlyDetectedSets, toast, dismissNewSets]);
   const binderSlots     = useStore(s => s.binderSlots ?? []);
 
   const navigate = useCallback((view, id = null, page = null, autoOpenCustomize = false) => {

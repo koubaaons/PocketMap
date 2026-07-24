@@ -26,7 +26,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button, EmptyState } from '../ui/index.jsx';
-import { fetchAllSets } from '../../services/pokemonApi.js';
+import { fetchAllSets } from '../../services/activeProvider.js';
 import { PokemonImportModal } from '../modals/PokemonImportModal.jsx';
 import { useDeclutteredSets } from '../../hooks/useDeclutteredSets.js';
 import { useMultiSelect } from '../../hooks/useMultiSelect.js';
