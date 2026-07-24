@@ -87,20 +87,32 @@ export function inventoryReducer(state, action) {
 
       const remainingInventory = state.inventory.filter(inv => inv.id !== item.id);
 
+      // === CHANGED: unowning a copy that's placed in a binder now
+      // REMOVES that slot/panel entirely, instead of converting it
+      // into a grey "missing" placeholder. Requested directly:
+      // pulling a card out of a binder should leave an empty hole,
+      // the same way it would physically — not silently leave behind
+      // a wishlist-style marker nobody asked for. This also avoids a
+      // real inconsistency with the #157 placement rule: converting
+      // to inventoryItemId: null here could have created a SECOND
+      // missing placeholder for a card that already has one
+      // elsewhere, violating the "only one, ever" rule that governs
+      // missing placeholders everywhere else.
+      //
       // Finds the EXACT slot/panel linked to this specific copy via
       // inventoryItemId, rather than an arbitrary one. Falls back to
       // the old count-based approach only for pre-migration slots
       // that were never linked to any specific copy at all — in that
       // case there's genuinely no way to know which one corresponds
       // to this copy.
-      let unlinkedSlotId = null, unlinkedPanelId = null;
+      let removedSlotId = null, removedPanelId = null;
       const linkedSlot = state.binderSlots.find(s => s.inventoryItemId === item.id);
       if (linkedSlot) {
-        unlinkedSlotId = linkedSlot.id;
+        removedSlotId = linkedSlot.id;
       } else {
         const linkedPanel = state.binderPanels.find(p => p.panelType === 'card' && p.inventoryItemId === item.id);
         if (linkedPanel) {
-          unlinkedPanelId = linkedPanel.id;
+          removedPanelId = linkedPanel.id;
         } else {
           const quantityOwned = remainingInventory.filter(inv => inv.cardDefId === item.cardDefId).length;
           const totalPlaced =
@@ -109,20 +121,20 @@ export function inventoryReducer(state, action) {
           if (totalPlaced > quantityOwned) {
             const excessSlot = state.binderSlots.find(s => s.cardDefId === item.cardDefId);
             if (excessSlot) {
-              unlinkedSlotId = excessSlot.id;
+              removedSlotId = excessSlot.id;
             } else {
               const excessPanel = state.binderPanels.find(p => p.panelType === 'card' && p.cardDefId === item.cardDefId);
-              if (excessPanel) unlinkedPanelId = excessPanel.id;
+              if (excessPanel) removedPanelId = excessPanel.id;
             }
           }
         }
       }
 
-      const binderSlots = unlinkedSlotId
-        ? state.binderSlots.map(s => s.id === unlinkedSlotId ? { ...s, inventoryItemId: null } : s)
+      const binderSlots = removedSlotId
+        ? state.binderSlots.filter(s => s.id !== removedSlotId)
         : state.binderSlots;
-      const binderPanels = unlinkedPanelId
-        ? state.binderPanels.map(p => p.id === unlinkedPanelId ? { ...p, inventoryItemId: null } : p)
+      const binderPanels = removedPanelId
+        ? state.binderPanels.filter(p => p.id !== removedPanelId)
         : state.binderPanels;
 
       return {

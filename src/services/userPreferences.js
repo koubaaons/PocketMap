@@ -1,6 +1,7 @@
 /**
  * @fileoverview userPreferences — reads/writes the user_preferences
- * table backing the Seed Loader (#135) and new-set check (#134).
+ * table backing the Seed Loader (#135), new-set check (#134), and the
+ * existing-collection update check.
  *
  * Deliberately separate from the main store/reducer/sync pattern,
  * the same way useAuth.js talks to Supabase directly rather than
@@ -12,9 +13,8 @@
  *
  * A brand-new account has no row in this table at all — nothing
  * creates one at signup. getUserPreferences returns sensible defaults
- * when no row exists yet; the two update functions below upsert,
- * creating the row lazily on whichever of the two features runs
- * first for that account.
+ * when no row exists yet; the update functions below upsert, creating
+ * the row lazily on whichever feature runs first for that account.
  */
 
 import { supabase } from './supabase.js';
@@ -23,16 +23,17 @@ const DEFAULTS = Object.freeze({
   seededStarterCollection: false,
   lastNewSetCheckAt: null,
   knownSetIds: [],
+  lastCollectionUpdateCheckAt: null,
 });
 
 /**
  * @param {string} userId
- * @returns {Promise<{ seededStarterCollection: boolean, lastNewSetCheckAt: string|null, knownSetIds: string[] }>}
+ * @returns {Promise<{ seededStarterCollection: boolean, lastNewSetCheckAt: string|null, knownSetIds: string[], lastCollectionUpdateCheckAt: string|null }>}
  */
 export async function getUserPreferences(userId) {
   const { data, error } = await supabase
     .from('user_preferences')
-    .select('seeded_starter_collection, last_new_set_check_at, known_set_ids')
+    .select('seeded_starter_collection, last_new_set_check_at, known_set_ids, last_collection_update_check_at')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -46,6 +47,7 @@ export async function getUserPreferences(userId) {
     seededStarterCollection: data.seeded_starter_collection,
     lastNewSetCheckAt: data.last_new_set_check_at,
     knownSetIds: data.known_set_ids ?? [],
+    lastCollectionUpdateCheckAt: data.last_collection_update_check_at,
   };
 }
 
@@ -76,4 +78,23 @@ export async function recordNewSetCheck(userId, knownSetIds) {
       { onConflict: 'user_id' }
     );
   if (error) console.error('[userPreferences] recording new-set check failed:', error);
+}
+
+/**
+ * Records that an existing-collection update check just ran — called
+ * after every check, whether or not it found anything new, capping
+ * checks to once per day regardless of outcome. Kept as a separate
+ * timestamp from recordNewSetCheck's, since these check two different
+ * questions ("does a new set exist?" vs. "did an already-imported set
+ * change?") — sharing one timestamp would let whichever check runs
+ * first block the other from running the same day.
+ */
+export async function recordCollectionUpdateCheck(userId) {
+  const { error } = await supabase
+    .from('user_preferences')
+    .upsert(
+      { user_id: userId, last_collection_update_check_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    );
+  if (error) console.error('[userPreferences] recording collection-update check failed:', error);
 }

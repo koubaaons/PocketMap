@@ -20,6 +20,31 @@ export function validateCollection(data) {
   if (typeof data.is_custom !== 'boolean') errors.push('is_custom must be a boolean');
   if (data.import_source !== null && data.import_source !== undefined && typeof data.import_source !== 'string') errors.push('import_source must be a string or null');
   if (data.cover_image_url !== null && data.cover_image_url !== undefined && typeof data.cover_image_url !== 'string') errors.push('cover_image_url must be a string or null');
+  // Both optional — only a provider-imported collection has these at
+  // all; a custom collection, or one created before this feature
+  // existed, simply won't. external_set_id is the machine-readable id
+  // (e.g. "base1") this collection was imported from, used to
+  // refetch and diff its current card list later — distinct from
+  // import_source, which is a human-readable display label ("Pokémon
+  // TCG: Base Set"), not something safe to refetch by.
+  // known_external_card_ids tracks every external card id this
+  // collection has ever been shown as available (whether actually
+  // imported or dismissed), so a dismissed "new card" notification
+  // doesn't reappear on every subsequent daily check.
+  if (data.external_set_id !== null && data.external_set_id !== undefined && typeof data.external_set_id !== 'string') {
+    errors.push('external_set_id must be a string or null');
+  }
+  // Which provider external_set_id/its cards' external_card_id
+  // actually belong to — see this field's own migration comment for
+  // why this matters once a provider swap ever happens. Optional for
+  // the same reason external_set_id is: only a provider-imported
+  // collection has this at all.
+  if (data.provider_key !== null && data.provider_key !== undefined && typeof data.provider_key !== 'string') {
+    errors.push('provider_key must be a string or null');
+  }
+  if (data.known_external_card_ids !== undefined && !Array.isArray(data.known_external_card_ids)) {
+    errors.push('known_external_card_ids must be an array');
+  }
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   if (typeof data.updatedAt !== 'number') errors.push('updatedAt must be a timestamp');
   return { valid: errors.length === 0, errors };
@@ -27,7 +52,7 @@ export function validateCollection(data) {
 // === END: userId added to validator ===
 
 // === MILESTONE 2: userId added to factory, defaults to local user ===
-export function createCollection({ name, is_custom, import_source = null, cover_image_url = null, userId = 'local-user-1' }) {
+export function createCollection({ name, is_custom, import_source = null, cover_image_url = null, userId = 'local-user-1', external_set_id = null, known_external_card_ids = [], provider_key = null }) {
   const now = Date.now();
   const collection = {
     id: generateId(),
@@ -36,6 +61,9 @@ export function createCollection({ name, is_custom, import_source = null, cover_
     is_custom: Boolean(is_custom),
     import_source: import_source ?? null,
     cover_image_url: cover_image_url ?? null,
+    external_set_id: external_set_id ?? null,
+    known_external_card_ids: known_external_card_ids ?? [],
+    provider_key: provider_key ?? null,
     createdAt: now,
     updatedAt: now,
   };
@@ -146,12 +174,21 @@ export function validateCardDefinition(data) {
   if (data.isDecluttered !== undefined && data.isDecluttered !== null && typeof data.isDecluttered !== 'boolean') {
     errors.push('isDecluttered must be a boolean');
   }
+  // Optional — only a provider-imported card has this at all. The
+  // stable id this exact card has in the source API (e.g. Pokémon TCG
+  // API's "base1-4"), used to reliably tell "a card I already have"
+  // apart from "a genuinely new card" when re-checking a set for
+  // updates — matching by name alone risks conflating reprints or
+  // alternate arts that legitimately share a name.
+  if (data.external_card_id !== null && data.external_card_id !== undefined && typeof data.external_card_id !== 'string') {
+    errors.push('external_card_id must be a string or null');
+  }
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   if (typeof data.updatedAt !== 'number') errors.push('updatedAt must be a timestamp');
   return { valid: errors.length === 0, errors };
 }
 
-export function createCardDefinition({ collectionId, name, image_url = null, attributes = {}, holoType = 'none', rarity = null, isDecluttered = false }) {
+export function createCardDefinition({ collectionId, name, image_url = null, attributes = {}, holoType = 'none', rarity = null, isDecluttered = false, external_card_id = null }) {
   const now = Date.now();
   const cardDef = {
     id: generateId(),
@@ -162,6 +199,7 @@ export function createCardDefinition({ collectionId, name, image_url = null, att
     holoType: HOLO_TYPES.includes(holoType) ? holoType : 'none',
     rarity: rarity ?? null,
     isDecluttered: Boolean(isDecluttered),
+    external_card_id: external_card_id ?? null,
     createdAt: now,
     updatedAt: now,
   };

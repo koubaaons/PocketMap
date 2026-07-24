@@ -10,11 +10,13 @@ import { useToast } from './hooks/useToast.js';
 import { useSupabaseSync } from './hooks/useSupabaseSync.js';
 import { useSeedLoader } from './hooks/useSeedLoader.js';
 import { useNewSetCheck } from './hooks/useNewSetCheck.js';
+import { useCollectionUpdateCheck } from './hooks/useCollectionUpdateCheck.js';
 import { useTheme } from './hooks/useTheme.js';
 import { ACTIONS } from './store/index.js';
 import { Sidebar } from './components/Sidebar.jsx';
 import { ToastContainer } from './components/ui/index.jsx';
 import { FeedbackButton } from './components/FeedbackButton.jsx';
+import { CollectionUpdateBanner } from './components/CollectionUpdateBanner.jsx';
 
 // Eagerly loaded — used on almost every session
 import { HomeView }        from './components/views/HomeView.jsx';
@@ -57,6 +59,8 @@ export default function App() {
   const inventory       = useStore(s => s.inventory);
   useSeedLoader({ syncing, collections, toast });
   const { newSets: newlyDetectedSets, dismiss: dismissNewSets } = useNewSetCheck();
+  const { pendingUpdates: pendingCollectionUpdates, dismiss: dismissCollectionUpdate, importNewCards } =
+    useCollectionUpdateCheck({ syncing, collections, cardDefinitions });
 
   useEffect(() => {
     if (newlyDetectedSets.length === 0) return;
@@ -274,6 +278,12 @@ export default function App() {
         </main>
       </div>
       <ToastContainer toasts={toasts} dismiss={dismiss} />
+      <CollectionUpdateBanner
+        pendingUpdates={pendingCollectionUpdates}
+        onImport={importNewCards}
+        onDismiss={dismissCollectionUpdate}
+        toast={toast}
+      />
       <FeedbackButton toast={toast} />
     </div>
     </Suspense>

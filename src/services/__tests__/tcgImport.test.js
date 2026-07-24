@@ -47,6 +47,15 @@ describe('buildCollectionFromSet', () => {
     expect(result.collection.cover_image_url).toBe('https://x/logo.png');
   });
 
+  it('stamps the collection with the active provider\'s key, so a future provider swap can tell old collections apart from new ones', async () => {
+    mockMapCardToDraft.mockReturnValue({ name: 'Pikachu', sourceImageUrl: null, holoType: 'none', rarity: 'Common', attributes: {} });
+    const { buildCollectionFromSet } = await import('../tcgImport.js');
+
+    const result = await buildCollectionFromSet(SET, { cards: [apiCard()] });
+
+    expect(result.collection.provider_key).toBe('pokemon');
+  });
+
   it('creates one template field per entry in TEMPLATE_FIELDS', async () => {
     mockMapCardToDraft.mockReturnValue({ name: 'Pikachu', sourceImageUrl: null, holoType: 'none', rarity: 'Common', attributes: {} });
     const { buildCollectionFromSet } = await import('../tcgImport.js');
@@ -128,5 +137,53 @@ describe('buildCollectionFromSet', () => {
 
     await expect(buildCollectionFromSet({ id: 'set-1', name: '' })).rejects.toThrow();
     expect(mockMapCardToDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('importNewCardsForCollection', () => {
+  it('creates a card definition for each given card, into the given existing collection', async () => {
+    mockMapCardToDraft.mockReturnValue({ name: 'Pikachu', externalCardId: 'card-1', sourceImageUrl: null, holoType: 'none', rarity: 'Common', attributes: {} });
+    const { importNewCardsForCollection } = await import('../tcgImport.js');
+
+    const result = await importNewCardsForCollection('existing-col-1', [apiCard()]);
+
+    expect(result.cardDefinitions).toHaveLength(1);
+    expect(result.cardDefinitions[0].collectionId).toBe('existing-col-1');
+    expect(result.cardDefinitions[0].external_card_id).toBe('card-1');
+  });
+
+  it('creates every card unowned — no inventory item or binder placement is part of this at all', async () => {
+    mockMapCardToDraft.mockReturnValue({ name: 'Pikachu', externalCardId: 'card-1', sourceImageUrl: null, holoType: 'none', rarity: 'Common', attributes: {} });
+    const { importNewCardsForCollection } = await import('../tcgImport.js');
+
+    const result = await importNewCardsForCollection('existing-col-1', [apiCard()]);
+
+    // Nothing in the returned shape references inventory or slots at all
+    expect(result).not.toHaveProperty('inventory');
+    expect(Object.keys(result)).toEqual(['cardDefinitions', 'failures']);
+  });
+
+  it('continues past a card that fails, same partial-failure handling as buildCollectionFromSet', async () => {
+    mockMapCardToDraft
+      .mockImplementationOnce(() => { throw new Error('bad card'); })
+      .mockImplementationOnce(() => ({ name: 'Raichu', externalCardId: 'card-2', sourceImageUrl: null, holoType: 'none', rarity: 'Common', attributes: {} }));
+    const { importNewCardsForCollection } = await import('../tcgImport.js');
+
+    const result = await importNewCardsForCollection('existing-col-1', [
+      apiCard({ id: 'card-1', name: 'Broken' }), apiCard({ id: 'card-2', name: 'Raichu' }),
+    ]);
+
+    expect(result.failures).toHaveLength(1);
+    expect(result.cardDefinitions).toHaveLength(1);
+    expect(result.cardDefinitions[0].name).toBe('Raichu');
+  });
+
+  it('returns empty results for an empty card list, without error', async () => {
+    const { importNewCardsForCollection } = await import('../tcgImport.js');
+
+    const result = await importNewCardsForCollection('existing-col-1', []);
+
+    expect(result.cardDefinitions).toEqual([]);
+    expect(result.failures).toEqual([]);
   });
 });

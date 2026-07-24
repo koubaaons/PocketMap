@@ -41,6 +41,8 @@ export async function buildCollectionFromSet(set, { cards, onProgress } = {}) {
     is_custom: false,
     import_source: `${GAME_LABEL}: ${set.name}`,
     cover_image_url: set.images?.logo ?? null,
+    external_set_id: set.id,
+    provider_key: PROVIDER_KEY,
   });
   if (!collection) throw new Error(`Collection creation failed: ${collectionErrors.join(', ')}`);
 
@@ -91,6 +93,7 @@ export async function buildCollectionFromSet(set, { cards, onProgress } = {}) {
         attributes: draft.attributes,
         holoType: draft.holoType,
         rarity: draft.rarity,
+        external_card_id: draft.externalCardId,
       });
       if (!cardDef) throw new Error(errors.join(', '));
 
@@ -105,3 +108,59 @@ export async function buildCollectionFromSet(set, { cards, onProgress } = {}) {
 
   return { collection, templateFields, cardDefinitions, failures };
 }
+
+/**
+ * Creates card definitions for the given (already-filtered-to-new)
+ * API cards, to add to an EXISTING collection — the counterpart to
+ * buildCollectionFromSet for updating a set that's already been
+ * imported, rather than importing one for the first time.
+ *
+ * Every card is created unowned (no inventory item, no binder
+ * placement) — purely adding the card to the collection's roster, the
+ * same starting state a freshly-imported card would have. Nothing
+ * about the collection's existing cards, ownership, favorites, or
+ * binder placements is touched.
+ *
+ * @param {string} collectionId
+ * @param {object[]} apiCards - the NEW cards only (already diffed by the caller)
+ * @returns {Promise<{ cardDefinitions: object[], failures: {name: string, error: string}[] }>}
+ */
+export async function importNewCardsForCollection(collectionId, apiCards) {
+  const cardDefinitions = [];
+  const failures = [];
+
+  for (const apiCard of apiCards) {
+    try {
+      const draft = mapCardToDraft(apiCard);
+      let image_url = null;
+
+      if (draft.sourceImageUrl) {
+        const path = `${PROVIDER_KEY}-cache/${apiCard.id}.jpg`;
+        image_url = await uploadSharedImageIfMissing(async () => {
+          const imgRes = await fetch(draft.sourceImageUrl);
+          if (!imgRes.ok) throw new Error(`image fetch failed (${imgRes.status})`);
+          return imgRes.blob();
+        }, path);
+      }
+
+      const { cardDef, errors } = createCardDefinition({
+        collectionId,
+        name: draft.name,
+        image_url,
+        attributes: draft.attributes,
+        holoType: draft.holoType,
+        rarity: draft.rarity,
+        external_card_id: draft.externalCardId,
+      });
+      if (!cardDef) throw new Error(errors.join(', '));
+
+      cardDefinitions.push(cardDef);
+    } catch (err) {
+      console.error(`[tcgImport] failed adding new card "${apiCard.name}" (${apiCard.id}):`, err);
+      failures.push({ name: apiCard.name, error: err.message });
+    }
+  }
+
+  return { cardDefinitions, failures };
+}
+

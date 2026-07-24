@@ -26,7 +26,7 @@ describe('getUserPreferences', () => {
 
     const prefs = await getUserPreferences('user-1');
 
-    expect(prefs).toEqual({ seededStarterCollection: false, lastNewSetCheckAt: null, knownSetIds: [] });
+    expect(prefs).toEqual({ seededStarterCollection: false, lastNewSetCheckAt: null, knownSetIds: [], lastCollectionUpdateCheckAt: null });
   });
 
   it('maps the real row correctly when one exists', async () => {
@@ -52,7 +52,7 @@ describe('getUserPreferences', () => {
 
     const prefs = await getUserPreferences('user-1');
 
-    expect(prefs).toEqual({ seededStarterCollection: false, lastNewSetCheckAt: null, knownSetIds: [] });
+    expect(prefs).toEqual({ seededStarterCollection: false, lastNewSetCheckAt: null, knownSetIds: [], lastCollectionUpdateCheckAt: null });
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
   });
@@ -103,5 +103,24 @@ describe('recordNewSetCheck', () => {
     );
     const call = mockUpsert.mock.calls[0][0];
     expect(typeof call.last_new_set_check_at).toBe('string');
+  });
+});
+
+describe('recordCollectionUpdateCheck', () => {
+  beforeEach(() => {
+    mockUpsert.mockReset().mockResolvedValue({ error: null });
+  });
+
+  it('upserts the current timestamp for last_collection_update_check_at', async () => {
+    const { recordCollectionUpdateCheck } = await import('../userPreferences.js');
+
+    await recordCollectionUpdateCheck('user-1');
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: 'user-1' }),
+      { onConflict: 'user_id' }
+    );
+    const call = mockUpsert.mock.calls[0][0];
+    expect(typeof call.last_collection_update_check_at).toBe('string');
   });
 });

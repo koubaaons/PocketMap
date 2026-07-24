@@ -334,6 +334,7 @@ export function mapRarityToHoloType(rarity) {
 export function mapPokemonCardToDraft(apiCard) {
   return {
     name: apiCard.name,
+    externalCardId: apiCard.id,
     sourceImageUrl: apiCard.images?.large ?? apiCard.images?.small ?? null,
     holoType: mapRarityToHoloType(apiCard.rarity),
     // Dedicated field (card_definitions.rarity) — the raw rarity

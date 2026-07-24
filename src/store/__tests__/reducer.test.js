@@ -199,7 +199,7 @@ describe('BINDER_SLOT_ADD', () => {
 });
 
 describe('INVENTORY_DELETE (hard delete - reverted from soft-delete per explicit request)', () => {
-  it('removing a copy linked to a slot UNLINKS it, never deletes the slot — still the most important fix here', () => {
+  it('removing a copy linked to a slot REMOVES the slot entirely — pulling a card out of a binder leaves an empty hole, not a leftover placeholder', () => {
     const state = baseState({
       inventory: [makeInventoryItem('inv-1')],
       binderSlots: [makeSlotPayload({ id: 'slot-1', inventoryItemId: 'inv-1' })],
@@ -207,10 +207,37 @@ describe('INVENTORY_DELETE (hard delete - reverted from soft-delete per explicit
     const next = reducer(state, { type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } });
 
     expect(next.inventory).toHaveLength(0);
-    // the slot must still exist — this is the whole point of the fix
-    expect(next.binderSlots).toHaveLength(1);
-    expect(next.binderSlots[0].id).toBe('slot-1');
-    expect(next.binderSlots[0].inventoryItemId).toBeNull(); // unlinked, now shows as a grey placeholder
+    expect(next.binderSlots).toHaveLength(0); // gone, not converted to a grey placeholder
+  });
+
+  it('unowning a placed copy never creates a conflicting missing placeholder, even when one already exists elsewhere for the same card', () => {
+    // Before this fix, converting the unowned slot to inventoryItemId:
+    // null here could have produced a SECOND missing placeholder for
+    // this card, violating the "only one, ever" rule (#157). Removing
+    // the slot instead of nulling it out makes that impossible by
+    // construction — worth a test confirming it directly.
+    const state = baseState({
+      inventory: [makeInventoryItem('inv-1')],
+      binderSlots: [
+        makeSlotPayload({ id: 'slot-owned', binderId: 'binder-a', inventoryItemId: 'inv-1' }),
+        makeSlotPayload({ id: 'slot-missing', binderId: 'binder-b', slotIndex: 1, inventoryItemId: null }),
+      ],
+    });
+    const next = reducer(state, { type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } });
+
+    const missingSlots = next.binderSlots.filter(s => s.cardDefId === 'card-1' && !s.inventoryItemId);
+    expect(missingSlots).toHaveLength(1); // still just the one that already existed
+    expect(missingSlots[0].id).toBe('slot-missing');
+  });
+
+  it('removing a copy linked to a card-type PANEL removes the panel entirely too — same fix as plain slots', () => {
+    const state = baseState({
+      inventory: [makeInventoryItem('inv-1')],
+      binderPanels: [{ id: 'panel-1', binderId: 'binder-1', panelType: 'card', cardDefId: 'card-1', inventoryItemId: 'inv-1', spanCols: 2, spanRows: 1, pageNumber: 1, startSlotIndex: 0, imageX: 50, imageY: 50, imageScale: 1, createdAt: 0 }],
+    });
+    const next = reducer(state, { type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } });
+
+    expect(next.binderPanels).toHaveLength(0);
   });
 
   it('removes the item permanently — no bin entry created (reverted from soft-delete)', () => {
@@ -228,7 +255,7 @@ describe('INVENTORY_DELETE (hard delete - reverted from soft-delete per explicit
     expect(next.binderSlots).toHaveLength(0);
   });
 
-  it('removing one of several copies only unlinks the one actually linked to it, not any other slot', () => {
+  it('removing one of several copies only removes the slot actually linked to it, not any other slot', () => {
     const state = baseState({
       inventory: [makeInventoryItem('inv-1'), makeInventoryItem('inv-2')],
       binderSlots: [
@@ -237,10 +264,9 @@ describe('INVENTORY_DELETE (hard delete - reverted from soft-delete per explicit
       ],
     });
     const next = reducer(state, { type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } });
-    const slot1 = next.binderSlots.find(s => s.id === 'slot-1');
-    const slot2 = next.binderSlots.find(s => s.id === 'slot-2');
-    expect(slot1.inventoryItemId).toBeNull(); // unlinked
-    expect(slot2.inventoryItemId).toBe('inv-2'); // untouched
+
+    expect(next.binderSlots.find(s => s.id === 'slot-1')).toBeUndefined(); // removed
+    expect(next.binderSlots.find(s => s.id === 'slot-2').inventoryItemId).toBe('inv-2'); // untouched
   });
 
   it('does nothing if the inventory item does not exist', () => {
