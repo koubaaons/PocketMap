@@ -24,14 +24,19 @@ vi.mock('../../services/userPreferences.js', () => ({
 }));
 
 const mockFetchAllCardsForSet = vi.fn();
+const mockMapCardToDraft = vi.fn();
 vi.mock('../../services/activeProvider.js', () => ({
   fetchAllCardsForSet: (...args) => mockFetchAllCardsForSet(...args),
+  mapCardToDraft: (...args) => mockMapCardToDraft(...args),
   PROVIDER_KEY: 'pokemon',
 }));
+
+const mockUploadCardImageIfAvailable = vi.fn();
 
 const mockImportNewCardsForCollection = vi.fn();
 vi.mock('../../services/tcgImport.js', () => ({
   importNewCardsForCollection: (...args) => mockImportNewCardsForCollection(...args),
+  uploadCardImageIfAvailable: (...args) => mockUploadCardImageIfAvailable(...args),
 }));
 
 function makeCollection(overrides = {}) {
@@ -46,6 +51,8 @@ describe('useCollectionUpdateCheck', () => {
     mockRecordCollectionUpdateCheck.mockReset().mockResolvedValue(undefined);
     mockFetchAllCardsForSet.mockReset();
     mockImportNewCardsForCollection.mockReset();
+    mockMapCardToDraft.mockReset().mockReturnValue({ sourceImageUrl: null });
+    mockUploadCardImageIfAvailable.mockReset();
   });
 
   it('does nothing while still syncing', async () => {
@@ -206,6 +213,85 @@ describe('useCollectionUpdateCheck', () => {
     expect(mockDispatch).toHaveBeenCalledWith({ type: ACTIONS.CARD_DEFINITION_BULK_ADD, payload: [{ id: 'cd-new' }] });
     expect(outcome).toEqual({ added: 1, failures: [] });
     expect(result.current.pendingUpdates).toEqual([]); // cleared after importing
+  });
+
+  it('backfills a missing image when the provider now has one for a card that had none at import time', async () => {
+    mockGetUserPreferences.mockResolvedValue({ lastCollectionUpdateCheckAt: null });
+    mockFetchAllCardsForSet.mockResolvedValue([{ id: 'ext-1', name: 'Fire Energy', image: 'https://cdn/fire-energy' }]);
+    mockMapCardToDraft.mockReturnValue({ sourceImageUrl: 'https://cdn/fire-energy/high.webp' });
+    mockUploadCardImageIfAvailable.mockResolvedValue('https://storage/fire-energy.jpg');
+    const { useCollectionUpdateCheck } = await import('../useCollectionUpdateCheck.js');
+    const { ACTIONS } = await import('../../store/index.js');
+    renderHook(() => useCollectionUpdateCheck({
+      syncing: false,
+      collections: [makeCollection()],
+      cardDefinitions: [{ id: 'cd-1', collectionId: 'col-1', external_card_id: 'ext-1', image_url: null }],
+    }));
+
+    await waitFor(() => expect(mockDispatch).toHaveBeenCalledWith({
+      type: ACTIONS.CARD_DEFINITION_UPDATE,
+      payload: { id: 'cd-1', image_url: 'https://storage/fire-energy.jpg' },
+    }));
+  });
+
+  it('does not touch a card that already has an image, even if the provider data changed', async () => {
+    mockGetUserPreferences.mockResolvedValue({ lastCollectionUpdateCheckAt: null });
+    mockFetchAllCardsForSet.mockResolvedValue([{ id: 'ext-1', name: 'Pikachu', image: 'https://cdn/pikachu' }]);
+    const { useCollectionUpdateCheck } = await import('../useCollectionUpdateCheck.js');
+    renderHook(() => useCollectionUpdateCheck({
+      syncing: false,
+      collections: [makeCollection()],
+      cardDefinitions: [{ id: 'cd-1', collectionId: 'col-1', external_card_id: 'ext-1', image_url: 'https://storage/already-has-one.jpg' }],
+    }));
+
+    await waitFor(() => expect(mockDispatch).toHaveBeenCalled()); // the COLLECTION_UPDATE call still happens
+    expect(mockUploadCardImageIfAvailable).not.toHaveBeenCalled(); // but this card was never attempted
+  });
+
+  it('does nothing for a card missing an image if the provider still doesn\'t have one either', async () => {
+    mockGetUserPreferences.mockResolvedValue({ lastCollectionUpdateCheckAt: null });
+    mockFetchAllCardsForSet.mockResolvedValue([{ id: 'ext-1', name: 'Fire Energy' }]); // still no image field
+    mockMapCardToDraft.mockReturnValue({ sourceImageUrl: null });
+    mockUploadCardImageIfAvailable.mockResolvedValue(null);
+    const { useCollectionUpdateCheck } = await import('../useCollectionUpdateCheck.js');
+    const { ACTIONS } = await import('../../store/index.js');
+    renderHook(() => useCollectionUpdateCheck({
+      syncing: false,
+      collections: [makeCollection()],
+      cardDefinitions: [{ id: 'cd-1', collectionId: 'col-1', external_card_id: 'ext-1', image_url: null }],
+    }));
+
+    await waitFor(() => expect(mockDispatch).toHaveBeenCalled());
+    const updateCalls = mockDispatch.mock.calls.filter(c => c[0].type === ACTIONS.CARD_DEFINITION_UPDATE);
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  it('one card failing to backfill does not stop other cards in the same collection from being checked', async () => {
+    mockGetUserPreferences.mockResolvedValue({ lastCollectionUpdateCheckAt: null });
+    mockFetchAllCardsForSet.mockResolvedValue([
+      { id: 'ext-1', name: 'Broken Energy', image: 'https://cdn/broken' },
+      { id: 'ext-2', name: 'Fire Energy', image: 'https://cdn/fire' },
+    ]);
+    mockMapCardToDraft.mockReturnValue({ sourceImageUrl: 'https://cdn/some-image/high.webp' });
+    mockUploadCardImageIfAvailable
+      .mockRejectedValueOnce(new Error('upload failed'))
+      .mockResolvedValueOnce('https://storage/fire.jpg');
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { useCollectionUpdateCheck } = await import('../useCollectionUpdateCheck.js');
+    const { ACTIONS } = await import('../../store/index.js');
+    renderHook(() => useCollectionUpdateCheck({
+      syncing: false,
+      collections: [makeCollection()],
+      cardDefinitions: [
+        { id: 'cd-1', collectionId: 'col-1', external_card_id: 'ext-1', image_url: null },
+        { id: 'cd-2', collectionId: 'col-1', external_card_id: 'ext-2', image_url: null },
+      ],
+    }));
+
+    await waitFor(() => expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: ACTIONS.CARD_DEFINITION_UPDATE, payload: { id: 'cd-2', image_url: 'https://storage/fire.jpg' },
+    })));
+    consoleError.mockRestore();
   });
 
   it('dismiss() clears the pending entry without importing anything', async () => {

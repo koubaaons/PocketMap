@@ -91,6 +91,24 @@ describe('useSeedLoader', () => {
     expect(toast).toHaveBeenCalledWith(expect.stringContaining('Newest Set'));
   });
 
+  it('toasts BEFORE the import starts, not just after it completes — a full import can take a while against a free API, and this is the only feedback a brand-new user gets during that stretch', async () => {
+    mockGetUserPreferences.mockResolvedValue({ seededStarterCollection: false, lastNewSetCheckAt: null, knownSetIds: [] });
+    mockFetchAllSets.mockResolvedValue([{ id: 'new-set', name: 'Newest Set', releaseDate: '2026-01-01' }]);
+    // handleCreate never resolves — simulates being mid-import, so we
+    // can check the toast fired without waiting for completion.
+    mockHandleCreate.mockReturnValue(new Promise(() => {}));
+    mockBuildCollectionFromSet.mockReturnValue(new Promise(() => {}));
+    const toast = vi.fn();
+
+    const { useSeedLoader } = await import('../useSeedLoader.js');
+    renderHook(() => useSeedLoader({ syncing: false, collections: [], toast }));
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(
+      expect.stringContaining('Setting up your first collection'), 'success', expect.any(Number)
+    ));
+    expect(mockMarkStarterCollectionSeeded).not.toHaveBeenCalled(); // import hasn't finished yet
+  });
+
   it('does NOT mark as seeded if the import fails — worth retrying next time, not giving up forever', async () => {
     mockGetUserPreferences.mockResolvedValue({ seededStarterCollection: false, lastNewSetCheckAt: null, knownSetIds: [] });
     mockFetchAllSets.mockRejectedValue(new Error('network down'));

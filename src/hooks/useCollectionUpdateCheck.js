@@ -38,6 +38,18 @@
  * there's only ever been one, but this stops applying the moment a
  * second provider is introduced, which is why every new collection is
  * explicitly stamped with its real provider_key going forward.
+ *
+ * === Also backfills missing card images ===
+ * A card can have no image at import time simply because the
+ * provider hadn't been given that artwork yet — TCGdex is an open,
+ * community-maintained database that receives image contributions on
+ * an ongoing basis, so "missing today" doesn't mean "missing forever".
+ * This rides along on the exact same per-collection apiCards fetch
+ * this hook already does for the new-cards check, at no extra
+ * network cost — for every owned card with no image_url, it checks
+ * whether the provider now has one and fills it in via a normal
+ * CARD_DEFINITION_UPDATE if so. Never touches a card that already has
+ * an image.
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
@@ -45,8 +57,8 @@ import { useAuth } from './useAuth.js';
 import { useDispatch } from './useStore.js';
 import { ACTIONS } from '../store/index.js';
 import { getUserPreferences, recordCollectionUpdateCheck } from '../services/userPreferences.js';
-import { fetchAllCardsForSet, PROVIDER_KEY } from '../services/activeProvider.js';
-import { importNewCardsForCollection } from '../services/tcgImport.js';
+import { fetchAllCardsForSet, mapCardToDraft, PROVIDER_KEY } from '../services/activeProvider.js';
+import { importNewCardsForCollection, uploadCardImageIfAvailable } from '../services/tcgImport.js';
 
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // once per day
 
@@ -85,17 +97,44 @@ export function useCollectionUpdateCheck({ syncing, collections, cardDefinitions
         for (const collection of importedCollections) {
           try {
             const apiCards = await fetchAllCardsForSet(collection.external_set_id);
+            const apiCardsByExternalId = new Map(apiCards.map(c => [c.id, c]));
 
+            const collectionCardDefs = cardDefinitions.filter(cd => cd.collectionId === collection.id);
             const alreadyHaveIds = new Set(
-              cardDefinitions
-                .filter(cd => cd.collectionId === collection.id && cd.external_card_id)
-                .map(cd => cd.external_card_id)
+              collectionCardDefs.filter(cd => cd.external_card_id).map(cd => cd.external_card_id)
             );
             const knownIds = new Set([...(collection.known_external_card_ids ?? []), ...alreadyHaveIds]);
 
             const newCards = apiCards.filter(c => !knownIds.has(c.id));
             if (newCards.length > 0) {
               results.push({ collectionId: collection.id, collectionName: collection.name, newCards });
+            }
+
+            // === Backfill missing images ===
+            // TCGdex is an open, community-maintained database that
+            // gets image contributions on an ongoing basis — a card
+            // with no image at import time isn't necessarily missing
+            // it forever. This rides along on the exact same apiCards
+            // fetch the new-cards check above already needed, so it
+            // costs nothing extra in requests. Only ever fills in an
+            // image where one is now genuinely available; never
+            // touches a card that already has one.
+            for (const cardDef of collectionCardDefs) {
+              if (cardDef.image_url || !cardDef.external_card_id) continue;
+              const apiCard = apiCardsByExternalId.get(cardDef.external_card_id);
+              if (!apiCard) continue;
+
+              try {
+                const draft = mapCardToDraft(apiCard);
+                const newImageUrl = await uploadCardImageIfAvailable(draft.sourceImageUrl, apiCard.id);
+                if (newImageUrl) {
+                  dispatch({ type: ACTIONS.CARD_DEFINITION_UPDATE, payload: { id: cardDef.id, image_url: newImageUrl } });
+                }
+              } catch (err) {
+                // One card's image failing to backfill shouldn't stop
+                // the rest from being checked.
+                console.error(`[useCollectionUpdateCheck] image backfill failed for card ${cardDef.id}:`, err);
+              }
             }
 
             // Regardless of outcome, record everything currently

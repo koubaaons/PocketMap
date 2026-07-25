@@ -83,7 +83,7 @@ function rowToBinderPanel(row) {
   };
 }
 
-function rowToCollection(row) {
+export function rowToCollection(row) {
   return {
     id:              row.id,
     userId:          row.user_id,
@@ -91,6 +91,9 @@ function rowToCollection(row) {
     is_custom:       row.is_custom,
     import_source:   row.import_source,
     cover_image_url: row.cover_image_url,
+    external_set_id: row.external_set_id ?? null,
+    known_external_card_ids: row.known_external_card_ids ?? [],
+    provider_key:    row.provider_key ?? null,
     createdAt:       new Date(row.created_at).getTime(),
     updatedAt:       new Date(row.updated_at).getTime(),
   };
@@ -115,7 +118,7 @@ function rowToTemplateField(row) {
   };
 }
 
-function rowToCardDefinition(row) {
+export function rowToCardDefinition(row) {
   return {
     id:           row.id,
     userId:       row.user_id,
@@ -126,6 +129,7 @@ function rowToCardDefinition(row) {
     rarity:       row.rarity,
     isDecluttered: row.is_decluttered ?? false,
     attributes:   row.attributes ?? {},
+    external_card_id: row.external_card_id ?? null,
     createdAt:    new Date(row.created_at).getTime(),
     updatedAt:    new Date(row.updated_at).getTime(),
   };
@@ -300,13 +304,16 @@ export function binderPanelToRow(panel) {
 
 export function collectionToRow(collection) {
   return {
-    id:              collection.id,
-    user_id:         collection.userId,
-    name:            collection.name,
-    is_custom:       collection.is_custom,
-    import_source:   collection.import_source ?? null,
-    cover_image_url: collection.cover_image_url ?? null,
-    updated_at:      new Date().toISOString(),
+    id:                       collection.id,
+    user_id:                  collection.userId,
+    name:                     collection.name,
+    is_custom:                collection.is_custom,
+    import_source:            collection.import_source ?? null,
+    cover_image_url:          collection.cover_image_url ?? null,
+    external_set_id:          collection.external_set_id ?? null,
+    known_external_card_ids:  collection.known_external_card_ids ?? [],
+    provider_key:             collection.provider_key ?? null,
+    updated_at:               new Date().toISOString(),
   };
 }
 
@@ -348,6 +355,7 @@ export function cardDefinitionToRow(cd) {
     rarity:        cd.rarity ?? null,
     is_decluttered: cd.isDecluttered ?? false,
     attributes:    cd.attributes ?? {},
+    external_card_id: cd.external_card_id ?? null,
     updated_at:    new Date().toISOString(),
   };
 }

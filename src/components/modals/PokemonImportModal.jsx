@@ -158,6 +158,9 @@ export function PokemonImportModal({ set, onSubmit, onClose }) {
         <p className="modal-step-note">
           {progress?.done ?? 0} / {progress?.total ?? 0} cards ({pct}%)
         </p>
+        <p className="modal-step-note">
+          Using a free, open card database — larger sets can take a minute or two.
+        </p>
       </Modal>
     );
   }

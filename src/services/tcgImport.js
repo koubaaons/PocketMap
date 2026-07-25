@@ -25,6 +25,42 @@ import { uploadSharedImageIfMissing } from '../utils/supabaseImageUpload.js';
 import { fetchAllCardsForSet, mapCardToDraft, TEMPLATE_FIELDS, GAME_LABEL, PROVIDER_KEY } from './activeProvider.js';
 
 /**
+ * Uploads one card's image to Storage (shared path, cached across
+ * every user — not per-user) if it's not already there, returning the
+ * resulting URL. Returns null if sourceImageUrl is null (this card
+ * genuinely has no image available from the provider yet).
+ *
+ * Takes the already-computed sourceImageUrl/cacheKey directly, rather
+ * than the raw apiCard + re-deriving them via mapCardToDraft — the
+ * caller has always already called mapCardToDraft once for its own
+ * purposes, and calling it a second time here would be both wasted
+ * work and, in tests, a second consumption of a mocked
+ * once-per-card implementation.
+ *
+ * Extracted out of buildCollectionFromSet and importNewCardsForCollection,
+ * which both had this exact logic duplicated inline — also used by
+ * the "backfill missing images" pass in useCollectionUpdateCheck.js,
+ * which re-checks cards that had no image at import time in case the
+ * provider's data has since been filled in (TCGdex, being an open,
+ * community-maintained database, gets image contributions on an
+ * ongoing basis — a card missing art today isn't necessarily missing
+ * it forever).
+ */
+export async function uploadCardImageIfAvailable(sourceImageUrl, cacheKey) {
+  if (!sourceImageUrl) return null;
+
+  // Namespaced by PROVIDER_KEY so a future second provider's cache
+  // never collides with this one, even if both happened to reuse the
+  // same card id.
+  const path = `${PROVIDER_KEY}-cache/${cacheKey}.jpg`;
+  return uploadSharedImageIfMissing(async () => {
+    const imgRes = await fetch(sourceImageUrl);
+    if (!imgRes.ok) throw new Error(`image fetch failed (${imgRes.status})`);
+    return imgRes.blob();
+  }, path);
+}
+
+/**
  * @param {object} set - one set object from the active provider's fetchAllSets()
  * @param {object} [opts]
  * @param {object[]} [opts.cards] - already-fetched cards for this set, if the
@@ -67,24 +103,7 @@ export async function buildCollectionFromSet(set, { cards, onProgress } = {}) {
     const apiCard = cardList[i];
     try {
       const draft = mapCardToDraft(apiCard);
-      let image_url = null;
-
-      if (draft.sourceImageUrl) {
-        // Shared path, not user-scoped — official card art is
-        // identical for every user who imports this same card, not a
-        // personal photo. One shared copy instead of one-per-user
-        // avoids duplicating identical images across every user who
-        // imports the same set (see supabaseImageUpload.js's
-        // uploadSharedImageIfMissing). Namespaced by PROVIDER_KEY so
-        // a future second provider's cache never collides with this
-        // one, even if both happened to reuse the same card id.
-        const path = `${PROVIDER_KEY}-cache/${apiCard.id}.jpg`;
-        image_url = await uploadSharedImageIfMissing(async () => {
-          const imgRes = await fetch(draft.sourceImageUrl);
-          if (!imgRes.ok) throw new Error(`image fetch failed (${imgRes.status})`);
-          return imgRes.blob();
-        }, path);
-      }
+      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl, apiCard.id);
 
       const { cardDef, errors } = createCardDefinition({
         collectionId: collection.id,
@@ -132,16 +151,7 @@ export async function importNewCardsForCollection(collectionId, apiCards) {
   for (const apiCard of apiCards) {
     try {
       const draft = mapCardToDraft(apiCard);
-      let image_url = null;
-
-      if (draft.sourceImageUrl) {
-        const path = `${PROVIDER_KEY}-cache/${apiCard.id}.jpg`;
-        image_url = await uploadSharedImageIfMissing(async () => {
-          const imgRes = await fetch(draft.sourceImageUrl);
-          if (!imgRes.ok) throw new Error(`image fetch failed (${imgRes.status})`);
-          return imgRes.blob();
-        }, path);
-      }
+      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl, apiCard.id);
 
       const { cardDef, errors } = createCardDefinition({
         collectionId,
@@ -163,4 +173,3 @@ export async function importNewCardsForCollection(collectionId, apiCards) {
 
   return { cardDefinitions, failures };
 }
-

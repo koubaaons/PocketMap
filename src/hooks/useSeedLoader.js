@@ -85,6 +85,15 @@ export function useSeedLoader({ syncing, collections, toast }) {
           (a, b) => new Date(b.releaseDate) - new Date(a.releaseDate)
         )[0];
 
+        // Fired before the work starts, not just after — a full set
+        // import against a free, open card database can take a
+        // minute or two, and with no visible progress indicator here
+        // (unlike the manual import modal, which has one), a
+        // brand-new user would otherwise get zero feedback for that
+        // whole stretch, easily reading as "broken" rather than
+        // "working".
+        toast(`Setting up your first collection ("${newestSet.name}") — this may take a minute since we use a free, open card database.`, 'success', 6000);
+
         const { collection, templateFields, cardDefinitions } = await buildCollectionFromSet(newestSet);
         await handleCreate({ collection, templateFields, cardDefinitions });
         await markStarterCollectionSeeded(user.id);

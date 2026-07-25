@@ -1,0 +1,21 @@
+-- =============================================================================
+-- Migration: 0019_user_preferences_grants
+--
+-- Fixes a real bug found during testing: every request to
+-- user_preferences was rejected with 403, even though the table
+-- existed with the correct columns and RLS policy from migrations
+-- 0016-0018.
+--
+-- The cause: RLS policies only FILTER what a role can already do —
+-- they don't grant access on their own. Every other table in this
+-- app got its base privileges automatically when created through
+-- Supabase's dashboard UI, but user_preferences was created via a
+-- raw SQL migration, which doesn't include those grants implicitly.
+-- Without them, PostgREST rejects the request before the RLS policy
+-- ever gets a chance to run at all.
+--
+-- Confirmed as the actual fix directly — running this manually
+-- resolved the 403s immediately, with no other change needed.
+-- =============================================================================
+
+grant select, insert, update, delete on public.user_preferences to authenticated;

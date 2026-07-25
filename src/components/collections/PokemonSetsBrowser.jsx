@@ -209,7 +209,12 @@ export function PokemonSetsBrowser({ onBack, onImportSuccess }) {
         </button>
       )}
 
-      {isLoading && <p className="modal-step-intro">Loading sets…</p>}
+      {isLoading && (
+        <>
+          <p className="modal-step-intro">Loading sets…</p>
+          <p className="modal-step-note">Using a free, open card database — this can take a little while.</p>
+        </>
+      )}
       {loadError && <p className="modal-step-error">{loadError}</p>}
 
       {!isLoading && !loadError && visibleSets.length === 0 && (

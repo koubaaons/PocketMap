@@ -187,3 +187,24 @@ describe('importNewCardsForCollection', () => {
     expect(result.failures).toEqual([]);
   });
 });
+
+describe('uploadCardImageIfAvailable', () => {
+  it('returns null immediately, without attempting any upload, when sourceImageUrl is null', async () => {
+    const { uploadCardImageIfAvailable } = await import('../tcgImport.js');
+
+    const result = await uploadCardImageIfAvailable(null, 'card-1');
+
+    expect(result).toBe(null);
+    expect(mockUploadSharedImageIfMissing).not.toHaveBeenCalled();
+  });
+
+  it('uploads via the shared, namespaced cache path when a source image is available', async () => {
+    mockUploadSharedImageIfMissing.mockResolvedValue('https://storage/card-1.jpg');
+    const { uploadCardImageIfAvailable } = await import('../tcgImport.js');
+
+    const result = await uploadCardImageIfAvailable('https://cdn/card-1.png', 'card-1');
+
+    expect(result).toBe('https://storage/card-1.jpg');
+    expect(mockUploadSharedImageIfMissing).toHaveBeenCalledWith(expect.any(Function), 'pokemon-cache/card-1.jpg');
+  });
+});

@@ -1,16 +1,17 @@
 /**
  * @fileoverview activeProvider — the one file every UI component
  * imports for set/card data, instead of importing a specific
- * provider (like pokemonProvider.js) directly.
+ * provider (like pokemonProvider.js or tcgdexProvider.js) directly.
  *
- * Right now there's exactly one provider, so this just re-exports it.
- * The point isn't complexity today — it's that swapping Pokémon TCG
- * API for a different one later, or adding a second game (One Piece
- * and Yu-Gi-Oh are both deferred, not cancelled — see the Seed Loader
- * and TabToolbar's roadmap notes), means changing the line below, or
- * adding a small "pick a provider for this collection" branch here —
- * never touching PokemonSetsBrowser.jsx, PokemonImportModal.jsx, or
- * anything else that currently only knows about Pokémon.
+ * === CHANGED: swapped from pokemonProvider.js (backed by
+ * pokemontcg.io) to tcgdexProvider.js (backed by TCGdex) ===
+ * pokemontcg.io has been acquired and folded into "Scrydex", a paid
+ * multi-TCG platform — multiple sources describe its free tier as
+ * being actively wound down in favor of the paid successor. Since
+ * this app hadn't been deployed yet, this was the right moment to
+ * switch rather than build further on a provider likely to need
+ * replacing anyway. This is the entire swap — exactly one line below
+ * changed, nothing else in the app needed to.
  */
 
-export * from './providers/pokemonProvider.js';
+export * from './providers/tcgdexProvider.js';
