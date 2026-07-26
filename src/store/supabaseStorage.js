@@ -20,7 +20,7 @@ const SCHEMA_VERSION = 2;
 // ── rowTo* mappers ────────────────────────────────────────────────────────────
 // Convert Supabase snake_case rows back to the JS shape the store expects.
 
-function rowToBinder(row) {
+export function rowToBinder(row) {
   return {
     id:          row.id,
     userId:      row.user_id,
@@ -36,7 +36,7 @@ function rowToBinder(row) {
   };
 }
 
-function rowToBinderSlot(row) {
+export function rowToBinderSlot(row) {
   return {
     id:           row.id,
     userId:       row.user_id,
@@ -52,7 +52,7 @@ function rowToBinderSlot(row) {
 }
 
 // === Michi Method support: combined slots ===
-function rowToBinderInsert(row) {
+export function rowToBinderInsert(row) {
   return {
     id:        row.id,
     userId:    row.user_id,
@@ -63,7 +63,7 @@ function rowToBinderInsert(row) {
   };
 }
 
-function rowToBinderPanel(row) {
+export function rowToBinderPanel(row) {
   return {
     id:             row.id,
     userId:         row.user_id,
@@ -99,7 +99,7 @@ export function rowToCollection(row) {
   };
 }
 
-function rowToTemplateField(row) {
+export function rowToTemplateField(row) {
   return {
     id:           row.id,
     userId:       row.user_id,
@@ -135,7 +135,7 @@ export function rowToCardDefinition(row) {
   };
 }
 
-function rowToInventoryItem(row) {
+export function rowToInventoryItem(row) {
   return {
     id:                  row.id,
     userId:              row.user_id,
