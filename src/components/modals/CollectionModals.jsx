@@ -2,9 +2,8 @@
  * @fileoverview Collection modals.
  * Responsibility: create and edit collections only.
  *
- * CreateCollectionModal has two multi-step flows:
- *   Custom:  Choose → Name → Build Template → Review → Create
- *   API:     Choose → Select Source → Confirm → Create
+ * CreateCollectionModal is custom-collection-only: Name → Build
+ * Template → Review → Create.
  *
  * Collection is NOT saved until the final step.
  * On confirm, calls onSubmit({ collection, templateFields, cardDefinitions })
@@ -21,9 +20,20 @@
  * inline in this file. That flow moved to a dedicated full page
  * (PokemonSetsBrowser.jsx, opened from CollectionsView, not this
  * modal) plus a reusable PokemonImportModal.jsx for the preview/
- * confirm/progress part — pokemon-api was removed from apiSources.js
- * accordingly, so this file's API flow now only covers sources that
- * don't have a real implementation yet (Yu-Gi-Oh, Winx mock).
+ * confirm/progress part.
+ *
+ * === Removed the "choose a source" step and the Yu-Gi-Oh/Winx mock
+ * API flow entirely, requested directly ===
+ * That step offered a choice between custom creation and importing
+ * from a source — but the only real, working import path (Pokémon)
+ * already has its own dedicated entry point (the franchise tiles in
+ * CollectionsView, opening PokemonSetsBrowser directly), and the
+ * "API" options this modal itself offered were non-functional mock
+ * placeholders (#131/#132, never implemented). Keeping a choice
+ * screen whose only two options were "the real thing, but you should
+ * actually use the other button for that" and "a fake demo" served no
+ * one — this modal now goes straight to custom creation, which is
+ * genuinely all it does.
  */
 
 import { useState } from 'react';
@@ -36,15 +46,10 @@ import { TemplatePreview } from '../collections/TemplatePreview.jsx';
 import { useTemplateEditor } from '../../hooks/useTemplateEditor.js';
 // === REFACTOR3a END ===
 
-// === REFACTOR3b START: import API sources from services layer ===
-import { getApiSources } from '../../services/apiSources.js';
-// === REFACTOR3b END ===
-
 // ─── CreateCollectionModal ────────────────────────────────────────────────────
 
 export function CreateCollectionModal({ onSubmit, onClose }) {
-  const [step, setStep] = useState('choose');
-  const [selectedSource, setSelectedSource] = useState(null);
+  const [step, setStep] = useState('custom-name');
   const [collectionName, setCollectionName] = useState('');
   const [nameError, setNameError] = useState('');
 
@@ -100,130 +105,6 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
     onSubmit({ collection, templateFields: fields, cardDefinitions: [] });
   };
 
-  // ── API flow (Yu-Gi-Oh/Winx mock sources — Pokémon has its own
-  // real flow now, see PokemonSetsBrowser.jsx) ─────────────────────
-
-  const handleApiConfirm = () => {
-    if (!selectedSource) return;
-
-    const { collection, errors: cErrors } = createCollection({
-      name: selectedSource.name,
-      is_custom: false,
-      import_source: selectedSource.id,
-    });
-    if (!collection) { console.error('Collection creation failed:', cErrors); return; }
-
-    const fields = selectedSource.templateFields
-      .map((f, idx) => createTemplateField({
-        collectionId: collection.id,
-        field_name: f.field_name,
-        field_type: f.field_type,
-        is_required: f.is_required,
-        order: idx,
-        options: f.options ?? [],
-      }).field)
-      .filter(Boolean);
-
-    const cardDefs = selectedSource.sampleCards.map(c => ({
-      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
-      collectionId: collection.id,
-      name: c.name,
-      image_url: null,
-      attributes: c.attributes,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }));
-
-    onSubmit({ collection, templateFields: fields, cardDefinitions: cardDefs });
-  };
-
-  // ── Step: Choose ────────────────────────────────────────────────────────────
-
-  if (step === 'choose') {
-    return (
-      <Modal title="Create New Collection" onClose={onClose}>
-        <p className="modal-step-intro">
-          Choose how you want to create your collection.
-        </p>
-        <div className="collection-choose-grid">
-          <button className="collection-choose-option" onClick={() => setStep('api-select')}>
-            <span className="choose-icon">🌐</span>
-            <span className="choose-title">Import from API</span>
-            <span className="choose-desc">Choose from thousands of official collections provided by our supported APIs.</span>
-          </button>
-          <button className="collection-choose-option" onClick={() => setStep('custom-name')}>
-            <span className="choose-icon">✏️</span>
-            <span className="choose-title">Create Custom Collection</span>
-            <span className="choose-desc">Build a completely custom collection with your own template and fields.</span>
-          </button>
-        </div>
-        <ModalActions>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-        </ModalActions>
-      </Modal>
-    );
-  }
-
-  // ── Step: API select ────────────────────────────────────────────────────────
-
-  if (step === 'api-select') {
-    const apiSources = getApiSources();
-    return (
-      <Modal title="Import Collection from API" onClose={onClose}>
-        <p className="modal-step-intro">
-          Choose a collection to import and confirm the template.
-        </p>
-        <div className="api-sources-grid">
-          {apiSources.map(source => (
-            <button
-              key={source.id}
-              className={`api-source-card ${selectedSource?.id === source.id ? 'selected' : ''}`}
-              onClick={() => setSelectedSource(source)}
-            >
-              <div className="api-source-name">{source.name}</div>
-              <div className="api-source-meta">{source.category}</div>
-              <div className="api-source-count">{source.cardCount.toLocaleString()} cards</div>
-            </button>
-          ))}
-        </div>
-        <ModalActions>
-          <Button variant="ghost" onClick={() => setStep('choose')}>← Back</Button>
-          <Button variant="primary" onClick={() => selectedSource && setStep('api-confirm')} disabled={!selectedSource}>
-            Next →
-          </Button>
-        </ModalActions>
-      </Modal>
-    );
-  }
-
-  // ── Step: API confirm ───────────────────────────────────────────────────────
-
-  if (step === 'api-confirm') {
-    const previewFields = selectedSource.templateFields.map((f, idx) => ({
-      id: String(idx),
-      collectionId: '',
-      ...f,
-      order: idx,
-    }));
-    return (
-      <Modal title={`Import "${selectedSource.name}"`} onClose={onClose}>
-        <p className="modal-step-intro">
-          This will create the collection with the following field schema:
-        </p>
-        <TemplatePreview fields={previewFields} showValidation={false} />
-        <p className="modal-step-note">
-          {selectedSource.sampleCards.length > 0
-            ? `${selectedSource.sampleCards.length} sample cards will be imported.`
-            : 'Card definitions will be imported from the API.'}
-        </p>
-        <ModalActions>
-          <Button variant="ghost" onClick={() => setStep('api-select')}>← Back</Button>
-          <Button variant="primary" onClick={handleApiConfirm}>Create Collection</Button>
-        </ModalActions>
-      </Modal>
-    );
-  }
-
   // ── Step: Custom name ───────────────────────────────────────────────────────
 
   if (step === 'custom-name') {
@@ -233,7 +114,7 @@ export function CreateCollectionModal({ onSubmit, onClose }) {
           value={collectionName} onChange={e => setCollectionName(e.target.value)}
           error={nameError} autoFocus />
         <ModalActions>
-          <Button variant="ghost" onClick={() => setStep('choose')}>← Back</Button>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button variant="primary" onClick={handleCustomNameNext}>Next →</Button>
         </ModalActions>
       </Modal>

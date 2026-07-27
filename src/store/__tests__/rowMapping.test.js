@@ -13,14 +13,27 @@
  * would have been useless — fixed correctly on save but appearing as
  * undefined again after every reload.
  *
- * These tests check every field explicitly, in both directions, so a
- * future field added to one side (the JS object shape) but forgotten
- * on the other (the row mapper) gets caught here rather than
- * discovered by a user months later.
+ * That bug was specific to two entities, but the underlying RISK is
+ * structural, not a one-off: every entity type has parallel
+ * create/toRow/rowTo functions that all have to be manually kept in
+ * sync by hand, with nothing enforcing that a new field added to one
+ * gets added to the other two. This file now covers every entity
+ * that has a toRow/rowTo pair (bin items are the only exception —
+ * they reference other entities by id/type rather than storing a full
+ * row of their own, so there's no round trip to check), explicitly
+ * checking every real field the factory can produce — not just the
+ * ones that have broken before — so a future field added to one side
+ * and forgotten on the other gets caught here rather than discovered
+ * by a user months later.
  */
 
 import { describe, it, expect } from 'vitest';
-import { collectionToRow, cardDefinitionToRow, rowToCollection, rowToCardDefinition } from '../supabaseStorage.js';
+import {
+  collectionToRow, cardDefinitionToRow, rowToCollection, rowToCardDefinition,
+  binderToRow, rowToBinder, binderSlotToRow, rowToBinderSlot,
+  binderInsertToRow, rowToBinderInsert, binderPanelToRow, rowToBinderPanel,
+  templateFieldToRow, rowToTemplateField, inventoryItemToRow, rowToInventoryItem,
+} from '../supabaseStorage.js';
 
 describe('collectionToRow', () => {
   const collection = {
@@ -143,5 +156,189 @@ describe('rowToCardDefinition', () => {
     const roundTripped = rowToCardDefinition(asRow);
 
     expect(roundTripped.external_card_id).toBe('base1-1');
+  });
+});
+
+describe('binder round trip', () => {
+  const original = {
+    id: 'binder-1', userId: 'user-1', name: 'My Binder', cols: 3, rows: 3, pages: 10,
+    cover_color: '#123456', page_color: '#1e1e1e', stickers: [{ id: 's1', image_url: 'x', x: 10, y: 10, scale: 1 }],
+  };
+
+  it('carries every field through binderToRow', () => {
+    const row = binderToRow(original);
+    expect(row).toMatchObject({
+      id: 'binder-1', user_id: 'user-1', name: 'My Binder', cols: 3, rows: 3, pages: 10,
+      cover_color: '#123456', page_color: '#1e1e1e', stickers: original.stickers,
+    });
+  });
+
+  it('round-trips every field back through rowToBinder', () => {
+    const asRow = { ...binderToRow(original), created_at: '2026-01-01T00:00:00Z' };
+    const roundTripped = rowToBinder(asRow);
+
+    expect(roundTripped.userId).toBe('user-1');
+    expect(roundTripped.name).toBe('My Binder');
+    expect(roundTripped.cols).toBe(3);
+    expect(roundTripped.rows).toBe(3);
+    expect(roundTripped.pages).toBe(10);
+    expect(roundTripped.cover_color).toBe('#123456');
+    expect(roundTripped.page_color).toBe('#1e1e1e');
+    expect(roundTripped.stickers).toEqual(original.stickers);
+  });
+});
+
+describe('binderSlot round trip', () => {
+  const original = {
+    id: 'slot-1', userId: 'user-1', binderId: 'binder-1', cardDefId: 'card-1',
+    collectionId: 'col-1', pageNumber: 2, slotIndex: 5, inventoryItemId: 'inv-1',
+  };
+
+  it('carries every field through binderSlotToRow', () => {
+    const row = binderSlotToRow(original);
+    expect(row).toMatchObject({
+      id: 'slot-1', user_id: 'user-1', binder_id: 'binder-1', card_def_id: 'card-1',
+      collection_id: 'col-1', page_number: 2, slot_index: 5, inventory_item_id: 'inv-1',
+    });
+  });
+
+  it('round-trips every field back through rowToBinderSlot', () => {
+    const asRow = { ...binderSlotToRow(original), created_at: '2026-01-01T00:00:00Z' };
+    const roundTripped = rowToBinderSlot(asRow);
+
+    expect(roundTripped.binderId).toBe('binder-1');
+    expect(roundTripped.cardDefId).toBe('card-1');
+    expect(roundTripped.collectionId).toBe('col-1');
+    expect(roundTripped.pageNumber).toBe(2);
+    expect(roundTripped.slotIndex).toBe(5);
+    expect(roundTripped.inventoryItemId).toBe('inv-1');
+  });
+
+  it('round-trips a null inventoryItemId (a missing placeholder, not an owned copy) correctly, not as undefined', () => {
+    const asRow = { ...binderSlotToRow({ ...original, inventoryItemId: null }), created_at: '2026-01-01T00:00:00Z' };
+    expect(rowToBinderSlot(asRow).inventoryItemId).toBe(null);
+  });
+});
+
+describe('binderInsert round trip', () => {
+  const original = { id: 'insert-1', userId: 'user-1', name: 'My Sticker Sheet', image_url: 'https://x/sheet.jpg' };
+
+  it('carries every field through binderInsertToRow', () => {
+    expect(binderInsertToRow(original)).toMatchObject({
+      id: 'insert-1', user_id: 'user-1', name: 'My Sticker Sheet', image_url: 'https://x/sheet.jpg',
+    });
+  });
+
+  it('round-trips every field back through rowToBinderInsert', () => {
+    const asRow = { ...binderInsertToRow(original), created_at: '2026-01-01T00:00:00Z' };
+    const roundTripped = rowToBinderInsert(asRow);
+
+    expect(roundTripped.name).toBe('My Sticker Sheet');
+    expect(roundTripped.image_url).toBe('https://x/sheet.jpg');
+  });
+});
+
+describe('binderPanel round trip', () => {
+  const original = {
+    id: 'panel-1', userId: 'user-1', binderId: 'binder-1', pageNumber: 1,
+    startSlotIndex: 0, spanCols: 2, spanRows: 1, panelType: 'card',
+    cardDefId: 'card-1', insertId: null, inventoryItemId: 'inv-1',
+    imageX: 25, imageY: 75, imageScale: 1.5,
+  };
+
+  it('carries every field through binderPanelToRow', () => {
+    const row = binderPanelToRow(original);
+    expect(row).toMatchObject({
+      id: 'panel-1', user_id: 'user-1', binder_id: 'binder-1', page_number: 1,
+      start_slot_index: 0, span_cols: 2, span_rows: 1, panel_type: 'card',
+      card_def_id: 'card-1', insert_id: null, inventory_item_id: 'inv-1',
+      image_x: 25, image_y: 75, image_scale: 1.5,
+    });
+  });
+
+  it('round-trips every field back through rowToBinderPanel', () => {
+    const asRow = { ...binderPanelToRow(original), created_at: '2026-01-01T00:00:00Z' };
+    const roundTripped = rowToBinderPanel(asRow);
+
+    expect(roundTripped.binderId).toBe('binder-1');
+    expect(roundTripped.pageNumber).toBe(1);
+    expect(roundTripped.startSlotIndex).toBe(0);
+    expect(roundTripped.spanCols).toBe(2);
+    expect(roundTripped.spanRows).toBe(1);
+    expect(roundTripped.panelType).toBe('card');
+    expect(roundTripped.cardDefId).toBe('card-1');
+    expect(roundTripped.inventoryItemId).toBe('inv-1');
+    expect(roundTripped.imageX).toBe(25);
+    expect(roundTripped.imageY).toBe(75);
+    expect(roundTripped.imageScale).toBe(1.5);
+  });
+});
+
+describe('templateField round trip', () => {
+  const original = {
+    id: 'tf-1', collectionId: 'col-1', field_name: 'Rarity', field_type: 'select',
+    is_required: true, order: 2, options: ['Common', 'Rare'],
+  };
+
+  it('carries every field through templateFieldToRow', () => {
+    const row = templateFieldToRow(original);
+    expect(row).toMatchObject({
+      id: 'tf-1', collection_id: 'col-1', field_name: 'Rarity', field_type: 'select',
+      is_required: true, field_order: 2, options: ['Common', 'Rare'],
+    });
+  });
+
+  it('round-trips every field back through rowToTemplateField', () => {
+    const asRow = { ...templateFieldToRow(original), created_at: '2026-01-01T00:00:00Z' };
+    const roundTripped = rowToTemplateField(asRow);
+
+    expect(roundTripped.collectionId).toBe('col-1');
+    expect(roundTripped.field_name).toBe('Rarity');
+    expect(roundTripped.field_type).toBe('select');
+    expect(roundTripped.is_required).toBe(true);
+    expect(roundTripped.order).toBe(2);
+    expect(roundTripped.options).toEqual(['Common', 'Rare']);
+  });
+});
+
+describe('inventoryItem round trip', () => {
+  // Deliberately uses camelCase-style JS field names (acquired_at,
+  // personal_notes, is_tradeable, is_sellable) — this entity's row
+  // column names genuinely differ from the JS field names
+  // (date_acquired, notes, available_for_trade, available_for_sale),
+  // not just a snake_case conversion, so this is exactly the kind of
+  // mapping most likely to silently drift if a new field is ever
+  // added without updating both sides.
+  const original = {
+    id: 'inv-1', userId: 'user-1', cardDefId: 'card-1', collectionId: 'col-1',
+    condition_rating: 'Near Mint', language: 'English', label: 'Alt Art',
+    is_tradeable: true, is_sellable: false, is_favorite: true,
+    personal_notes: 'Bought at a show', acquired_at: 1700000000000,
+  };
+
+  it('carries every field through inventoryItemToRow, including the renamed ones', () => {
+    const row = inventoryItemToRow(original);
+    expect(row).toMatchObject({
+      id: 'inv-1', user_id: 'user-1', card_def_id: 'card-1', collection_id: 'col-1',
+      condition_rating: 'Near Mint', language: 'English', label: 'Alt Art',
+      available_for_trade: true, available_for_sale: false, is_favorite: true,
+      notes: 'Bought at a show', date_acquired: 1700000000000,
+    });
+  });
+
+  it('round-trips every field back through rowToInventoryItem, including the renamed ones', () => {
+    const asRow = { ...inventoryItemToRow(original), created_at: '2026-01-01T00:00:00Z' };
+    const roundTripped = rowToInventoryItem(asRow);
+
+    expect(roundTripped.cardDefId).toBe('card-1');
+    expect(roundTripped.collectionId).toBe('col-1');
+    expect(roundTripped.condition_rating).toBe('Near Mint');
+    expect(roundTripped.language).toBe('English');
+    expect(roundTripped.label).toBe('Alt Art');
+    expect(roundTripped.is_tradeable).toBe(true);
+    expect(roundTripped.is_sellable).toBe(false);
+    expect(roundTripped.is_favorite).toBe(true);
+    expect(roundTripped.personal_notes).toBe('Bought at a show');
+    expect(roundTripped.acquired_at).toBe(1700000000000);
   });
 });

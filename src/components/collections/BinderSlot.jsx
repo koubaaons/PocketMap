@@ -220,10 +220,13 @@ export function BinderSlot({
       {/* === Hover-only remove-from-binder — a direct action on the
           slot itself, separate from card ownership entirely (removing
           a card from this binder doesn't un-own it; that's a
-          different toggle above). Only in normal mode — preview mode
-          has its own slot-selection workflow, removing here would
-          conflict with it. === */}
-      {onRemove && !isPreviewMode && !isCombineMode && (
+          different toggle above). Available in preview mode too —
+          routes through previewRemoveSlot (staged in the local draft,
+          not the real store) rather than being suppressed; stopPropagation
+          below already isolates this click from the slot's own
+          select-for-move handler, so there's no real conflict between
+          the two. === */}
+      {onRemove && !isCombineMode && (
         <button
           className="binder-slot-remove"
           onClick={(e) => { e.stopPropagation(); onRemove(); }}

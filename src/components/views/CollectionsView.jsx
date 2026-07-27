@@ -78,7 +78,7 @@ export function CollectionsView({ toast, onNavigate }) {
       <div className="section-header">
         <p className="section-subtitle">Manage all your collections in one place.</p>
         <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-          + Create Collection
+          + Create Custom
         </Button>
       </div>
 
@@ -122,7 +122,7 @@ export function CollectionsView({ toast, onNavigate }) {
           icon="◈"
           title="No collections yet"
           subtitle="Create your first collection to start tracking your cards"
-          action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ Create Collection</Button>}
+          action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ Create Custom</Button>}
         />
       )}
 

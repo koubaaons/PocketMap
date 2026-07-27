@@ -95,18 +95,19 @@ describe('INVENTORY_DELETE sync (hard delete, reverted from soft-delete)', () =>
     expect(calls.some(c => c.table === 'bin')).toBe(false);
   });
 
-  it('syncs the slot unlink correctly (the real bug this session: this used to look for a DELETED slot, never an UPDATED one)', async () => {
+  it('deletes the slot\'s row entirely when it was removed (matches the current reducer behavior — #165 changed this from unlinking to removing outright)', async () => {
     const prevSlot = { id: 'slot-1', inventoryItemId: 'inv-1' };
-    const nextSlot = { id: 'slot-1', inventoryItemId: null };
-    const nextState = baseState({ inventory: [], binderSlots: [nextSlot] });
+    // The slot is genuinely ABSENT from nextState now, not merely
+    // present with a nulled link — matching what the reducer has
+    // actually done since #165.
+    const nextState = baseState({ inventory: [], binderSlots: [] });
     const prevState = baseState({ inventory: [{ id: 'inv-1', cardDefId: 'card-1' }], binderSlots: [prevSlot] });
 
     await syncToSupabase({ type: ACTIONS.INVENTORY_DELETE, payload: { inventoryId: 'inv-1' } }, nextState, prevState);
 
     const slotCall = calls.find(c => c.table === 'binder_slots');
     expect(slotCall).toBeDefined();
-    const updateOp = slotCall.ops.find(o => o.op === 'update');
-    expect(updateOp.args[0].inventory_item_id).toBeNull();
+    expect(slotCall.ops.some(o => o.op === 'delete')).toBe(true);
   });
 
   it('does not touch binder_slots at all if nothing was unlinked', async () => {

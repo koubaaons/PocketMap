@@ -5,12 +5,21 @@
  *   - Display name (stored in Supabase user_metadata.display_name)
  *   - Change password flow (Supabase Auth updateUser)
  *   - Join date derived from user.created_at
- *   - Account deletion with confirmation (Supabase admin deleteUser
- *     isn't available client-side — we sign the user out and clear
- *     local data; full server-side deletion is a Milestone 11 task
- *     once the backend exists)
+ *   - Account deletion with confirmation — genuinely deletes the
+ *     account now, via the delete-account Edge Function (see
+ *     supabase/functions/delete-account/index.ts). The previous
+ *     "sign out and clear local data, real deletion is a future
+ *     task" version left the actual account and all its data sitting
+ *     in Supabase forever, with no indication to the user that
+ *     nothing had really been deleted.
  *   - Logout (carried over from Issue #106)
- *   - Clear local data (carried over from before auth existed)
+ *
+ * The old "Clear All Local Data" section was removed entirely — its
+ * copy was stale (claiming data was only stored locally and "would be
+ * migrated to the cloud" — this app has been fully Supabase-synced
+ * the whole time), and the action itself only ever cleared one
+ * localStorage cache key, which Supabase immediately re-populates on
+ * the next successful sync anyway.
  */
 
 import { useState } from 'react';
@@ -240,16 +249,10 @@ function formatLastSynced(date) {
 export function AccountView({ toast, lastSynced }) {
   const { user } = useAuth();
 
-  const [confirmReset, setConfirmReset]   = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [loggingOut, setLoggingOut]       = useState(false);
-
-  const handleReset = () => {
-    clearState();
-    toast('All data cleared. Reloading…', 'info');
-    setTimeout(() => window.location.reload(), 1200);
-  };
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -261,13 +264,25 @@ export function AccountView({ toast, lastSynced }) {
   };
 
   const handleDeleteAccount = async () => {
-    // Full server-side deletion requires a backend (Milestone 11).
-    // For now: sign out and clear local data so the account is
-    // effectively inaccessible from this device. The Supabase user
-    // record remains until the backend can cascade-delete it.
+    setDeletingAccount(true);
+    // The Edge Function is what actually deletes the account — see
+    // supabase/functions/delete-account/index.ts. It deletes this
+    // user's private storage files and the auth.users row itself,
+    // which the database then cascades into deleting every row across
+    // every table for this user automatically (migration
+    // 0020_cascade_delete_user_data.sql). None of that can happen from
+    // client-side code alone — deleting a user's login requires the
+    // service role key, which must never reach the browser.
+    const { data, error } = await supabase.functions.invoke('delete-account');
+    if (error || data?.error) {
+      toast(`Could not delete your account: ${data?.error ?? error.message}`, 'error');
+      setDeletingAccount(false);
+      return;
+    }
+
     clearState();
     await supabase.auth.signOut();
-    toast('Account data cleared. You have been logged out.', 'info');
+    toast('Your account has been permanently deleted.', 'info');
   };
 
   return (
@@ -299,24 +314,13 @@ export function AccountView({ toast, lastSynced }) {
         </Button>
       </div>
 
-      <div className="account-section">
-        <h4 className="account-section-title">Data & Storage</h4>
-        <p className="account-section-subtitle">
-          Your collection data is stored locally on this device. This will
-          be migrated to the cloud in Milestone 11.
-        </p>
-        <Button variant="danger" size="sm" onClick={() => setConfirmReset(true)}>
-          Clear All Local Data
-        </Button>
-      </div>
-
       <div className="account-section account-section-danger">
         <h4 className="account-section-title">Danger zone</h4>
         <p className="account-section-subtitle">
           Permanently delete your account. This cannot be undone.
         </p>
-        <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
-          Delete Account
+        <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)} disabled={deletingAccount}>
+          {deletingAccount ? 'Deleting…' : 'Delete Account'}
         </Button>
       </div>
 
@@ -330,20 +334,10 @@ export function AccountView({ toast, lastSynced }) {
         />
       )}
 
-      {confirmReset && (
-        <ConfirmModal
-          title="Clear all local data?"
-          message="This will permanently delete all your binders, cards, collections, and settings from this device. This cannot be undone."
-          confirmLabel="Clear Everything"
-          onConfirm={handleReset}
-          onClose={() => setConfirmReset(false)}
-        />
-      )}
-
       {confirmDelete && (
         <ConfirmModal
           title="Delete your account?"
-          message="This will sign you out and clear all local data. Full account deletion from our servers will complete automatically. This cannot be undone."
+          message="This permanently deletes your account and everything in it — every binder, collection, and card. This cannot be undone."
           confirmLabel="Delete Account"
           onConfirm={handleDeleteAccount}
           onClose={() => setConfirmDelete(false)}

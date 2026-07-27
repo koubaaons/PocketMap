@@ -33,7 +33,7 @@
 
 import { useState, useCallback } from 'react';
 
-export function useBinderView(binder, binderSlots) {
+export function useBinderView(binder, binderSlots, binderPanels = []) {
   const [page, setPage]                     = useState(0);
   const [addingToSlot, setAddingToSlot]     = useState(null);
   const [activeSlot, setActiveSlot]         = useState(null);
@@ -42,6 +42,7 @@ export function useBinderView(binder, binderSlots) {
   // === ISSUE #82: preview mode with local slot state ===
   const [isPreviewMode, setIsPreviewMode]   = useState(false);
   const [previewSlots, setPreviewSlots]     = useState(null); // null = not in preview
+  const [previewPanels, setPreviewPanels]   = useState(null); // null = not in preview — panels' own draft, added so Combine/Uncombine/Swap Pages can be staged the same way slots already are
   const [selectedSlot, setSelectedSlot]     = useState(null);
 
   // Cover (1) + one spread per content page-pair, plus one extra spread
@@ -55,6 +56,7 @@ export function useBinderView(binder, binderSlots) {
 
   // The slots to render — preview slots when in preview, real slots otherwise
   const activeSlots = isPreviewMode ? (previewSlots ?? binderSlots) : binderSlots;
+  const activePanels = isPreviewMode ? (previewPanels ?? binderPanels) : binderPanels;
 
   const openAddToSlot  = (slotIndex, pageNumber) => setAddingToSlot({ slotIndex, pageNumber });
   const closeAddToSlot = () => setAddingToSlot(null);
@@ -67,17 +69,19 @@ export function useBinderView(binder, binderSlots) {
 
   const goToPage = (n) => setPage(Math.max(0, Math.min(totalSpreads - 1, n)));
 
-  // Enter preview — copy current slots to local state
+  // Enter preview — copy current slots and panels to local state
   const enterPreviewMode = useCallback(() => {
     setPreviewSlots([...binderSlots]);
+    setPreviewPanels([...binderPanels]);
     setIsPreviewMode(true);
     setSelectedSlot(null);
-  }, [binderSlots]);
+  }, [binderSlots, binderPanels]);
 
   // Exit preview without saving — discard local state
   const exitPreviewMode = useCallback(() => {
     setIsPreviewMode(false);
     setPreviewSlots(null);
+    setPreviewPanels(null);
     setSelectedSlot(null);
   }, []);
 
@@ -109,6 +113,56 @@ export function useBinderView(binder, binderSlots) {
   // Add a card in preview mode — adds to local preview slots
   const previewAddSlot = useCallback((newSlot) => {
     setPreviewSlots(prev => prev ? [...prev, newSlot] : [newSlot]);
+  }, []);
+
+  // Remove a card in preview mode — removes from the local draft only,
+  // same staged-until-Save-Layout treatment as every other preview
+  // action. Requested directly: Plan mode previously only supported
+  // moving/swapping cards, with no way to remove one at all.
+  const previewRemoveSlot = useCallback((slotId) => {
+    setPreviewSlots(prev => prev ? prev.filter(s => s.id !== slotId) : prev);
+    setSelectedSlot(prevSelected => (prevSelected?.id === slotId ? null : prevSelected));
+  }, []);
+
+  // === Panels get the exact same staged treatment as slots —
+  // requested directly, since Combine/Uncombine used to write straight
+  // to the real store, which meant confirming a combine over a slot
+  // you'd just removed IN THE DRAFT still saw that slot as occupied
+  // (the real store hadn't caught up yet), silently rejecting the
+  // panel while the UI reported success anyway. ===
+
+  // Add a new panel in preview mode — adds to the local draft only.
+  const previewAddPanel = useCallback((newPanel) => {
+    setPreviewPanels(prev => prev ? [...prev, newPanel] : [newPanel]);
+  }, []);
+
+  // Remove (uncombine) a panel in preview mode — removes from the
+  // local draft only.
+  const previewRemovePanel = useCallback((panelId) => {
+    setPreviewPanels(prev => prev ? prev.filter(p => p.id !== panelId) : prev);
+  }, []);
+
+  // Patch a panel (assigning/repositioning its image) in preview mode
+  // — patches the local draft only. Needed because a panel created via
+  // previewAddPanel only exists in the draft until Save Layout; a real
+  // BINDER_PANEL_UPDATE dispatch against its id would silently match
+  // nothing at all in the real store, since that row doesn't exist yet.
+  const previewUpdatePanel = useCallback((panelId, patch) => {
+    setPreviewPanels(prev => prev ? prev.map(p => p.id === panelId ? { ...p, ...patch } : p) : prev);
+  }, []);
+
+  // Swap two pages in preview mode — applies to both the slot AND
+  // panel drafts at once, mirroring exactly what the real
+  // BINDER_SWAP_PAGES reducer case does to the real store, just
+  // staged locally instead.
+  const previewSwapPages = useCallback((pageA, pageB) => {
+    const swapPage = (p) => (p === pageA ? pageB : p === pageB ? pageA : p);
+    setPreviewSlots(prev => prev ? prev.map(s =>
+      s.pageNumber === pageA || s.pageNumber === pageB ? { ...s, pageNumber: swapPage(s.pageNumber) } : s
+    ) : prev);
+    setPreviewPanels(prev => prev ? prev.map(p =>
+      p.pageNumber === pageA || p.pageNumber === pageB ? { ...p, pageNumber: swapPage(p.pageNumber) } : p
+    ) : prev);
   }, []);
 
   const selectSlotForMove = (slot) => setSelectedSlot(slot);
@@ -190,7 +244,9 @@ export function useBinderView(binder, binderSlots) {
     viewingCardDef,
     isPreviewMode,
     previewSlots,
+    previewPanels,
     activeSlots,
+    activePanels,
     selectedSlot,
 
     openAddToSlot,
@@ -206,6 +262,11 @@ export function useBinderView(binder, binderSlots) {
     exitPreviewMode,
     previewMoveSlot,
     previewAddSlot,
+    previewRemoveSlot,
+    previewAddPanel,
+    previewRemovePanel,
+    previewUpdatePanel,
+    previewSwapPages,
     selectSlotForMove,
     clearSelectedSlot,
 

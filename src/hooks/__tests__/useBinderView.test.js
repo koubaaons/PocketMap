@@ -145,6 +145,39 @@ describe('useBinderView — preview mode', () => {
     expect(result.current.previewSlots).toHaveLength(2);
     expect(slots).toHaveLength(1); // the real array passed in is untouched
   });
+
+  it('previewRemoveSlot removes a slot from the preview-local draft only, without touching the real slots passed in — requested directly, since Plan mode previously had no way to remove a card at all', () => {
+    const slots = [makeSlot({ id: 'a' }), makeSlot({ id: 'b', slotIndex: 1 })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), slots));
+    act(() => result.current.enterPreviewMode());
+
+    act(() => result.current.previewRemoveSlot('a'));
+
+    expect(result.current.previewSlots.map(s => s.id)).toEqual(['b']);
+    expect(slots).toHaveLength(2); // the real array passed in is untouched
+  });
+
+  it('previewRemoveSlot clears selectedSlot if the removed slot was the one currently selected for a move', () => {
+    const slots = [makeSlot({ id: 'a' })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), slots));
+    act(() => result.current.enterPreviewMode());
+    act(() => result.current.selectSlotForMove(slots[0]));
+
+    act(() => result.current.previewRemoveSlot('a'));
+
+    expect(result.current.selectedSlot).toBe(null);
+  });
+
+  it('previewRemoveSlot leaves selectedSlot untouched if a DIFFERENT slot is removed', () => {
+    const slots = [makeSlot({ id: 'a' }), makeSlot({ id: 'b', slotIndex: 1 })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), slots));
+    act(() => result.current.enterPreviewMode());
+    act(() => result.current.selectSlotForMove(slots[0])); // selects 'a'
+
+    act(() => result.current.previewRemoveSlot('b'));
+
+    expect(result.current.selectedSlot?.id).toBe('a');
+  });
 });
 
 describe('useBinderView — combine mode selection', () => {
@@ -255,5 +288,126 @@ describe('useBinderView — getCombineRectangle', () => {
       spanCols: 3,
       spanRows: 1,
     });
+  });
+});
+
+describe('useBinderView — panel draft (Combine/Uncombine/Swap Pages staged in Plan mode)', () => {
+  function makePanel(overrides = {}) {
+    return { id: 'panel-1', binderId: 'binder-1', pageNumber: 1, startSlotIndex: 0, spanCols: 2, spanRows: 1, panelType: 'insert', ...overrides };
+  }
+
+  it('enterPreviewMode clones binderPanels into the local draft, without touching the real array passed in', () => {
+    const panels = [makePanel()];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), [], panels));
+    act(() => result.current.enterPreviewMode());
+
+    expect(result.current.previewPanels).toEqual(panels);
+    expect(result.current.previewPanels).not.toBe(panels); // a real clone, not the same array reference
+  });
+
+  it('activePanels reflects the real binderPanels when not in preview mode', () => {
+    const panels = [makePanel()];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), [], panels));
+
+    expect(result.current.activePanels).toBe(panels);
+  });
+
+  it('previewAddPanel appends a new panel to the draft only, leaving the real array passed in untouched', () => {
+    const panels = [makePanel({ id: 'a' })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), [], panels));
+    act(() => result.current.enterPreviewMode());
+
+    act(() => result.current.previewAddPanel(makePanel({ id: 'new', startSlotIndex: 4 })));
+
+    expect(result.current.previewPanels).toHaveLength(2);
+    expect(panels).toHaveLength(1);
+  });
+
+  it('previewRemovePanel (uncombine) removes a panel from the draft only, leaving the real array passed in untouched', () => {
+    const panels = [makePanel({ id: 'a' }), makePanel({ id: 'b', startSlotIndex: 2 })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), [], panels));
+    act(() => result.current.enterPreviewMode());
+
+    act(() => result.current.previewRemovePanel('a'));
+
+    expect(result.current.previewPanels.map(p => p.id)).toEqual(['b']);
+    expect(panels).toHaveLength(2);
+  });
+
+  it('previewUpdatePanel patches a panel in the draft only — the actual fix for a real bug where assigning an image to a combine-created panel silently did nothing, since that panel only existed in the draft, not yet the real store BINDER_PANEL_UPDATE was dispatching against', () => {
+    const panels = [makePanel({ id: 'a', insertId: null })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), [], panels));
+    act(() => result.current.enterPreviewMode());
+    act(() => result.current.previewAddPanel(makePanel({ id: 'new-combine', insertId: null })));
+
+    act(() => result.current.previewUpdatePanel('new-combine', { insertId: 'insert-1' }));
+
+    expect(result.current.previewPanels.find(p => p.id === 'new-combine').insertId).toBe('insert-1');
+    expect(result.current.previewPanels.find(p => p.id === 'a').insertId).toBe(null); // untouched
+    expect(panels[0].insertId).toBe(null); // the real array passed in is untouched
+  });
+
+  it('previewUpdatePanel also works for repositioning an image on an already-existing panel, not just a newly-combined one', () => {
+    const panels = [makePanel({ id: 'a', imageX: 50, imageY: 50, imageScale: 1 })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), [], panels));
+    act(() => result.current.enterPreviewMode());
+
+    act(() => result.current.previewUpdatePanel('a', { imageX: 30, imageY: 70 }));
+
+    const updated = result.current.previewPanels.find(p => p.id === 'a');
+    expect(updated.imageX).toBe(30);
+    expect(updated.imageY).toBe(70);
+    expect(updated.imageScale).toBe(1); // untouched field preserved
+  });
+
+  it('previewSwapPages swaps pageNumber for both slots AND panels on the two given pages, in the draft only', () => {
+    const slots = [makeSlot({ id: 's1', pageNumber: 1 }), makeSlot({ id: 's2', pageNumber: 2, slotIndex: 1 })];
+    const panels = [makePanel({ id: 'p1', pageNumber: 1 }), makePanel({ id: 'p2', pageNumber: 2 })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), slots, panels));
+    act(() => result.current.enterPreviewMode());
+
+    act(() => result.current.previewSwapPages(1, 2));
+
+    expect(result.current.previewSlots.find(s => s.id === 's1').pageNumber).toBe(2);
+    expect(result.current.previewSlots.find(s => s.id === 's2').pageNumber).toBe(1);
+    expect(result.current.previewPanels.find(p => p.id === 'p1').pageNumber).toBe(2);
+    expect(result.current.previewPanels.find(p => p.id === 'p2').pageNumber).toBe(1);
+
+    // The real arrays passed in are untouched
+    expect(slots[0].pageNumber).toBe(1);
+    expect(panels[0].pageNumber).toBe(1);
+  });
+
+  it('previewSwapPages leaves anything on an unrelated page completely untouched', () => {
+    const panels = [makePanel({ id: 'p1', pageNumber: 5 })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), [], panels));
+    act(() => result.current.enterPreviewMode());
+
+    act(() => result.current.previewSwapPages(1, 2));
+
+    expect(result.current.previewPanels.find(p => p.id === 'p1').pageNumber).toBe(5);
+  });
+
+  it('enterPreviewMode followed immediately by previewRemovePanel in the same synchronous call correctly removes the panel — the exact sequence BinderView.jsx uses to auto-enter Plan mode when uncombining from outside it, worth confirming directly rather than trusting React\'s batching by reasoning alone', () => {
+    const panels = [makePanel({ id: 'a' })];
+    const { result } = renderHook(() => useBinderView(makeBinder(10), [], panels));
+
+    act(() => {
+      result.current.enterPreviewMode();
+      result.current.previewRemovePanel('a');
+    });
+
+    expect(result.current.previewPanels).toEqual([]);
+  });
+
+  it('enterPreviewMode followed immediately by previewAddPanel in the same synchronous call correctly adds the panel — the same sequence used when auto-entering Plan mode to fill a blank combined slot', () => {
+    const { result } = renderHook(() => useBinderView(makeBinder(10), [], []));
+
+    act(() => {
+      result.current.enterPreviewMode();
+      result.current.previewAddPanel(makePanel({ id: 'new' }));
+    });
+
+    expect(result.current.previewPanels.map(p => p.id)).toEqual(['new']);
   });
 });

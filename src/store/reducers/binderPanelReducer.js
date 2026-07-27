@@ -132,7 +132,7 @@ export function binderPanelReducer(state, action) {
 // a panel spanning multiple ROWS doesn't cover a contiguous range of
 // indices (e.g. a 2-wide, 2-tall panel starting at index 1 in a
 // 3-column grid covers 1, 2, 4, 5 — not 1, 2, 3, 4). ===
-function getSlotIndicesForPanel(startSlotIndex, spanCols, spanRows, gridCols) {
+export function getSlotIndicesForPanel(startSlotIndex, spanCols, spanRows, gridCols) {
   const indices = [];
   const startRow = Math.floor(startSlotIndex / gridCols);
   const startCol = startSlotIndex % gridCols;

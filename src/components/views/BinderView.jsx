@@ -56,6 +56,7 @@ import { useStore, useDispatch } from '../../hooks/useStore.js';
 import { ACTIONS } from '../../store/index.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 import { createBinderSlot, createBinderPanel } from '../../types/index.js';
+import { getSlotIndicesForPanel } from '../../store/reducers/binderPanelReducer.js';
 
 export function BinderView({ toast, onNavigate, initialPage = null }) {
   const nav             = useStore(s => s.nav);
@@ -71,7 +72,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const binderSlots     = allBinderSlots.filter(s => s.binderId === binder?.id);
   const binderPanels    = allBinderPanels.filter(p => p.binderId === binder?.id);
   const dispatch   = useDispatch();
-  const view       = useBinderView(binder, binderSlots);
+  const view       = useBinderView(binder, binderSlots, binderPanels);
 
   // If navigated here from search with a specific page, open to that page.
   // pageNumber from slot is 1-based. BinderBookFlip pairs content pages
@@ -239,7 +240,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const filled   = getOwnedFilledSlotCount(binderSlots, binder.id, inventory, binderPanels);
   const capacity = binderCapacity(binder, binderPanels);
 
-  const { handleAddToSlot, handleRemoveFromSlot, handleAddPage, handleSwapPages } =
+  const { handleAddToSlot, handleRemoveFromSlot, handleAddPage } =
     useBinderSlotActions(toast, {
       onRemoveSuccess: view.closeSlotAction,
     });
@@ -381,6 +382,12 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
   // ── Save layout — commit preview slots to store ─────────────────────────
 
+  const handleDiscardLayout = () => {
+    view.exitPreviewMode();
+    view.exitCombineMode();
+    setIsLibraryPanelOpen(false);
+  };
+
   const handleSaveLayout = () => {
     if (!view.previewSlots) return;
 
@@ -399,7 +406,44 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       }
     });
 
+    // === Commits removals made via previewRemoveSlot — a slot that
+    // existed originally but is no longer present in the draft at
+    // all. This loop previously only ever handled additions/moves,
+    // since there was no way to remove a card while in Plan mode at
+    // all until now.
+    const previewSlotIds = new Set(view.previewSlots.map(s => s.id));
+    binderSlots.forEach(original => {
+      if (!previewSlotIds.has(original.id)) {
+        dispatch({ type: ACTIONS.BINDER_SLOT_REMOVE, payload: { slotId: original.id } });
+      }
+    });
+
+    // === Commits panel changes from the draft — additions (new
+    // combines), removals (uncombines), and page-number changes
+    // (a staged swap-pages) — mirroring exactly how slot adds/moves/
+    // removals are committed above, since panels now get the same
+    // staged treatment.
+    view.previewPanels.forEach(previewPanel => {
+      const original = binderPanels.find(p => p.id === previewPanel.id);
+      if (!original) {
+        dispatch({ type: ACTIONS.BINDER_PANEL_ADD, payload: previewPanel });
+      } else if (original.pageNumber !== previewPanel.pageNumber) {
+        dispatch({ type: ACTIONS.BINDER_PANEL_UPDATE, payload: { id: previewPanel.id, pageNumber: previewPanel.pageNumber } });
+      }
+    });
+
+    const previewPanelIds = new Set(view.previewPanels.map(p => p.id));
+    binderPanels.forEach(original => {
+      if (!previewPanelIds.has(original.id)) {
+        dispatch({ type: ACTIONS.BINDER_PANEL_REMOVE, payload: { panelId: original.id } });
+      }
+    });
+
     view.exitPreviewMode();
+    // Neither is reachable outside Plan mode anymore, so leaving
+    // either "open" after saving wouldn't make sense.
+    view.exitCombineMode();
+    setIsLibraryPanelOpen(false);
     toast('Layout saved');
   };
 
@@ -451,12 +495,24 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   };
 
   // === Michi Method support: combine mode ===
+  // Combine/Uncombine are Plan-mode-only actions — the X button
+  // itself is still shown regardless of mode (removing it from normal
+  // browsing would just be confusing), but clicking it while not
+  // already in Plan mode now auto-enters it first, then removes the
+  // panel from the freshly-entered draft, rather than either silently
+  // doing nothing (the bug this replaces) or requiring a separate,
+  // manual "enter Plan mode first" step.
   const handleUncombinePanel = (panel) => {
-    dispatch({ type: ACTIONS.BINDER_PANEL_REMOVE, payload: { panelId: panel.id } });
+    if (!view.isPreviewMode) view.enterPreviewMode();
+    view.previewRemovePanel(panel.id);
     toast('Slots uncombined');
   };
 
   const handleUpdatePanel = (panelId, patch) => {
+    if (view.isPreviewMode) {
+      view.previewUpdatePanel(panelId, patch);
+      return;
+    }
     dispatch({ type: ACTIONS.BINDER_PANEL_UPDATE, payload: { id: panelId, ...patch } });
   };
 
@@ -466,7 +522,44 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   // something that was always going to be "decorative image" anyway.
   // Confirming a combine now goes straight to creating the panel
   // blank and opening the library panel to fill it, no modal at all.
+  //
+  // === CHANGED: staged in the draft, validated against the draft too
+  // — this used to dispatch straight to the real store, whose own
+  // reducer validation (conflicting slot / overlapping panel) checked
+  // the REAL, already-committed data. Since a card removed via
+  // previewRemoveSlot only exists in the draft until Save Layout, that
+  // real-data check could silently reject a combine over a slot that
+  // correctly looked empty on screen — the toast said "combined"
+  // regardless, since nothing checked whether it actually was. The
+  // same validation logic (getSlotIndicesForPanel, imported from the
+  // reducer rather than duplicated) now runs here against the DRAFT
+  // (displaySlots/view.activePanels), which correctly reflects
+  // anything already removed/moved/combined in this Plan session. ===
   const handleConfirmCombine = (rect) => {
+    if (!view.isPreviewMode) { console.warn('[Pinder] handleConfirmCombine called outside Plan mode'); return; }
+
+    const newIndices = getSlotIndicesForPanel(rect.startSlotIndex, rect.spanCols, rect.spanRows, binder.cols);
+
+    const conflictingSlot = displaySlots.find(
+      s => s.binderId === binder.id && s.pageNumber === rect.pageNumber && newIndices.includes(s.slotIndex) && s.cardDefId
+    );
+    if (conflictingSlot) {
+      toast('One of the selected slots now has a card in it — please reselect empty slots', 'error');
+      view.exitCombineMode();
+      return;
+    }
+
+    const overlappingPanel = view.activePanels.find(p => {
+      if (p.binderId !== binder.id || p.pageNumber !== rect.pageNumber) return false;
+      const existingIndices = getSlotIndicesForPanel(p.startSlotIndex, p.spanCols, p.spanRows, binder.cols);
+      return existingIndices.some(i => newIndices.includes(i));
+    });
+    if (overlappingPanel) {
+      toast('One of the selected slots overlaps a panel that\'s already there', 'error');
+      view.exitCombineMode();
+      return;
+    }
+
     const { panel, errors } = createBinderPanel({
       binderId: binder.id,
       pageNumber: rect.pageNumber,
@@ -479,7 +572,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     });
     if (!panel) { console.error('Panel creation failed:', errors); return; }
 
-    dispatch({ type: ACTIONS.BINDER_PANEL_ADD, payload: panel });
+    view.previewAddPanel(panel);
     toast('Slots combined');
     view.clearCombineSelection();
     // Stay in combine mode (so the user can combine another group
@@ -501,7 +594,14 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     // library so the user can drag something onto it right away —
     // one already has an image, editing/replacing it happens via the
     // panel's own uncombine + re-add flow for now, not this.
+    //
+    // === Combine/Library/panel modification are all Plan-mode-only
+    // now — auto-entering Plan mode here, rather than either silently
+    // letting this bypass that rule or blocking the click outright,
+    // makes "click a blank combined slot to fill it" still feel like
+    // one seamless action instead of two.
     if (panel.panelType === 'insert' && !panel.insertId) {
+      if (!view.isPreviewMode) view.enterPreviewMode();
       setIsLibraryPanelOpen(true);
     }
   };
@@ -530,13 +630,13 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           : view.openCardDetail(cardDef);
       },
       onToggleOwned: handleToggleOwnedInSlot,
-      onRemove: (slot) => handleRemoveFromSlot(slot.id),
+      onRemove: (slot) => view.isPreviewMode ? view.previewRemoveSlot(slot.id) : handleRemoveFromSlot(slot.id),
       onDropEmpty: (view.addingToSlot && !view.isCombineMode)
         ? (slotIndex, payload) => handleDropCardOnSlot(pageNumber, slotIndex, payload)
         : undefined,
     },
     panels: {
-      pagePanels: binderPanels.filter(p => p.pageNumber === pageNumber),
+      pagePanels: view.activePanels.filter(p => p.pageNumber === pageNumber),
       binderInsertMap,
       onClickPanel: handleClickPanel,
       onUncombinePanel: handleUncombinePanel,
@@ -548,17 +648,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       combineSelection: view.combineSelection.filter(s => s.pageNumber === pageNumber).map(s => s.slotIndex),
       getCombineRectangle: view.getCombineRectangle,
       onClearCombineSelection: view.clearCombineSelection,
-      onConfirmCombine: (rect) => {
-        const stillAllEmpty = view.combineSelection.every(({ pageNumber: pn, slotIndex: si }) =>
-          !allBinderSlots.some(s => s.binderId === binder.id && s.pageNumber === pn && s.slotIndex === si && s.cardDefId)
-        );
-        if (!stillAllEmpty) {
-          toast('One of the selected slots now has a card in it — please reselect empty slots', 'error');
-          view.exitCombineMode();
-          return;
-        }
-        handleConfirmCombine(rect);
-      },
+      onConfirmCombine: handleConfirmCombine,
     },
   });
 
@@ -577,7 +667,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         filled={filled}
         capacity={capacity}
         isPreviewMode={view.isPreviewMode}
-        onExitPreviewMode={view.exitPreviewMode}
+        onExitPreviewMode={handleDiscardLayout}
         onEnterPreviewMode={view.enterPreviewMode}
         onSaveLayout={handleSaveLayout}
         onAddPage={() => handleAddPage(binder.id)}
@@ -746,7 +836,11 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       {isSwapPagesOpen && (
         <SwapPagesModal
           binder={binder}
-          onSubmit={(pageA, pageB) => handleSwapPages(binder.id, pageA, pageB)}
+          onSubmit={(pageA, pageB) => {
+            if (!view.isPreviewMode) { console.warn('[Pinder] Swap Pages submitted outside Plan mode'); return; }
+            view.previewSwapPages(pageA, pageB);
+            toast(`Swapped page ${pageA} and page ${pageB}`);
+          }}
           onClose={() => setIsSwapPagesOpen(false)}
         />
       )}

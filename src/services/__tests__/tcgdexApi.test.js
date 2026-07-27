@@ -162,10 +162,10 @@ describe('fetchAllSets', () => {
     vi.useRealTimers();
   });
 
-  it('normalizes each set to include images.logo/images.symbol and a flat total — the actual fix for a real bug where these silently failed to render, since TCGdex\'s raw shape uses flat logo/symbol fields and a nested cardCount, not the images.{logo,symbol}/total shape the UI expects', async () => {
+  it('normalizes each set to include images.logo/images.symbol — the actual fix for a real bug where these silently failed to render, since TCGdex\'s raw shape uses flat logo/symbol fields, not the images.{logo,symbol} shape the UI expects', async () => {
     const mockFetch = vi.fn()
       .mockResolvedValueOnce(jsonResponse([{ id: 'base1', name: 'Base Set', logo: 'https://assets.tcgdex.net/en/base/base1/logo', symbol: 'https://assets.tcgdex.net/en/base/base1/symbol' }]))
-      .mockResolvedValueOnce(jsonResponse({ id: 'base1', releaseDate: '1999-01-09', cardCount: { official: 102 }, cards: [] }));
+      .mockResolvedValueOnce(jsonResponse({ id: 'base1', releaseDate: '1999-01-09', cardCount: { official: 102 }, cards: new Array(102).fill({ id: 'x' }) }));
     vi.stubGlobal('fetch', mockFetch);
 
     const { fetchAllSets } = await import('../tcgdexApi.js');
@@ -174,6 +174,35 @@ describe('fetchAllSets', () => {
     expect(sets[0].images.logo).toBe('https://assets.tcgdex.net/en/base/base1/logo.webp');
     expect(sets[0].images.symbol).toBe('https://assets.tcgdex.net/en/base/base1/symbol.webp');
     expect(sets[0].total).toBe(102);
+    vi.unstubAllGlobals();
+  });
+
+  it('total reflects the real number of catalogued cards, not cardCount.official, when the two disagree — the actual live bug: a set advertised as 84 cards can have secret rares or extras bringing its real catalogued count to 120', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: 'set-1', name: 'Pitch Black' }]))
+      .mockResolvedValueOnce(jsonResponse({ id: 'set-1', releaseDate: '2026-01-01', cardCount: { official: 84 }, cards: new Array(120).fill({ id: 'x' }) }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { fetchAllSets } = await import('../tcgdexApi.js');
+    const sets = await fetchAllSets();
+
+    // The real catalogued count (120) wins, not the official print-run
+    // figure (84) — so the set tile's advertised count always matches
+    // what the import actually delivers.
+    expect(sets[0].total).toBe(120);
+    vi.unstubAllGlobals();
+  });
+
+  it('a genuinely empty set (0 real cards catalogued, like a promo set with none added yet) still shows 0, not the official count', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: 'promo-1', name: 'MEP Black Star Promos' }]))
+      .mockResolvedValueOnce(jsonResponse({ id: 'promo-1', releaseDate: '2025-01-01', cardCount: { official: 0 }, cards: [] }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { fetchAllSets } = await import('../tcgdexApi.js');
+    const sets = await fetchAllSets();
+
+    expect(sets[0].total).toBe(0);
     vi.unstubAllGlobals();
   });
 

@@ -61,6 +61,25 @@ export function BinderTopbar({
             <span className="binder-plan-layout-label">
               Planning layout — showing every card as if owned. Nothing is saved yet.
             </span>
+
+            <Button variant="ghost" size="sm" onClick={onSwapPages}>
+              Swap Pages
+            </Button>
+
+            {!isCombineMode && (
+              <Button variant="ghost" size="sm" onClick={onEnterCombineMode}>
+                Combine Slots
+              </Button>
+            )}
+            {isCombineMode && (
+              <Button variant="ghost" size="sm" onClick={onExitCombineMode}>
+                Exit Combine Mode
+              </Button>
+            )}
+            <Button variant={isLibraryPanelOpen ? 'primary' : 'ghost'} size="sm" onClick={onToggleLibraryPanel}>
+              Library
+            </Button>
+
             <Button variant="ghost" size="sm" onClick={onExitPreviewMode}>Discard</Button>
             <Button variant="primary" size="sm" onClick={onSaveLayout}>Save Layout</Button>
           </div>
@@ -71,26 +90,6 @@ export function BinderTopbar({
         )}
 
         <Button variant="ghost" size="sm" onClick={onAddPage} disabled={isClosed}>+ Page</Button>
-
-        {!isCombineMode && (
-          <Button variant="ghost" size="sm" onClick={onSwapPages} disabled={isClosed}>
-            Swap Pages
-          </Button>
-        )}
-
-        {!isCombineMode && (
-          <Button variant="ghost" size="sm" onClick={onEnterCombineMode} disabled={isClosed}>
-            Combine Slots
-          </Button>
-        )}
-        {isCombineMode && (
-          <Button variant="ghost" size="sm" onClick={onExitCombineMode}>
-            Exit Combine Mode
-          </Button>
-        )}
-        <Button variant={isLibraryPanelOpen ? 'primary' : 'ghost'} size="sm" onClick={onToggleLibraryPanel} disabled={isClosed}>
-          Library
-        </Button>
 
         {!isClosed && (
           <Button variant="ghost" size="sm" onClick={onToggleCardInfo}>

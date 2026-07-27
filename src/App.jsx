@@ -14,7 +14,7 @@ import { useCollectionUpdateCheck } from './hooks/useCollectionUpdateCheck.js';
 import { useTheme } from './hooks/useTheme.js';
 import { ACTIONS } from './store/index.js';
 import { Sidebar } from './components/Sidebar.jsx';
-import { ToastContainer } from './components/ui/index.jsx';
+import { ToastContainer, EmptyState } from './components/ui/index.jsx';
 import { FeedbackButton } from './components/FeedbackButton.jsx';
 import { CollectionUpdateBanner } from './components/CollectionUpdateBanner.jsx';
 
@@ -223,6 +223,23 @@ export default function App() {
       case 'account':
       case 'settings':
         return <AccountView toast={toast} theme={theme} onToggleTheme={toggleTheme} lastSynced={lastSynced} />;
+
+      // === Deliberately just a placeholder for now — real statistics
+      // are deferred until the app's main features are stable and no
+      // longer need active debugging, rather than half-building this
+      // alongside everything else. Previously this fell through to
+      // the default case below (silently showing Home) since no case
+      // for it existed at all.
+      case 'statistics':
+        return (
+          <div className="view">
+            <EmptyState
+              icon="📊"
+              title="Statistics — in progress"
+              subtitle="This page isn't built yet. It'll arrive once the rest of the app is stable."
+            />
+          </div>
+        );
 
       default:
         return (

@@ -20,35 +20,48 @@ export function inventorySync(action, nextState, prevState, pending) {
 
     case ACTIONS.INVENTORY_ADD: {
       const item = nextState.inventory.find(i => i.id === action.payload.id);
-      if (item) pending.push(upsertInventoryItem(item));
+      if (!item) break;
 
-      // === Fixes the real "disconnected from binders" bug — the
-      // reducer may have auto-linked an existing, unowned placeholder
-      // slot/panel to this newly-added copy (see reducer.js's
-      // INVENTORY_ADD case). Diffing prevState/nextState is how the
-      // sync layer finds out whether that happened and, if so, which
-      // one, since the action payload itself only ever mentions the
-      // new inventory item.
-      const newlyLinkedSlot = nextState.binderSlots.find(s => {
-        const prev = prevState.binderSlots.find(ps => ps.id === s.id);
-        return prev && !prev.inventoryItemId && s.inventoryItemId === item?.id;
-      });
-      if (newlyLinkedSlot) {
-        pending.push(
-          supabase.from('binder_slots').update({ inventory_item_id: newlyLinkedSlot.inventoryItemId }).eq('id', newlyLinkedSlot.id)
-            .then(({ error }) => { if (error) console.error('[Sync] slot auto-link failed:', error); })
-        );
-      }
-      const newlyLinkedPanel = nextState.binderPanels.find(p => {
-        const prev = prevState.binderPanels.find(pp => pp.id === p.id);
-        return prev && !prev.inventoryItemId && p.inventoryItemId === item?.id;
-      });
-      if (newlyLinkedPanel) {
-        pending.push(
-          supabase.from('binder_panels').update({ inventory_item_id: newlyLinkedPanel.inventoryItemId }).eq('id', newlyLinkedPanel.id)
-            .then(({ error }) => { if (error) console.error('[Sync] panel auto-link failed:', error); })
-        );
-      }
+      // === Fixes a real, intermittent bug: the upsert and the
+      // auto-link update below used to be pushed as two independent,
+      // unordered promises. binder_slots.inventory_item_id (and the
+      // equivalent on binder_panels) has a real foreign key
+      // constraint against user_inventory(id) — if the auto-link
+      // update reached the database before the insert above had
+      // actually committed, it failed outright with a foreign-key
+      // violation (surfaced as a 409). A race, not a guaranteed
+      // failure, which is why it only showed up intermittently.
+      // Fixed by explicitly awaiting the insert first, inside one
+      // combined async function, instead of relying on both being
+      // pushed to the same array ever implying an order between them.
+      pending.push((async () => {
+        await upsertInventoryItem(item);
+
+        // === Fixes the real "disconnected from binders" bug — the
+        // reducer may have auto-linked an existing, unowned placeholder
+        // slot/panel to this newly-added copy (see reducer.js's
+        // INVENTORY_ADD case). Diffing prevState/nextState is how the
+        // sync layer finds out whether that happened and, if so, which
+        // one, since the action payload itself only ever mentions the
+        // new inventory item.
+        const newlyLinkedSlot = nextState.binderSlots.find(s => {
+          const prev = prevState.binderSlots.find(ps => ps.id === s.id);
+          return prev && !prev.inventoryItemId && s.inventoryItemId === item.id;
+        });
+        if (newlyLinkedSlot) {
+          const { error } = await supabase.from('binder_slots').update({ inventory_item_id: newlyLinkedSlot.inventoryItemId }).eq('id', newlyLinkedSlot.id);
+          if (error) console.error('[Sync] slot auto-link failed:', error);
+        }
+
+        const newlyLinkedPanel = nextState.binderPanels.find(p => {
+          const prev = prevState.binderPanels.find(pp => pp.id === p.id);
+          return prev && !prev.inventoryItemId && p.inventoryItemId === item.id;
+        });
+        if (newlyLinkedPanel) {
+          const { error } = await supabase.from('binder_panels').update({ inventory_item_id: newlyLinkedPanel.inventoryItemId }).eq('id', newlyLinkedPanel.id);
+          if (error) console.error('[Sync] panel auto-link failed:', error);
+        }
+      })());
       break;
     }
     case ACTIONS.INVENTORY_UPDATE: {
@@ -68,36 +81,40 @@ export function inventorySync(action, nextState, prevState, pending) {
             .then(({ error }) => { if (error) console.error('[Sync] inventory delete failed:', error); })
         );
 
-        // === Fixes two related, real bugs found via testing:
-        // (1) originally this looked for a slot/panel that got
-        // DELETED (id disappearing from the array) — but the reducer
-        // was fixed to only UNLINK a slot when a copy is removed
-        // (same id, inventoryItemId cleared to null), never delete it
-        // outright, since an unowned card can still sit in a slot as
-        // a grey placeholder. This stale diff logic never found
-        // anything to sync, meaning the unlink happened locally but
-        // never reached the database at all.
-        // (2) the fix syncs an UPDATE (clearing inventory_item_id),
-        // not a delete — matching what the reducer actually does now.
-        const unlinkedSlot = nextState.binderSlots.find(s => {
-          const prev = prevState.binderSlots.find(ps => ps.id === s.id);
-          return prev && prev.inventoryItemId === inventoryId && s.inventoryItemId === null;
+        // === CHANGED: matches the actual current reducer behavior
+        // (#165) — unowning a placed copy REMOVES that slot/panel
+        // entirely now, it doesn't merely clear its inventoryItemId
+        // to null while leaving the row in place. The diff below used
+        // to look for a slot that still exists in nextState with its
+        // link nulled out — which stopped ever matching anything the
+        // moment #165 shipped, meaning the actual Supabase row was
+        // never deleted at all: it just sat there forever, and
+        // because inventory_item_id has a real foreign key with ON
+        // DELETE SET NULL, it silently reappeared on the very next
+        // reload looking exactly like a legitimate missing
+        // placeholder the user had deliberately created. Fixed by
+        // diffing for a slot/panel that disappeared ENTIRELY (present
+        // in prevState, absent from nextState) and deleting that row
+        // outright, matching what actually happens locally now.
+        const removedSlot = prevState.binderSlots.find(ps => {
+          const stillExists = nextState.binderSlots.some(s => s.id === ps.id);
+          return !stillExists && ps.inventoryItemId === inventoryId;
         });
-        if (unlinkedSlot) {
+        if (removedSlot) {
           pending.push(
-            supabase.from('binder_slots').update({ inventory_item_id: null }).eq('id', unlinkedSlot.id)
-              .then(({ error }) => { if (error) console.error('[Sync] slot unlink failed:', error); })
+            supabase.from('binder_slots').delete().eq('id', removedSlot.id)
+              .then(({ error }) => { if (error) console.error('[Sync] slot delete failed:', error); })
           );
         }
 
-        const unlinkedPanel = nextState.binderPanels.find(p => {
-          const prev = prevState.binderPanels.find(pp => pp.id === p.id);
-          return prev && prev.inventoryItemId === inventoryId && p.inventoryItemId === null;
+        const removedPanel = prevState.binderPanels.find(pp => {
+          const stillExists = nextState.binderPanels.some(p => p.id === pp.id);
+          return !stillExists && pp.inventoryItemId === inventoryId;
         });
-        if (unlinkedPanel) {
+        if (removedPanel) {
           pending.push(
-            supabase.from('binder_panels').update({ inventory_item_id: null }).eq('id', unlinkedPanel.id)
-              .then(({ error }) => { if (error) console.error('[Sync] panel unlink failed:', error); })
+            supabase.from('binder_panels').delete().eq('id', removedPanel.id)
+              .then(({ error }) => { if (error) console.error('[Sync] panel delete failed:', error); })
           );
         }
       }
@@ -138,13 +155,18 @@ export function inventorySync(action, nextState, prevState, pending) {
       const deletedIds = action.payload?.inventoryIds ?? [];
       const deletedIdSet = new Set(deletedIds);
 
-      const unlinkedSlots = nextState.binderSlots.filter(s => {
-        const prev = prevState.binderSlots.find(ps => ps.id === s.id);
-        return prev && deletedIdSet.has(prev.inventoryItemId) && s.inventoryItemId === null;
+      // === CHANGED: same fix as the single-item INVENTORY_DELETE
+      // case above — diffs for slots/panels that disappeared entirely
+      // (present in prevState, absent from nextState) rather than
+      // ones that merely got their link nulled out, matching what the
+      // reducer has actually done since #165.
+      const removedSlots = prevState.binderSlots.filter(ps => {
+        const stillExists = nextState.binderSlots.some(s => s.id === ps.id);
+        return !stillExists && deletedIdSet.has(ps.inventoryItemId);
       });
-      const unlinkedPanels = nextState.binderPanels.filter(p => {
-        const prev = prevState.binderPanels.find(pp => pp.id === p.id);
-        return prev && deletedIdSet.has(prev.inventoryItemId) && p.inventoryItemId === null;
+      const removedPanels = prevState.binderPanels.filter(pp => {
+        const stillExists = nextState.binderPanels.some(p => p.id === pp.id);
+        return !stillExists && deletedIdSet.has(pp.inventoryItemId);
       });
 
       pending.push((async () => {
@@ -152,13 +174,13 @@ export function inventorySync(action, nextState, prevState, pending) {
           const { error } = await supabase.from('user_inventory').delete().eq('id', id);
           if (error) console.error('[Sync] inventory bulk delete failed:', error);
         }
-        for (const slot of unlinkedSlots) {
-          const { error } = await supabase.from('binder_slots').update({ inventory_item_id: null }).eq('id', slot.id);
-          if (error) console.error('[Sync] slot unlink failed (bulk):', error);
+        for (const slot of removedSlots) {
+          const { error } = await supabase.from('binder_slots').delete().eq('id', slot.id);
+          if (error) console.error('[Sync] slot delete failed (bulk):', error);
         }
-        for (const panel of unlinkedPanels) {
-          const { error } = await supabase.from('binder_panels').update({ inventory_item_id: null }).eq('id', panel.id);
-          if (error) console.error('[Sync] panel unlink failed (bulk):', error);
+        for (const panel of removedPanels) {
+          const { error } = await supabase.from('binder_panels').delete().eq('id', panel.id);
+          if (error) console.error('[Sync] panel delete failed (bulk):', error);
         }
       })());
       break;

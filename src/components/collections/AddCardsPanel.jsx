@@ -55,6 +55,17 @@ export function AddCardsPanel({
 }) {
   const [query, setQuery] = useState('');
   const [selectedCollectionId, setSelectedCollectionId] = useState(null); // null = All
+  // Requested directly: mirror Collection's Owned/Missing tabs here
+  // too, rather than one flat mixed list. "Unorganised"/"Declutter"/
+  // "Settings" don't apply to a placement picker — every card shown
+  // here is already "not yet placed" by definition (fully-placed ones
+  // are excluded entirely already), and a hidden/decluttered card has
+  // no business being offered for placement at all.
+  const [ownershipFilter, setOwnershipFilter] = useState('all'); // 'all' | 'owned' | 'missing'
+  // Favorites is a filter here, not its own tab — it isn't one of
+  // Collection's own tabs either; it's a separate page elsewhere in
+  // the app's navigation.
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   // === Panel dragging — move the whole panel out of the way of
   // whatever it's covering (see file header comment). Position is
@@ -288,6 +299,15 @@ export function AddCardsPanel({
     const available = cardDefinitions.filter(cd => {
       if (cd.isDecluttered) return false;
       if (fullyPlacedIds.has(cd.id)) return false;
+
+      const isOwned = ownershipMap[cd.id] !== undefined;
+      if (ownershipFilter === 'owned' && !isOwned) return false;
+      if (ownershipFilter === 'missing' && isOwned) return false;
+      // A card with no owned copy at all has nothing that could be
+      // favorited — favoritesOnly naturally excludes every unowned
+      // card, on top of whatever ownershipFilter already did.
+      if (favoritesOnly && !ownershipMap[cd.id]?.is_favorite) return false;
+
       if (!q) return true;
       if (cd.name.toLowerCase().includes(q)) return true;
       const col = collectionMap[cd.collectionId];
@@ -301,7 +321,7 @@ export function AddCardsPanel({
       .filter(c => byCollection[c.id]?.length)
       .filter(c => !selectedCollectionId || c.id === selectedCollectionId)
       .map(c => ({ collection: c, cards: byCollection[c.id] }));
-  }, [cardDefinitions, collections, collectionMap, fullyPlacedIds, query, selectedCollectionId]);
+  }, [cardDefinitions, collections, collectionMap, fullyPlacedIds, ownershipMap, query, selectedCollectionId, ownershipFilter, favoritesOnly]);
 
   // === CHANGED: this used to hide a collection's pill entirely once
   // every one of its cards already had a spot in THIS binder (owned
@@ -373,6 +393,25 @@ export function AddCardsPanel({
         <Button variant="primary" size="sm" onClick={onClose}>Done</Button>
       </div>
 
+      <div className="add-cards-panel-collection-tabs" role="tablist" aria-label="Filter by ownership">
+        {[
+          { key: 'all', label: 'Cards' },
+          { key: 'owned', label: 'Owned' },
+          { key: 'missing', label: 'Missing' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={ownershipFilter === key}
+            className={`add-cards-panel-collection-tab ${ownershipFilter === key ? 'add-cards-panel-collection-tab-active' : ''}`}
+            onClick={() => setOwnershipFilter(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {collections.length > 1 && (
         <div className="add-cards-panel-collection-tabs" role="tablist" aria-label="Filter by collection">
           <button
@@ -409,6 +448,16 @@ export function AddCardsPanel({
           aria-label="Search cards"
         />
         {query && <button className="search-clear" onClick={() => setQuery('')}>✕</button>}
+        <button
+          type="button"
+          className={`add-cards-panel-favorites-toggle ${favoritesOnly ? 'add-cards-panel-favorites-toggle-active' : ''}`}
+          onClick={() => setFavoritesOnly(v => !v)}
+          disabled={ownershipFilter === 'missing'}
+          title={ownershipFilter === 'missing' ? 'An unowned card can\'t be a favorite' : (favoritesOnly ? 'Show all cards' : 'Show favorites only')}
+          aria-pressed={favoritesOnly}
+        >
+          ★ Favorites
+        </button>
       </div>
 
       <div className="add-cards-panel-body">

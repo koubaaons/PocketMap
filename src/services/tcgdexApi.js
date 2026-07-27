@@ -137,7 +137,7 @@ export async function fetchAllSets() {
     try {
       const full = await fetchSetWithBriefCards(brief.id);
       if (full.serie?.id === 'tcgp') continue; // TCG Pocket — not a physical set, excluded entirely
-      enriched.push({ ...brief, releaseDate: full.releaseDate, cardCount: full.cardCount });
+      enriched.push({ ...brief, releaseDate: full.releaseDate, cardCount: full.cardCount, actualCardCount: full.cards?.length });
     } catch (err) {
       // A single set's detail failing to load shouldn't lose every
       // other set — keep the brief version (no releaseDate/cardCount)
@@ -207,7 +207,12 @@ export async function fetchCardsForSet(setId, page = 1, pageSize = 24) {
     cards.push(await fetchCardDetail(brief.id));
   }
 
-  return { cards: cards.map(normalizeCard), page, pageSize, totalCount: set.cardCount?.official ?? briefCards.length };
+  // Deliberately briefCards.length first, not cardCount.official —
+  // same reasoning as normalizeSet's `total` field: TCGdex's official
+  // print-run count doesn't always match the real number of cards it
+  // has catalogued for a set, and this preview step's own displayed
+  // total needs to agree with what the full import will actually do.
+  return { cards: cards.map(normalizeCard), page, pageSize, totalCount: briefCards.length ?? set.cardCount?.official ?? 0 };
 }
 
 /**
@@ -373,7 +378,15 @@ function fullAssetUrl(baseAssetUrl) {
 function normalizeSet(rawSet) {
   return {
     ...rawSet,
-    total: rawSet.cardCount?.official ?? rawSet.cardCount?.total ?? 0,
+    // Deliberately the actual length of the embedded card list
+    // (carried through enrichment as actualCardCount), not
+    // cardCount.official/cardCount.total — TCGdex's own metadata
+    // fields don't always match the real number of cards it has
+    // catalogued for a set (a set advertised as, say, 84 cards often
+    // has secret rares or extras numbered beyond that). Using the
+    // same source the import itself counts against means the tile's
+    // number and what actually gets imported can never disagree.
+    total: rawSet.actualCardCount ?? rawSet.cardCount?.official ?? rawSet.cardCount?.total ?? 0,
     images: {
       logo: fullAssetUrl(rawSet.logo),
       symbol: fullAssetUrl(rawSet.symbol),
