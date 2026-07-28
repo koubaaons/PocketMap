@@ -1,8 +1,10 @@
-# Environment variables — never commit these
+﻿# Environment variables — never commit these
 .env
 .env.local
 .env.production
 .env.staging
+supabase/.temp/
+
 # Logs
 logs
 *.log
@@ -20,6 +22,7 @@ dist-ssr
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .DS_Store
 *.suo
