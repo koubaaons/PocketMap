@@ -187,7 +187,7 @@ export async function emptyBin(userId, binItems) {
           await deleteImageFromStorage(getStoragePathFromUrl(sticker.image_url));
         }
       } else if (binItem._type === 'collection') {
-        const { data: cds } = await supabase.from('card_definitions').select('id, image_url').eq('collection_id', binItem.id).eq('user_id', userId);
+        const { data: cds } = await supabase.from('card_definitions').select('id, image_url, image_size_bytes').eq('collection_id', binItem.id).eq('user_id', userId);
         if (cds?.length) {
           const cdIds = cds.map(c => c.id);
           await logIfError(supabase.from('user_inventory').delete().in('card_def_id', cdIds).eq('user_id', userId), `empty bin: inventory for collection ${binItem.id}`);

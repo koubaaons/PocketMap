@@ -385,6 +385,7 @@ export function SearchView({
           onEdit={() => { onNavigateToCollection?.(viewingCard.collectionId); setViewingCard(null); }}
           onDelete={() => setViewingCard(null)}
           onClose={() => setViewingCard(null)}
+          toast={toast}
         />
       )}
     </div>

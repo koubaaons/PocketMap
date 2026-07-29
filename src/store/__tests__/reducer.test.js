@@ -364,6 +364,33 @@ describe('INVENTORY_ADD', () => {
   });
 });
 
+describe('BINDER_ADD_PAGE — page cap', () => {
+  it('increments pages normally when under the cap', () => {
+    const state = baseState({ binders: [{ id: 'binder-1', userId: 'user-1', name: 'Test', rows: 3, cols: 3, pages: 20, cover_color: '#000', page_color: '#111', stickers: [], createdAt: 0, updatedAt: 0 }] });
+
+    const next = reducer(state, { type: ACTIONS.BINDER_ADD_PAGE, payload: { binderId: 'binder-1' } });
+
+    expect(next.binders[0].pages).toBe(21);
+  });
+
+  it('refuses to add a page once already at MAX_BINDER_PAGES — the real gap this fixes, since this case previously incremented unconditionally with no upper bound at all', async () => {
+    const { MAX_BINDER_PAGES } = await import('../../types/index.js');
+    const state = baseState({ binders: [{ id: 'binder-1', userId: 'user-1', name: 'Test', rows: 3, cols: 3, pages: MAX_BINDER_PAGES, cover_color: '#000', page_color: '#111', stickers: [], createdAt: 0, updatedAt: 0 }] });
+
+    const next = reducer(state, { type: ACTIONS.BINDER_ADD_PAGE, payload: { binderId: 'binder-1' } });
+
+    expect(next.binders[0].pages).toBe(MAX_BINDER_PAGES); // unchanged, not incremented past the cap
+  });
+
+  it('does nothing (no throw) if the binder does not exist', () => {
+    const state = baseState();
+
+    const next = reducer(state, { type: ACTIONS.BINDER_ADD_PAGE, payload: { binderId: 'does-not-exist' } });
+
+    expect(next).toBe(state); // same reference — genuinely a no-op
+  });
+});
+
 describe('BINDER_PANEL_ADD (Michi Method combined slots)', () => {  function makePanelPayload(overrides = {}) {
     return {
       id: 'panel-new', userId: 'user-1', binderId: 'binder-1',

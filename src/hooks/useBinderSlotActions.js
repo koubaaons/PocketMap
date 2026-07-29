@@ -8,7 +8,7 @@
 import { useCallback } from 'react';
 import { useDispatch } from './useStore.js';
 import { ACTIONS } from '../store/index.js';
-import { createBinderSlot } from '../types/index.js';
+import { createBinderSlot, MAX_BINDER_PAGES } from '../types/index.js';
 
 export function useBinderSlotActions(toast, callbacks = {}) {
   const dispatch = useDispatch();
@@ -58,7 +58,11 @@ export function useBinderSlotActions(toast, callbacks = {}) {
   /**
    * Adds a page to a binder.
    */
-  const handleAddPage = useCallback((binderId) => {
+  const handleAddPage = useCallback((binderId, currentPages) => {
+    if (currentPages >= MAX_BINDER_PAGES) {
+      toast(`A binder can have at most ${MAX_BINDER_PAGES} pages.`, 'error');
+      return;
+    }
     dispatch({ type: ACTIONS.BINDER_ADD_PAGE, payload: { binderId } });
     toast('Page added');
   }, [dispatch, toast]);

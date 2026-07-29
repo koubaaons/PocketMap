@@ -15,6 +15,7 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
       name: initialCard?.name ?? '',
       // === ISSUE #80: include image_url in initial values ===
       image_url: initialCard?.image_url ?? null,
+      image_size_bytes: initialCard?.image_size_bytes ?? null,
       // === HOLO: seed from the card's current holoType so editing
       // starts the picker on its real value, not always 'none' — an
       // existing card with no holoType at all (created before this
@@ -86,6 +87,7 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
         name: values.name.trim(),
         // === ISSUE #80: pass image_url to factory ===
         image_url: values.image_url ?? null,
+        image_size_bytes: values.image_size_bytes ?? null,
         attributes,
         // === HOLO: pass the picked holoType through to the factory,
         // which itself clamps any invalid value back to 'none'. ===
@@ -100,6 +102,7 @@ export function useCardDefinitionForm({ collection, sortedFields, initialCard, m
         name: values.name.trim(),
         // === ISSUE #80: include image_url in update ===
         image_url: values.image_url ?? null,
+        image_size_bytes: values.image_size_bytes ?? null,
         attributes,
         // === HOLO FIX: this was missing entirely — without it, picking
         // a different holoType while editing an existing card was

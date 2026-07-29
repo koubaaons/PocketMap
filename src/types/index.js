@@ -4,7 +4,7 @@
 
 // === ISSUE #81: export BINDER_COLORS and DEFAULT_BINDER_COLOR ===
 // === ISSUE #92: export createSticker for the cover customizer ===
-export { validateBinder, createBinder, createSticker, BINDER_COLORS, DEFAULT_BINDER_COLOR } from './binder.types.js';
+export { validateBinder, createBinder, createSticker, BINDER_COLORS, DEFAULT_BINDER_COLOR, MAX_BINDER_COLS, MAX_BINDER_ROWS, MAX_BINDER_PAGES } from './binder.types.js';
 
 // === ISSUE #58 START: Remove Legacy Card System — card types kept for migration only ===
 // === ISSUE #58 END ===

@@ -16,6 +16,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase.js';
 import { runImageMigrationIfNeeded } from '../utils/migrateImagesToStorage.js';
+import { runImageSizeBackfillIfNeeded } from '../utils/backfillImageSizes.js';
 
 export function useAuth() {
   const [user, setUser]       = useState(null);
@@ -37,6 +38,7 @@ export function useAuth() {
       // base64 images sitting around. ===
       if (session?.user?.id) {
         runImageMigrationIfNeeded(session.user.id);
+        runImageSizeBackfillIfNeeded(session.user.id);
       }
     });
 
@@ -53,6 +55,7 @@ export function useAuth() {
         // refresh when SIGNED_IN already tells us definitively.
         if (event === 'SIGNED_IN' && session?.user?.id) {
           runImageMigrationIfNeeded(session.user.id);
+          runImageSizeBackfillIfNeeded(session.user.id);
         }
       }
     );

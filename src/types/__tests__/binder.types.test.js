@@ -25,17 +25,20 @@ describe('validateBinder', () => {
     expect(validateBinder(validBaseBinder()).valid).toBe(true);
   });
 
-  it('requires cols/rows to be integers within 1-10', () => {
+  it('requires cols/rows to be integers within 1-6', () => {
     expect(validateBinder(validBaseBinder({ cols: 0 })).valid).toBe(false);
-    expect(validateBinder(validBaseBinder({ cols: 11 })).valid).toBe(false);
+    expect(validateBinder(validBaseBinder({ cols: 7 })).valid).toBe(false);
+    expect(validateBinder(validBaseBinder({ cols: 6 })).valid).toBe(true);
     expect(validateBinder(validBaseBinder({ cols: 3.5 })).valid).toBe(false);
     expect(validateBinder(validBaseBinder({ rows: 0 })).valid).toBe(false);
+    expect(validateBinder(validBaseBinder({ rows: 7 })).valid).toBe(false);
+    expect(validateBinder(validBaseBinder({ rows: 6 })).valid).toBe(true);
   });
 
-  it('requires pages to be an integer within 1-500', () => {
+  it('requires pages to be an integer within 1-100', () => {
     expect(validateBinder(validBaseBinder({ pages: 0 })).valid).toBe(false);
-    expect(validateBinder(validBaseBinder({ pages: 501 })).valid).toBe(false);
-    expect(validateBinder(validBaseBinder({ pages: 500 })).valid).toBe(true);
+    expect(validateBinder(validBaseBinder({ pages: 101 })).valid).toBe(false);
+    expect(validateBinder(validBaseBinder({ pages: 100 })).valid).toBe(true);
   });
 
   it('requires cover_color to be a hex string', () => {

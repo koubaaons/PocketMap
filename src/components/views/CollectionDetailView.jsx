@@ -305,12 +305,13 @@ export function CollectionDetailView({ toast, onBack }) {
           onEdit={handleUpdate}
           onDelete={() => handleDelete(ownership.viewingCard.id, ownership.viewingCard.name)}
           onClose={ownership.closeDetail}
+          toast={toast}
         />
       )}
 
       {editor.showCreate && (
         <CardDefinitionForm collection={collection} templateFields={collectionTemplateFields}
-          mode="create" onSubmit={handleCreate} onClose={editor.closeCreate} />
+          mode="create" onSubmit={handleCreate} onClose={editor.closeCreate} toast={toast} />
       )}
 
       {editor.confirmDelete && (

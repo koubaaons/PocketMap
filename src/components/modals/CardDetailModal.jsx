@@ -63,6 +63,7 @@ export function CardDetailModal({
   onEdit,
   onDelete,
   onClose,
+  toast,
 }) {
   const [confirmUnownId, setConfirmUnownId] = useState(null); // which copy's removal is being confirmed, or null
   const [confirmDelete, setConfirmDelete]     = useState(false);
@@ -144,7 +145,7 @@ export function CardDetailModal({
   // === Image upload while editing — now genuinely shared with
   // CardDefinitionForm.jsx via useCardImageUpload, not just similar
   // code duplicated in two places. ===
-  const { isCompressing, fileInputRef, handleImageChange, handleRemoveImage } = useCardImageUpload({ set: cardForm.set });
+  const { isCompressing, fileInputRef, handleImageChange, handleRemoveImage } = useCardImageUpload({ set: cardForm.set, toast });
 
   // Same overlay/escape-key/focus-trap behavior as the shared Modal
   // component (see ui/index.jsx) — replicated here since this needs

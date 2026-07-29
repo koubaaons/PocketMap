@@ -17,10 +17,10 @@
 
 import { useState, useCallback } from 'react';
 import { Modal, ModalActions, Button, Input } from '../ui/index.jsx';
-import { createBinder, DEFAULT_BINDER_COLOR } from '../../types/index.js';
+import { createBinder, DEFAULT_BINDER_COLOR, MAX_BINDER_COLS, MAX_BINDER_ROWS, MAX_BINDER_PAGES } from '../../types/index.js';
 
-const GRID_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-const PAGE_OPTIONS = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200];
+const GRID_OPTIONS = Array.from({ length: MAX_BINDER_COLS }, (_, i) => i + 1);
+const PAGE_OPTIONS = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100].filter(n => n <= MAX_BINDER_PAGES);
 
 export function CreateBinderModal({ onSubmit, onClose }) {
   const [fields, setFields] = useState({
@@ -42,9 +42,9 @@ export function CreateBinderModal({ onSubmit, onClose }) {
       const fieldErrors = {};
       errs.forEach(e => {
         if (e.includes('name'))  fieldErrors.name  = 'Required';
-        if (e.includes('cols'))  fieldErrors.cols  = '1–10';
-        if (e.includes('rows'))  fieldErrors.rows  = '1–10';
-        if (e.includes('pages')) fieldErrors.pages = '1–500';
+        if (e.includes('cols'))  fieldErrors.cols  = `1–${MAX_BINDER_COLS}`;
+        if (e.includes('rows'))  fieldErrors.rows  = `1–${MAX_BINDER_ROWS}`;
+        if (e.includes('pages')) fieldErrors.pages = `1–${MAX_BINDER_PAGES}`;
       });
       setErrors(fieldErrors);
       return;

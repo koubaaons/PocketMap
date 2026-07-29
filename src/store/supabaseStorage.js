@@ -58,6 +58,7 @@ export function rowToBinderInsert(row) {
     userId:    row.user_id,
     name:      row.name,
     image_url: row.image_url,
+    image_size_bytes: row.image_size_bytes ?? null,
     deletedAt: row.deleted_at ? new Date(row.deleted_at).getTime() : null,
     createdAt: new Date(row.created_at).getTime(),
   };
@@ -130,6 +131,7 @@ export function rowToCardDefinition(row) {
     isDecluttered: row.is_decluttered ?? false,
     attributes:   row.attributes ?? {},
     external_card_id: row.external_card_id ?? null,
+    image_size_bytes: row.image_size_bytes ?? null,
     createdAt:    new Date(row.created_at).getTime(),
     updatedAt:    new Date(row.updated_at).getTime(),
   };
@@ -280,6 +282,7 @@ export function binderInsertToRow(insert) {
     user_id:   insert.userId,
     name:      insert.name,
     image_url: insert.image_url,
+    image_size_bytes: insert.image_size_bytes ?? null,
   };
 }
 
@@ -356,6 +359,7 @@ export function cardDefinitionToRow(cd) {
     is_decluttered: cd.isDecluttered ?? false,
     attributes:    cd.attributes ?? {},
     external_card_id: cd.external_card_id ?? null,
+    image_size_bytes: cd.image_size_bytes ?? null,
     updated_at:    new Date().toISOString(),
   };
 }

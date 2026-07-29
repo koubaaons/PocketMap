@@ -22,11 +22,19 @@
  * the next successful sync anyway.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, ConfirmModal } from '../ui/index.jsx';
 import { clearState } from '../../store/storage.js';
 import { supabase } from '../../services/supabase.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { getAllUsersStorageUsage, formatBytes, STORAGE_QUOTA_BYTES } from '../../services/userPreferences.js';
+
+// Matches the email in migration 0021's RLS policy exactly — this
+// gate is purely a UI convenience (don't even attempt the fetch for
+// anyone else, since RLS would just correctly return their own single
+// row anyway); the real access control lives in the database policy,
+// not here.
+const OWNER_EMAIL = 'koubaons@gmail.com';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -246,6 +254,57 @@ function formatLastSynced(date) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+// === Admin-only storage usage view — requested directly, built
+// alongside the storage quota feature since it reuses the exact same
+// tracked data. Only ever fetches/renders anything for the account
+// matching OWNER_EMAIL; the real access control is the RLS policy
+// from migration 0021 (everyone else's fetch just correctly returns
+// their own single row, same as any other read in this app already
+// respects RLS), this check is just a UI convenience so the fetch
+// isn't even attempted for anyone else. ===
+function AdminStorageSection() {
+  const [usage, setUsage] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAllUsersStorageUsage().then(rows => { if (!cancelled) { setUsage(rows); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div className="account-section">
+      <h4 className="account-section-title">Storage Usage (Admin)</h4>
+      <p className="account-section-subtitle">
+        Every account's private storage usage — shared card art doesn't count against any
+        one account, so this only reflects custom uploads (custom cards, stickers, inserts).
+        Shown by user id, since email addresses aren't available from client-side code —
+        cross-reference a specific id in Supabase's dashboard under Authentication → Users.
+      </p>
+      {loading ? (
+        <p className="modal-step-note">Loading…</p>
+      ) : usage.length === 0 ? (
+        <p className="modal-step-note">No accounts have used any private storage yet.</p>
+      ) : (
+        <table className="admin-storage-table">
+          <thead>
+            <tr><th>User ID</th><th>Storage Used</th><th>% of Quota</th></tr>
+          </thead>
+          <tbody>
+            {usage.map(row => (
+              <tr key={row.userId}>
+                <td className="admin-storage-userid">{row.userId}</td>
+                <td>{formatBytes(row.storageBytesUsed)}</td>
+                <td>{Math.round((row.storageBytesUsed / STORAGE_QUOTA_BYTES) * 100)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export function AccountView({ toast, lastSynced }) {
   const { user } = useAuth();
 
@@ -313,6 +372,8 @@ export function AccountView({ toast, lastSynced }) {
           {loggingOut ? 'Logging out…' : 'Log out'}
         </Button>
       </div>
+
+      {user?.email === OWNER_EMAIL && <AdminStorageSection />}
 
       <div className="account-section account-section-danger">
         <h4 className="account-section-title">Danger zone</h4>

@@ -285,3 +285,29 @@
   color: var(--text-secondary);
   margin: 0;
 }
+
+/* Admin storage usage table (AccountView.jsx) */
+.admin-storage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.admin-storage-table th {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-muted);
+  font-weight: var(--weight-medium);
+  border-bottom: 0.5px solid var(--border-primary);
+}
+
+.admin-storage-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 0.5px solid var(--border-primary);
+}
+
+.admin-storage-userid {
+  font-family: monospace;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}

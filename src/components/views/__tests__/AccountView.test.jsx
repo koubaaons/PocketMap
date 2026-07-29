@@ -28,8 +28,16 @@ vi.mock('../../../store/storage.js', () => ({
   clearState: (...args) => mockClearState(...args),
 }));
 
+let mockUserEmail = 'test@example.com';
 vi.mock('../../../hooks/useAuth.js', () => ({
-  useAuth: () => ({ user: { id: 'user-1', email: 'test@example.com', created_at: '2026-01-01T00:00:00Z' }, loading: false }),
+  useAuth: () => ({ user: { id: 'user-1', email: mockUserEmail, created_at: '2026-01-01T00:00:00Z' }, loading: false }),
+}));
+
+const mockGetAllUsersStorageUsage = vi.fn();
+vi.mock('../../../services/userPreferences.js', () => ({
+  getAllUsersStorageUsage: (...args) => mockGetAllUsersStorageUsage(...args),
+  formatBytes: (b) => `${b} B`,
+  STORAGE_QUOTA_BYTES: 10 * 1024 * 1024,
 }));
 
 function renderAccountView(props = {}) {
@@ -41,6 +49,8 @@ describe('AccountView — account deletion', () => {
     mockInvoke.mockReset();
     mockSignOut.mockReset().mockResolvedValue({ error: null });
     mockClearState.mockReset();
+    mockUserEmail = 'test@example.com';
+    mockGetAllUsersStorageUsage.mockReset().mockResolvedValue([]);
   });
 
   it('does not show a "Data & Storage" / "Clear All Local Data" section at all — removed entirely, stale copy and a near-no-op action', () => {
@@ -99,5 +109,37 @@ describe('AccountView — account deletion', () => {
     await waitFor(() => expect(screen.getByText('Deleting…')).toBeDisabled());
 
     resolveInvoke({ data: { success: true }, error: null });
+  });
+});
+
+describe('AccountView — admin storage section (owner-only)', () => {
+  it('does not fetch or render the admin storage section for a non-owner account', async () => {
+    mockUserEmail = 'test@example.com'; // not the owner
+    renderAccountView();
+
+    expect(mockGetAllUsersStorageUsage).not.toHaveBeenCalled();
+    expect(screen.queryByText('Storage Usage (Admin)')).not.toBeInTheDocument();
+  });
+
+  it('fetches and renders the admin storage section for the owner\'s account', async () => {
+    mockUserEmail = 'koubaons@gmail.com'; // matches OWNER_EMAIL exactly
+    mockGetAllUsersStorageUsage.mockResolvedValue([
+      { userId: 'user-a', storageBytesUsed: 5 * 1024 * 1024 },
+      { userId: 'user-b', storageBytesUsed: 1024 },
+    ]);
+    renderAccountView();
+
+    await waitFor(() => expect(screen.getByText('Storage Usage (Admin)')).toBeInTheDocument());
+    expect(mockGetAllUsersStorageUsage).toHaveBeenCalled();
+    expect(screen.getByText('user-a')).toBeInTheDocument();
+    expect(screen.getByText('user-b')).toBeInTheDocument();
+  });
+
+  it('shows a clear empty state when no accounts have used any storage yet', async () => {
+    mockUserEmail = 'koubaons@gmail.com';
+    mockGetAllUsersStorageUsage.mockResolvedValue([]);
+    renderAccountView();
+
+    await waitFor(() => expect(screen.getByText(/No accounts have used/)).toBeInTheDocument());
   });
 });

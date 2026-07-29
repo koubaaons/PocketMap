@@ -111,7 +111,7 @@ export function binSync(action, nextState, prevState, pending) {
         } else if (binItem._type === 'collection') {
           pending.push(getRealUserId().then(async userId => {
             if (!userId) return;
-            const { data: cds } = await supabase.from('card_definitions').select('id, image_url').eq('collection_id', itemId).eq('user_id', userId);
+            const { data: cds } = await supabase.from('card_definitions').select('id, image_url, image_size_bytes').eq('collection_id', itemId).eq('user_id', userId);
             if (cds?.length) {
               const cdIds = cds.map(c => c.id);
               await logIfError(supabase.from('user_inventory').delete().in('card_def_id', cdIds).eq('user_id', userId), `permanent delete: inventory for collection ${itemId}`);

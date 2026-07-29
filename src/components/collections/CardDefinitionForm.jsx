@@ -23,7 +23,7 @@ import { useCardHoloPointer } from '../../hooks/useCardHoloPointer.js';
 // that visibly applies an effect would be confusing UI. See
 // holoTypes.js for the full rationale.
 
-export function CardDefinitionForm({ collection, templateFields, initialCard, mode = 'create', onSubmit, onClose }) {
+export function CardDefinitionForm({ collection, templateFields, initialCard, mode = 'create', onSubmit, onClose, toast }) {
   const sortedFields = [...templateFields]
     .filter(f => f.collectionId === collection.id)
     .sort((a, b) => a.order - b.order);
@@ -44,7 +44,7 @@ export function CardDefinitionForm({ collection, templateFields, initialCard, mo
   //     is now uploaded to Storage immediately after, and it's the
   //     returned public URL, not the base64 itself, that ends up in
   //     values.image_url and eventually the database. ===
-  const { isCompressing, fileInputRef, handleImageChange, handleRemoveImage } = useCardImageUpload({ set });
+  const { isCompressing, fileInputRef, handleImageChange, handleRemoveImage } = useCardImageUpload({ set, toast });
 
   // === HOLO: live preview, driven directly by values.holoType as the
   // user clicks different picker buttons — no save needed to see it.

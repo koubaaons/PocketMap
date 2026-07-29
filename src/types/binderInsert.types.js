@@ -25,18 +25,24 @@ export function validateBinderInsert(data) {
   if (data.deletedAt !== undefined && data.deletedAt !== null && typeof data.deletedAt !== 'number') {
     errors.push('deletedAt must be a timestamp or null');
   }
+  // Optional — used to accurately decrement the per-user storage
+  // total when this insert is later permanently deleted.
+  if (data.image_size_bytes !== undefined && data.image_size_bytes !== null && typeof data.image_size_bytes !== 'number') {
+    errors.push('image_size_bytes must be a number or null');
+  }
   return { valid: errors.length === 0, errors };
 }
 
 /**
  * @param {{ name: string, image_url: string, userId?: string }} params
  */
-export function createBinderInsert({ name, image_url, userId = 'local-user-1' }) {
+export function createBinderInsert({ name, image_url, userId = 'local-user-1', image_size_bytes = null }) {
   const insert = {
     id: generateId(),
     userId,
     name: (name || '').trim(),
     image_url,
+    image_size_bytes: image_size_bytes ?? null,
     createdAt: Date.now(),
   };
   const { valid, errors } = validateBinderInsert(insert);

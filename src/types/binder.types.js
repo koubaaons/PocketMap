@@ -15,6 +15,13 @@
 
 import { generateId } from './utils.js';
 
+// Shared with binderReducer.js's BINDER_ADD_PAGE guard and
+// BinderModals.jsx's create form — a single source of truth so these
+// three places can't silently drift out of sync with each other.
+export const MAX_BINDER_COLS = 6;
+export const MAX_BINDER_ROWS = 6;
+export const MAX_BINDER_PAGES = 100;
+
 // === FIX (binder covers looking too saturated/basic — user reference:
 // soft pastel covers with a subtle spine + light decorative accent):
 // same 8-hue wheel as before, just lightened/desaturated so covers
@@ -56,6 +63,14 @@ function validateSticker(sticker) {
   // consistent across every container, the same reasoning already
   // applied to x/y. ===
   if (typeof sticker.size !== 'number' || sticker.size < 5 || sticker.size > 60) errors.push('sticker.size must be a number 5-60 (percentage of cover width)');
+  // Optional — used to accurately decrement the per-user storage
+  // total when this sticker is later removed. Named distinctly from
+  // the existing `size` field, which is the sticker's visual/display
+  // size (a percentage of cover width), not a file byte count —
+  // reusing that name here would have been a real, confusing collision.
+  if (sticker.imageSizeBytes !== undefined && sticker.imageSizeBytes !== null && typeof sticker.imageSizeBytes !== 'number') {
+    errors.push('sticker.imageSizeBytes must be a number or null');
+  }
   return errors;
 }
 
@@ -65,9 +80,9 @@ export function validateBinder(data) {
   if (!data.id || typeof data.id !== 'string') errors.push('id must be a non-empty string');
   if (!data.userId || typeof data.userId !== 'string') errors.push('userId must be a non-empty string');
   if (!data.name || typeof data.name !== 'string' || !data.name.trim()) errors.push('name must be a non-empty string');
-  if (!Number.isInteger(data.cols) || data.cols < 1 || data.cols > 10) errors.push('cols must be integer 1–10');
-  if (!Number.isInteger(data.rows) || data.rows < 1 || data.rows > 10) errors.push('rows must be integer 1–10');
-  if (!Number.isInteger(data.pages) || data.pages < 1 || data.pages > 500) errors.push('pages must be integer 1–500');
+  if (!Number.isInteger(data.cols) || data.cols < 1 || data.cols > MAX_BINDER_COLS) errors.push(`cols must be integer 1–${MAX_BINDER_COLS}`);
+  if (!Number.isInteger(data.rows) || data.rows < 1 || data.rows > MAX_BINDER_ROWS) errors.push(`rows must be integer 1–${MAX_BINDER_ROWS}`);
+  if (!Number.isInteger(data.pages) || data.pages < 1 || data.pages > MAX_BINDER_PAGES) errors.push(`pages must be integer 1–${MAX_BINDER_PAGES}`);
   if (typeof data.cover_color !== 'string' || !data.cover_color.startsWith('#')) errors.push('cover_color must be a hex string');
   // Accepts either the old fixed 'dark'/'light' preset strings
   // (existing binders in the database already have these — this
@@ -124,7 +139,7 @@ export function createBinder({
  * @param {{ image_url: string, x: number, y: number, rotation?: number }} params
  * @returns {{ sticker: object|null, errors: string[] }}
  */
-export function createSticker({ image_url, x, y, rotation = 0, scale = 1, size = 17.5 }) {
+export function createSticker({ image_url, x, y, rotation = 0, scale = 1, size = 17.5, imageSizeBytes = null }) {
   const sticker = {
     id: generateId(),
     image_url,
@@ -133,6 +148,7 @@ export function createSticker({ image_url, x, y, rotation = 0, scale = 1, size =
     rotation: Number(rotation),
     scale: Number(scale),
     size: Number(size),
+    imageSizeBytes: imageSizeBytes ?? null,
   };
   const errors = validateSticker(sticker);
   return errors.length === 0 ? { sticker, errors: [] } : { sticker: null, errors };

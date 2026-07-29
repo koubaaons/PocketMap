@@ -83,17 +83,30 @@ describe('useBinderSlotActions', () => {
     expect(toast).toHaveBeenCalledWith('Card moved');
   });
 
-  it('handleAddPage dispatches BINDER_ADD_PAGE', async () => {
+  it('handleAddPage dispatches BINDER_ADD_PAGE when under the page cap', async () => {
     mockDispatch.mockClear();
     const toast = vi.fn();
     const { useBinderSlotActions } = await import('../useBinderSlotActions.js');
     const { ACTIONS } = await import('../../store/index.js');
     const { result } = renderHook(() => useBinderSlotActions(toast));
 
-    act(() => result.current.handleAddPage('binder-1'));
+    act(() => result.current.handleAddPage('binder-1', 20));
 
     expect(mockDispatch).toHaveBeenCalledWith({ type: ACTIONS.BINDER_ADD_PAGE, payload: { binderId: 'binder-1' } });
     expect(toast).toHaveBeenCalledWith('Page added');
+  });
+
+  it('handleAddPage refuses and toasts an error instead, without dispatching, once already at the page cap', async () => {
+    mockDispatch.mockClear();
+    const toast = vi.fn();
+    const { useBinderSlotActions } = await import('../useBinderSlotActions.js');
+    const { MAX_BINDER_PAGES } = await import('../../types/index.js');
+    const { result } = renderHook(() => useBinderSlotActions(toast));
+
+    act(() => result.current.handleAddPage('binder-1', MAX_BINDER_PAGES));
+
+    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining(`${MAX_BINDER_PAGES} pages`), 'error');
   });
 
   it('handleSwapPages dispatches BINDER_SWAP_PAGES for two different pages', async () => {

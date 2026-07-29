@@ -670,7 +670,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         onExitPreviewMode={handleDiscardLayout}
         onEnterPreviewMode={view.enterPreviewMode}
         onSaveLayout={handleSaveLayout}
-        onAddPage={() => handleAddPage(binder.id)}
+        onAddPage={() => handleAddPage(binder.id, binder.pages)}
         onSwapPages={() => setIsSwapPagesOpen(true)}
         onExportBinder={() => setIsExportOpen(true)}
         isFullscreen={isFullscreen}
@@ -820,6 +820,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           onEdit={handleUpdateCard}
           onDelete={() => view.closeCardDetail()}
           onClose={view.closeCardDetail}
+          toast={toast}
         />
       )}
 

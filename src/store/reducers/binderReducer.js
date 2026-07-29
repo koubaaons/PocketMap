@@ -14,6 +14,7 @@
  */
 
 import { ACTIONS } from '../actionTypes.js';
+import { MAX_BINDER_PAGES } from '../../types/binder.types.js';
 
 export function binderReducer(state, action) {
   switch (action.type) {
@@ -49,13 +50,22 @@ export function binderReducer(state, action) {
     }
 
 
-    case ACTIONS.BINDER_ADD_PAGE:
+    case ACTIONS.BINDER_ADD_PAGE: {
+      const binder = state.binders.find(b => b.id === action.payload.binderId);
+      // === Real gap fixed: this case previously incremented pages
+      // unconditionally, with no upper bound at all — completely
+      // bypassing validateBinder's own pages limit, since adding a
+      // page never goes through createBinder/validateBinder in the
+      // first place. Silently no-ops once already at the cap, same
+      // as every other "already at the limit" guard in this app.
+      if (!binder || binder.pages >= MAX_BINDER_PAGES) return state;
       return {
         ...state,
         binders: state.binders.map(b =>
           b.id === action.payload.binderId ? { ...b, pages: b.pages + 1 } : b
         ),
       };
+    }
 
     // === New: Swap Pages — exchanges everything on page A with
     // everything on page B within one binder (cards a user has

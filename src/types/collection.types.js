@@ -183,12 +183,21 @@ export function validateCardDefinition(data) {
   if (data.external_card_id !== null && data.external_card_id !== undefined && typeof data.external_card_id !== 'string') {
     errors.push('external_card_id must be a string or null');
   }
+  // Optional — only a card with an image at all has this, and only
+  // for privately-uploaded images (custom cards); shared, deduplicated
+  // card art (imported via a TCG provider) doesn't count against any
+  // one user's storage quota, so this stays null for those. Used to
+  // accurately decrement the per-user running total when this card's
+  // image is later permanently deleted.
+  if (data.image_size_bytes !== null && data.image_size_bytes !== undefined && typeof data.image_size_bytes !== 'number') {
+    errors.push('image_size_bytes must be a number or null');
+  }
   if (typeof data.createdAt !== 'number') errors.push('createdAt must be a timestamp');
   if (typeof data.updatedAt !== 'number') errors.push('updatedAt must be a timestamp');
   return { valid: errors.length === 0, errors };
 }
 
-export function createCardDefinition({ collectionId, name, image_url = null, attributes = {}, holoType = 'none', rarity = null, isDecluttered = false, external_card_id = null }) {
+export function createCardDefinition({ collectionId, name, image_url = null, attributes = {}, holoType = 'none', rarity = null, isDecluttered = false, external_card_id = null, image_size_bytes = null }) {
   const now = Date.now();
   const cardDef = {
     id: generateId(),
@@ -200,6 +209,7 @@ export function createCardDefinition({ collectionId, name, image_url = null, att
     rarity: rarity ?? null,
     isDecluttered: Boolean(isDecluttered),
     external_card_id: external_card_id ?? null,
+    image_size_bytes: image_size_bytes ?? null,
     createdAt: now,
     updatedAt: now,
   };
