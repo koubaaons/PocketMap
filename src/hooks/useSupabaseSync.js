@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react';
 import { useDispatch } from './useStore.js';
 import { ACTIONS, waitForPendingSyncs } from '../store/index.js';
 import { loadStateFromSupabase } from '../store/supabaseStorage.js';
+import { loadState } from '../store/storage.js';
 import { useAuth } from './useAuth.js';
 import { supabase } from '../services/supabase.js';
 
@@ -39,6 +40,24 @@ export function useSupabaseSync() {
 
     async function sync() {
       setSyncing(true);
+
+      // === Real bug fixed: records which account is now logged in,
+      // and — critically — the reducer's AUTH_SET case atomically
+      // clears any previous account's data if this is a genuine
+      // switch, so nothing from a different account can be shown,
+      // edited, or persisted under this one's identity even for a
+      // moment, regardless of what happens next (including if the
+      // Supabase load below fails or is slow).
+      dispatch({ type: ACTIONS.AUTH_SET, payload: { id: user.id } });
+
+      // Offline-first: load and show THIS account's own local cache
+      // immediately, while the fresh Supabase fetch is in flight —
+      // never a different, stale account's data (the old bug: a
+      // single, unscoped localStorage key shared by every account on
+      // this browser).
+      const localCache = loadState(user.id);
+      if (!cancelled) dispatch({ type: ACTIONS.HYDRATE, payload: localCache });
+
       const serverState = await loadStateFromSupabase();
       if (cancelled) return;
 

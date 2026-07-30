@@ -8,7 +8,6 @@ import { useCallback, lazy, Suspense, useEffect } from 'react';
 import { useStore, useDispatch } from './hooks/useStore.js';
 import { useToast } from './hooks/useToast.js';
 import { useSupabaseSync } from './hooks/useSupabaseSync.js';
-import { useSeedLoader } from './hooks/useSeedLoader.js';
 import { useNewSetCheck } from './hooks/useNewSetCheck.js';
 import { useCollectionUpdateCheck } from './hooks/useCollectionUpdateCheck.js';
 import { useTheme } from './hooks/useTheme.js';
@@ -57,7 +56,6 @@ export default function App() {
   const cardDefinitions = useStore(s => s.cardDefinitions);
   const templateFields  = useStore(s => s.templateFields);
   const inventory       = useStore(s => s.inventory);
-  useSeedLoader({ syncing, collections, toast });
   const { newSets: newlyDetectedSets, dismiss: dismissNewSets } = useNewSetCheck();
   const { pendingUpdates: pendingCollectionUpdates, dismiss: dismissCollectionUpdate, importNewCards } =
     useCollectionUpdateCheck({ syncing, collections, cardDefinitions });

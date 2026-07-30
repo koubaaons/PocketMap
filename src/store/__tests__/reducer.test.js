@@ -69,6 +69,62 @@ function makePanelForBinderTest(overrides = {}) {
   };
 }
 
+describe('AUTH_SET — real bug fixed: account-switch data isolation', () => {
+  it('the very first AUTH_SET (no previous currentUserId) just records the user, without clearing anything — nothing stale to clear on a genuinely first login', () => {
+    const state = baseState({
+      currentUserId: null,
+      binders: [{ id: 'binder-1' }],
+      collections: [{ id: 'coll-1' }],
+    });
+
+    const next = reducer(state, { type: ACTIONS.AUTH_SET, payload: { id: 'user-1' } });
+
+    expect(next.currentUserId).toBe('user-1');
+    expect(next.binders).toEqual([{ id: 'binder-1' }]);
+    expect(next.collections).toEqual([{ id: 'coll-1' }]);
+  });
+
+  it('the SAME user re-authenticating (e.g. a token refresh) does NOT clear any data — only a genuine account change should', () => {
+    const state = baseState({
+      currentUserId: 'user-1',
+      binders: [{ id: 'binder-1' }],
+    });
+
+    const next = reducer(state, { type: ACTIONS.AUTH_SET, payload: { id: 'user-1' } });
+
+    expect(next.currentUserId).toBe('user-1');
+    expect(next.binders).toEqual([{ id: 'binder-1' }]); // untouched
+  });
+
+  it('a genuinely DIFFERENT user logging in clears every server-sourced field — the actual fix, since this used to leave a previous account\'s data sitting in memory (and even editable) under the new account\'s identity', () => {
+    const state = baseState({
+      currentUserId: 'user-1',
+      binders: [{ id: 'binder-1' }],
+      binderSlots: [{ id: 'slot-1' }],
+      binderInserts: [{ id: 'insert-1' }],
+      binderPanels: [{ id: 'panel-1' }],
+      collections: [{ id: 'coll-1' }],
+      templateFields: [{ id: 'field-1' }],
+      cardDefinitions: [{ id: 'card-1' }],
+      inventory: [{ id: 'inv-1' }],
+      bin: [{ id: 'bin-1' }],
+    });
+
+    const next = reducer(state, { type: ACTIONS.AUTH_SET, payload: { id: 'user-2' } });
+
+    expect(next.currentUserId).toBe('user-2');
+    expect(next.binders).toEqual([]);
+    expect(next.binderSlots).toEqual([]);
+    expect(next.binderInserts).toEqual([]);
+    expect(next.binderPanels).toEqual([]);
+    expect(next.collections).toEqual([]);
+    expect(next.templateFields).toEqual([]);
+    expect(next.cardDefinitions).toEqual([]);
+    expect(next.inventory).toEqual([]);
+    expect(next.bin).toEqual([]);
+  });
+});
+
 describe('BINDER_SLOT_ADD', () => {
   it('places an unowned card as a grey placeholder (0 copies owned) — the regression that broke this entirely', () => {
     const state = baseState({ inventory: [] }); // owns nothing

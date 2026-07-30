@@ -10,7 +10,7 @@
  */
 
 import { reducer, ACTIONS } from './reducer.js';
-import { loadState, saveState } from './storage.js';
+import { DEFAULT_STATE, saveState } from './storage.js';
 import { syncToSupabase } from './supabaseSync.js';
 
 const DEBUG = import.meta.env.DEV;
@@ -28,9 +28,16 @@ export function waitForPendingSyncs() {
 }
 
 function buildInitialState() {
-  const persisted = loadState();
+  // === CHANGED: no longer loads any localStorage cache here at all.
+  // This runs at module load, before auth has resolved — there's no
+  // way to know which account's cache to load yet, and guessing
+  // (the old behavior: always load the single global key) is exactly
+  // the bug that let one account's data leak into another's session.
+  // useSupabaseSync.js now loads the correct, user-scoped cache
+  // itself once the real logged-in user is actually known.
   return {
-    ...persisted,
+    ...DEFAULT_STATE,
+    currentUserId: null,
     nav: {
       currentView:         'home',
       currentBinderId:     null,
@@ -88,7 +95,7 @@ function createStore(reducerFn, initialState) {
           binderSlots:     state.binderSlots,
           binderInserts:   state.binderInserts,
           binderPanels:    state.binderPanels,
-        });
+        }, state.currentUserId);
         if (!success) {
           listeners.forEach(fn => fn(state, { saveError: true }));
           return Promise.resolve();

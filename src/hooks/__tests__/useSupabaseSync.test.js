@@ -21,6 +21,11 @@ vi.mock('../../store/supabaseStorage.js', () => ({
   loadStateFromSupabase: (...args) => mockLoadStateFromSupabase(...args),
 }));
 
+const mockLoadState = vi.fn();
+vi.mock('../../store/storage.js', () => ({
+  loadState: (...args) => mockLoadState(...args),
+}));
+
 const mockWaitForPendingSyncs = vi.fn().mockResolvedValue(undefined);
 // Deliberately NOT vi.importActual('../../store/index.js') here — that
 // module's real import chain reaches all the way down to
@@ -30,7 +35,7 @@ const mockWaitForPendingSyncs = vi.fn().mockResolvedValue(undefined);
 // is just plain string constants, so they're hardcoded here to match
 // actionTypes.js exactly instead of pulling in that whole chain for them.
 vi.mock('../../store/index.js', () => ({
-  ACTIONS: { HYDRATE: 'HYDRATE', NAV_SET: 'NAV_SET' },
+  ACTIONS: { HYDRATE: 'HYDRATE', NAV_SET: 'NAV_SET', AUTH_SET: 'AUTH_SET' },
   waitForPendingSyncs: (...args) => mockWaitForPendingSyncs(...args),
 }));
 
@@ -50,6 +55,7 @@ describe('useSupabaseSync', () => {
     mockUser = null;
     mockDispatch.mockReset();
     mockLoadStateFromSupabase.mockReset();
+    mockLoadState.mockReset().mockReturnValue({ binders: [] }); // empty local cache by default
     mockWaitForPendingSyncs.mockClear();
     mockOn.mockReset().mockReturnValue({ subscribe: mockSubscribe });
     mockSubscribe.mockReset().mockReturnValue({});
@@ -96,9 +102,43 @@ describe('useSupabaseSync', () => {
     });
   });
 
-  it('does not dispatch HYDRATE when the server is unavailable, but still resets navigation and stops syncing', async () => {
+  it('dispatches AUTH_SET with the current user\'s id before anything else — the real fix that lets the reducer detect a genuine account switch', async () => {
     mockUser = { id: 'user-1' };
-    mockLoadStateFromSupabase.mockResolvedValue(null); // unavailable — falls back to localStorage
+    mockLoadStateFromSupabase.mockResolvedValue({ binders: [] });
+    const { useSupabaseSync } = await import('../useSupabaseSync.js');
+    const { ACTIONS } = await import('../../store/index.js');
+    const { result } = renderHook(() => useSupabaseSync());
+
+    await waitFor(() => expect(result.current.syncing).toBe(false));
+
+    expect(mockDispatch).toHaveBeenCalledWith({ type: ACTIONS.AUTH_SET, payload: { id: 'user-1' } });
+    // AUTH_SET must be the very first dispatch, before any HYDRATE —
+    // the reducer relies on this ordering to correctly detect and
+    // clear a previous account's stale data before anything new gets
+    // loaded on top of it.
+    expect(mockDispatch.mock.calls[0][0]).toEqual({ type: ACTIONS.AUTH_SET, payload: { id: 'user-1' } });
+  });
+
+  it('loads and dispatches this specific user\'s own local cache (via loadState(user.id)) before attempting the Supabase fetch — the real fix for a previous account\'s data ever being shown under a different one', async () => {
+    mockUser = { id: 'user-1' };
+    const localCache = { binders: [{ id: 'local-binder' }] };
+    mockLoadState.mockReturnValue(localCache);
+    mockLoadStateFromSupabase.mockResolvedValue({ binders: [] });
+    const { useSupabaseSync } = await import('../useSupabaseSync.js');
+    const { ACTIONS } = await import('../../store/index.js');
+    const { result } = renderHook(() => useSupabaseSync());
+
+    await waitFor(() => expect(result.current.syncing).toBe(false));
+
+    expect(mockLoadState).toHaveBeenCalledWith('user-1');
+    expect(mockDispatch).toHaveBeenCalledWith({ type: ACTIONS.HYDRATE, payload: localCache });
+  });
+
+  it('still hydrates from the local cache (and resets navigation) even when the server is unavailable — the fix: a failed/slow server load must never leave stale data from a DIFFERENT account showing, but the current account\'s own cache is fine', async () => {
+    mockUser = { id: 'user-1' };
+    const localCache = { binders: [{ id: 'local-binder' }] };
+    mockLoadState.mockReturnValue(localCache);
+    mockLoadStateFromSupabase.mockResolvedValue(null); // server unavailable
     const { useSupabaseSync } = await import('../useSupabaseSync.js');
     const { ACTIONS } = await import('../../store/index.js');
     const { result } = renderHook(() => useSupabaseSync());
@@ -106,7 +146,8 @@ describe('useSupabaseSync', () => {
     await waitFor(() => expect(result.current.syncing).toBe(false));
 
     const hydrateCalls = mockDispatch.mock.calls.filter(([action]) => action.type === ACTIONS.HYDRATE);
-    expect(hydrateCalls).toHaveLength(0);
+    expect(hydrateCalls).toHaveLength(1); // exactly one — from the local cache, not the (unavailable) server
+    expect(hydrateCalls[0]).toEqual([{ type: ACTIONS.HYDRATE, payload: localCache }]);
     expect(result.current.lastSynced).toBe(null);
   });
 

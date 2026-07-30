@@ -6,6 +6,18 @@
  * in Milestone 12 only touches supabaseStorage.js — this file stays stable.
  *
  * Swap localStorage for AsyncStorage (React Native) by changing only this file.
+ *
+ * === Real bug fixed: every function here used to read/write a single,
+ * fixed, global key ('bindervault'), with no user id in it at all —
+ * meaning every account signed into the same browser shared the exact
+ * same cached state. Switching accounts on the same device could show,
+ * and even let you edit, a completely different account's binders and
+ * collections under the new account's identity, until a fresh Supabase
+ * load happened to overwrite it (and if that load ever failed or was
+ * slow, the stale data would just sit there instead). Every function
+ * below now takes userId and scopes its key to that specific account,
+ * the same fix already applied to useDeclutteredSets.js for the same
+ * underlying class of bug. ===
  */
 
 import {
@@ -17,8 +29,12 @@ import {
 
 const DEBUG = import.meta.env.DEV;
 
-const STORAGE_KEY    = 'bindervault';
+const STORAGE_KEY_PREFIX = 'bindervault';
 const SCHEMA_VERSION = 2;
+
+function storageKeyFor(userId) {
+  return `${STORAGE_KEY_PREFIX}:${userId ?? 'anonymous'}`;
+}
 
 export const DEFAULT_STATE = {
   version: SCHEMA_VERSION,
@@ -158,9 +174,9 @@ export function sanitizeState(raw) {
   };
 }
 
-export function loadState() {
+export function loadState(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKeyFor(userId));
     if (!raw) return { ...DEFAULT_STATE };
     const parsed = JSON.parse(raw);
     const migrated = applyMigrations(parsed);
@@ -171,9 +187,9 @@ export function loadState() {
   }
 }
 
-export function saveState(state) {
+export function saveState(state, userId) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, version: SCHEMA_VERSION }));
+    localStorage.setItem(storageKeyFor(userId), JSON.stringify({ ...state, version: SCHEMA_VERSION }));
     return { success: true };
   } catch (err) {
     console.error('[Pinder] Failed to save state:', err);
@@ -181,14 +197,14 @@ export function saveState(state) {
   }
 }
 
-export function clearState() {
-  try { localStorage.removeItem(STORAGE_KEY); return { success: true }; }
+export function clearState(userId) {
+  try { localStorage.removeItem(storageKeyFor(userId)); return { success: true }; }
   catch (err) { return { success: false, error: err }; }
 }
 
-export function getStorageUsage() {
+export function getStorageUsage(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? '';
+    const raw = localStorage.getItem(storageKeyFor(userId)) ?? '';
     return Math.round((raw.length * 2) / 1024);
   } catch { return 0; }
 }

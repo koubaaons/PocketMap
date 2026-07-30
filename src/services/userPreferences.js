@@ -61,19 +61,6 @@ export async function getUserPreferences(userId) {
 }
 
 /**
- * Marks the starter collection as seeded — called once, right after
- * the Seed Loader successfully creates the starter collection, so it
- * never runs again for this account (even across devices, even if
- * the user later deletes that collection).
- */
-export async function markStarterCollectionSeeded(userId) {
-  const { error } = await supabase
-    .from('user_preferences')
-    .upsert({ user_id: userId, seeded_starter_collection: true }, { onConflict: 'user_id' });
-  if (error) console.error('[userPreferences] marking starter collection seeded failed:', error);
-}
-
-/**
  * Records that a new-set check just ran, and which set ids are now
  * known — called after every check, whether or not it actually found
  * anything new, so last_new_set_check_at correctly reflects "we just

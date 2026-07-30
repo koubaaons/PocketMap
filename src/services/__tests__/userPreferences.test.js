@@ -72,23 +72,6 @@ describe('getUserPreferences', () => {
   });
 });
 
-describe('markStarterCollectionSeeded', () => {
-  beforeEach(() => {
-    mockUpsert.mockReset().mockResolvedValue({ error: null });
-  });
-
-  it('upserts seeded_starter_collection: true for the given user', async () => {
-    const { markStarterCollectionSeeded } = await import('../userPreferences.js');
-
-    await markStarterCollectionSeeded('user-1');
-
-    expect(mockUpsert).toHaveBeenCalledWith(
-      { user_id: 'user-1', seeded_starter_collection: true },
-      { onConflict: 'user_id' }
-    );
-  });
-});
-
 describe('recordNewSetCheck', () => {
   beforeEach(() => {
     mockUpsert.mockReset().mockResolvedValue({ error: null });

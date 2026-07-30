@@ -23,8 +23,31 @@ export function sessionReducer(state, action) {
       return { ...state, nav: { ...state.nav, ...action.payload } };
 
 
-    case ACTIONS.AUTH_SET:
-      return { ...state, user: action.payload };
+    case ACTIONS.AUTH_SET: {
+      const newUserId = action.payload?.id ?? null;
+      // === Real bug fixed: AUTH_SET was defined and even already
+      // listed as a persisted action, but nothing in the app ever
+      // actually dispatched it — state.user just sat at its
+      // DEFAULT_STATE placeholder forever, completely disconnected
+      // from the real Supabase-authenticated user. Now genuinely
+      // wired up (see useSupabaseSync.js), and — the actual fix —
+      // clears every server-sourced field the moment the account
+      // changes to a DIFFERENT one, so a previous account's data can
+      // never be shown, edited, or persisted under a new account's
+      // identity, even for the brief moment before a fresh load
+      // completes (or, worse, if that fresh load ever fails). ===
+      if (state.currentUserId && state.currentUserId !== newUserId) {
+        return {
+          ...state,
+          user: action.payload,
+          currentUserId: newUserId,
+          binders: [], binderSlots: [], binderInserts: [], binderPanels: [],
+          collections: [], templateFields: [], cardDefinitions: [],
+          inventory: [], bin: [],
+        };
+      }
+      return { ...state, user: action.payload, currentUserId: newUserId };
+    }
 
 
     case ACTIONS.HYDRATE:

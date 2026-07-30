@@ -339,7 +339,7 @@ export function AccountView({ toast, lastSynced }) {
       return;
     }
 
-    clearState();
+    clearState(user.id);
     await supabase.auth.signOut();
     toast('Your account has been permanently deleted.', 'info');
   };
