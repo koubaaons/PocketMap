@@ -21,7 +21,6 @@
  */
 
 import { createCollection, createTemplateField, createCardDefinition } from '../types/index.js';
-import { uploadSharedImageIfMissing } from '../utils/supabaseImageUpload.js';
 import { fetchAllCardsForSet, mapCardToDraft, TEMPLATE_FIELDS, GAME_LABEL, PROVIDER_KEY } from './activeProvider.js';
 
 /**
@@ -46,18 +45,29 @@ import { fetchAllCardsForSet, mapCardToDraft, TEMPLATE_FIELDS, GAME_LABEL, PROVI
  * ongoing basis — a card missing art today isn't necessarily missing
  * it forever).
  */
-export async function uploadCardImageIfAvailable(sourceImageUrl, cacheKey) {
-  if (!sourceImageUrl) return null;
-
-  // Namespaced by PROVIDER_KEY so a future second provider's cache
-  // never collides with this one, even if both happened to reuse the
-  // same card id.
-  const path = `${PROVIDER_KEY}-cache/${cacheKey}.jpg`;
-  return uploadSharedImageIfMissing(async () => {
-    const imgRes = await fetch(sourceImageUrl);
-    if (!imgRes.ok) throw new Error(`image fetch failed (${imgRes.status})`);
-    return imgRes.blob();
-  }, path);
+/**
+ * Returns the card's own TCGdex image URL directly, unchanged.
+ *
+ * === CHANGED: real bug fixed. This used to fetch() the image bytes
+ * client-side and re-upload them to our own Supabase Storage, to
+ * build a shared, deduplicated cache. But assets.tcgdex.net has no
+ * CORS headers at all -- not missing for this specific domain,
+ * missing entirely -- so that fetch() was blocked by every browser,
+ * on every origin, including localhost. It just hadn't been caught:
+ * earlier testing mostly touched cards that already had an image
+ * cached in Storage from before this migration, so the failure
+ * never surfaced clearly until a genuinely fresh import, with a
+ * completely empty cache, hit every single card at once.
+ *
+ * The actual fix is also simpler than patching around the CORS
+ * block: TCGdex already serves one stable, public URL per card to
+ * everyone — that IS the shared, deduplicated copy. Mirroring it into
+ * our own Storage was never actually buying anything beyond reduced
+ * dependency on TCGdex's own uptime, which isn't worth the tradeoff
+ * of imports being broken outright.
+ */
+export async function uploadCardImageIfAvailable(sourceImageUrl) {
+  return sourceImageUrl ?? null;
 }
 
 /**
@@ -103,7 +113,7 @@ export async function buildCollectionFromSet(set, { cards, onProgress } = {}) {
     const apiCard = cardList[i];
     try {
       const draft = mapCardToDraft(apiCard);
-      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl, apiCard.id);
+      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl);
 
       const { cardDef, errors } = createCardDefinition({
         collectionId: collection.id,
@@ -151,7 +161,7 @@ export async function importNewCardsForCollection(collectionId, apiCards) {
   for (const apiCard of apiCards) {
     try {
       const draft = mapCardToDraft(apiCard);
-      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl, apiCard.id);
+      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl);
 
       const { cardDef, errors } = createCardDefinition({
         collectionId,
@@ -173,3 +183,4 @@ export async function importNewCardsForCollection(collectionId, apiCards) {
 
   return { cardDefinitions, failures };
 }
+

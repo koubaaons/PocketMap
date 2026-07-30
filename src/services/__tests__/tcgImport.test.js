@@ -85,14 +85,14 @@ describe('buildCollectionFromSet', () => {
     expect(mockFetchAllCardsForSet).not.toHaveBeenCalled();
   });
 
-  it('uploads each card\'s image via the shared (not per-user) path, namespaced by PROVIDER_KEY', async () => {
+  it('uses the card\'s source image URL directly — the real fix for a CORS bug where fetching the image bytes client-side to re-upload was blocked by every browser, since TCGdex\'s asset CDN has no CORS headers at all', async () => {
     mockMapCardToDraft.mockReturnValue({ name: 'Pikachu', sourceImageUrl: 'https://cdn/pikachu.png', holoType: 'none', rarity: 'Common', attributes: {} });
-    mockUploadSharedImageIfMissing.mockResolvedValue('https://storage/pikachu.jpg');
     const { buildCollectionFromSet } = await import('../tcgImport.js');
 
-    await buildCollectionFromSet(SET, { cards: [apiCard({ id: 'card-99' })] });
+    const { cardDefinitions } = await buildCollectionFromSet(SET, { cards: [apiCard({ id: 'card-99' })] });
 
-    expect(mockUploadSharedImageIfMissing).toHaveBeenCalledWith(expect.any(Function), 'pokemon-cache/card-99.jpg');
+    expect(cardDefinitions[0].image_url).toBe('https://cdn/pikachu.png');
+    expect(mockUploadSharedImageIfMissing).not.toHaveBeenCalled();
   });
 
   it('skips the image upload entirely when a card has no source image', async () => {
@@ -198,13 +198,12 @@ describe('uploadCardImageIfAvailable', () => {
     expect(mockUploadSharedImageIfMissing).not.toHaveBeenCalled();
   });
 
-  it('uploads via the shared, namespaced cache path when a source image is available', async () => {
-    mockUploadSharedImageIfMissing.mockResolvedValue('https://storage/card-1.jpg');
+  it('returns the source image URL directly, unchanged — the real fix: no more client-side fetch+re-upload, which was blocked by CORS on TCGdex\'s asset CDN', async () => {
     const { uploadCardImageIfAvailable } = await import('../tcgImport.js');
 
-    const result = await uploadCardImageIfAvailable('https://cdn/card-1.png', 'card-1');
+    const result = await uploadCardImageIfAvailable('https://cdn/card-1.png');
 
-    expect(result).toBe('https://storage/card-1.jpg');
-    expect(mockUploadSharedImageIfMissing).toHaveBeenCalledWith(expect.any(Function), 'pokemon-cache/card-1.jpg');
+    expect(result).toBe('https://cdn/card-1.png');
+    expect(mockUploadSharedImageIfMissing).not.toHaveBeenCalled();
   });
 });
