@@ -126,7 +126,7 @@ export function useCollectionUpdateCheck({ syncing, collections, cardDefinitions
 
               try {
                 const draft = mapCardToDraft(apiCard);
-                const newImageUrl = await uploadCardImageIfAvailable(draft.sourceImageUrl);
+                const newImageUrl = await uploadCardImageIfAvailable(draft.sourceImageUrl, apiCard.id);
                 if (newImageUrl) {
                   dispatch({ type: ACTIONS.CARD_DEFINITION_UPDATE, payload: { id: cardDef.id, image_url: newImageUrl } });
                 }

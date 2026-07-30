@@ -17,9 +17,9 @@ vi.mock('../activeProvider.js', () => ({
   PROVIDER_KEY: 'pokemon',
 }));
 
-const mockUploadSharedImageIfMissing = vi.fn();
-vi.mock('../../utils/supabaseImageUpload.js', () => ({
-  uploadSharedImageIfMissing: (...args) => mockUploadSharedImageIfMissing(...args),
+const mockInvoke = vi.fn();
+vi.mock('../supabase.js', () => ({
+  supabase: { functions: { invoke: (...args) => mockInvoke(...args) } },
 }));
 
 const SET = { id: 'set-1', name: 'Base Set', images: { logo: 'https://x/logo.png' } };
@@ -32,7 +32,7 @@ describe('buildCollectionFromSet', () => {
   beforeEach(() => {
     mockFetchAllCardsForSet.mockReset();
     mockMapCardToDraft.mockReset();
-    mockUploadSharedImageIfMissing.mockReset();
+    mockInvoke.mockReset().mockResolvedValue({ data: { url: 'https://storage/cached.jpg' }, error: null });
   });
 
   it('creates a collection using GAME_LABEL and the set name, marked non-custom', async () => {
@@ -85,14 +85,17 @@ describe('buildCollectionFromSet', () => {
     expect(mockFetchAllCardsForSet).not.toHaveBeenCalled();
   });
 
-  it('uses the card\'s source image URL directly — the real fix for a CORS bug where fetching the image bytes client-side to re-upload was blocked by every browser, since TCGdex\'s asset CDN has no CORS headers at all', async () => {
+  it('caches each card\'s image via the cache-shared-image Edge Function, using the resulting cached URL — the real fix for a CORS bug where fetching the image bytes client-side to re-upload was blocked by every browser, since TCGdex\'s asset CDN has no CORS headers at all', async () => {
     mockMapCardToDraft.mockReturnValue({ name: 'Pikachu', sourceImageUrl: 'https://cdn/pikachu.png', holoType: 'none', rarity: 'Common', attributes: {} });
+    mockInvoke.mockResolvedValue({ data: { url: 'https://storage/tcgdex-cache/card-99.jpg' }, error: null });
     const { buildCollectionFromSet } = await import('../tcgImport.js');
 
     const { cardDefinitions } = await buildCollectionFromSet(SET, { cards: [apiCard({ id: 'card-99' })] });
 
-    expect(cardDefinitions[0].image_url).toBe('https://cdn/pikachu.png');
-    expect(mockUploadSharedImageIfMissing).not.toHaveBeenCalled();
+    expect(mockInvoke).toHaveBeenCalledWith('cache-shared-image', {
+      body: { imageUrl: 'https://cdn/pikachu.png', path: 'pokemon-cache/card-99.jpg' },
+    });
+    expect(cardDefinitions[0].image_url).toBe('https://storage/tcgdex-cache/card-99.jpg');
   });
 
   it('skips the image upload entirely when a card has no source image', async () => {
@@ -101,7 +104,7 @@ describe('buildCollectionFromSet', () => {
 
     const result = await buildCollectionFromSet(SET, { cards: [apiCard()] });
 
-    expect(mockUploadSharedImageIfMissing).not.toHaveBeenCalled();
+    expect(mockInvoke).not.toHaveBeenCalled();
     expect(result.cardDefinitions[0].image_url).toBe(null);
   });
 
@@ -189,21 +192,38 @@ describe('importNewCardsForCollection', () => {
 });
 
 describe('uploadCardImageIfAvailable', () => {
-  it('returns null immediately, without attempting any upload, when sourceImageUrl is null', async () => {
+  it('returns null immediately, without calling the Edge Function at all, when sourceImageUrl is null', async () => {
     const { uploadCardImageIfAvailable } = await import('../tcgImport.js');
 
     const result = await uploadCardImageIfAvailable(null, 'card-1');
 
     expect(result).toBe(null);
-    expect(mockUploadSharedImageIfMissing).not.toHaveBeenCalled();
+    expect(mockInvoke).not.toHaveBeenCalled();
   });
 
-  it('returns the source image URL directly, unchanged — the real fix: no more client-side fetch+re-upload, which was blocked by CORS on TCGdex\'s asset CDN', async () => {
+  it('calls cache-shared-image with the source URL and the provider-namespaced path, returning its cached URL', async () => {
+    mockInvoke.mockResolvedValue({ data: { url: 'https://storage/pokemon-cache/card-1.jpg' }, error: null });
     const { uploadCardImageIfAvailable } = await import('../tcgImport.js');
 
-    const result = await uploadCardImageIfAvailable('https://cdn/card-1.png');
+    const result = await uploadCardImageIfAvailable('https://cdn/card-1.png', 'card-1');
 
-    expect(result).toBe('https://cdn/card-1.png');
-    expect(mockUploadSharedImageIfMissing).not.toHaveBeenCalled();
+    expect(mockInvoke).toHaveBeenCalledWith('cache-shared-image', {
+      body: { imageUrl: 'https://cdn/card-1.png', path: 'pokemon-cache/card-1.jpg' },
+    });
+    expect(result).toBe('https://storage/pokemon-cache/card-1.jpg');
+  });
+
+  it('throws with the Edge Function\'s own error message if it reports a failure', async () => {
+    mockInvoke.mockResolvedValue({ data: { error: 'image fetch failed (404)' }, error: null });
+    const { uploadCardImageIfAvailable } = await import('../tcgImport.js');
+
+    await expect(uploadCardImageIfAvailable('https://cdn/card-1.png', 'card-1')).rejects.toThrow('image fetch failed (404)');
+  });
+
+  it('throws if invoking the Edge Function itself fails (network error, function not deployed, etc.)', async () => {
+    mockInvoke.mockResolvedValue({ data: null, error: new Error('Function not found') });
+    const { uploadCardImageIfAvailable } = await import('../tcgImport.js');
+
+    await expect(uploadCardImageIfAvailable('https://cdn/card-1.png', 'card-1')).rejects.toThrow('Function not found');
   });
 });

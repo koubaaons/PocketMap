@@ -22,52 +22,48 @@
 
 import { createCollection, createTemplateField, createCardDefinition } from '../types/index.js';
 import { fetchAllCardsForSet, mapCardToDraft, TEMPLATE_FIELDS, GAME_LABEL, PROVIDER_KEY } from './activeProvider.js';
+import { supabase } from './supabase.js';
 
 /**
- * Uploads one card's image to Storage (shared path, cached across
- * every user — not per-user) if it's not already there, returning the
- * resulting URL. Returns null if sourceImageUrl is null (this card
- * genuinely has no image available from the provider yet).
+ * Caches one card's image via the cache-shared-image Edge Function
+ * (shared path, cached across every user -- not per-user), returning
+ * the resulting URL. Returns null if sourceImageUrl is null (this
+ * card genuinely has no image available from the provider yet).
  *
- * Takes the already-computed sourceImageUrl/cacheKey directly, rather
- * than the raw apiCard + re-deriving them via mapCardToDraft — the
- * caller has always already called mapCardToDraft once for its own
- * purposes, and calling it a second time here would be both wasted
- * work and, in tests, a second consumption of a mocked
- * once-per-card implementation.
+ * === CHANGED: this used to fetch() the image bytes directly in the
+ * browser and re-upload them client-side. That was blocked by CORS --
+ * TCGdex's asset CDN sends no CORS headers at all, so every browser,
+ * on every origin, refused to let JS read the response -- fixed at
+ * the time by just passing the source URL straight through instead.
+ * But that broke a DIFFERENT feature: binder export uses html2canvas,
+ * which needs to read raw pixel data out of each card image to
+ * capture it, and that requires the image to either be same-origin
+ * or have real CORS headers set by its own server -- TCGdex's CDN has
+ * neither. So a card's image could be *displayed* fine directly from
+ * TCGdex, but never *captured* into an export.
  *
- * Extracted out of buildCollectionFromSet and importNewCardsForCollection,
- * which both had this exact logic duplicated inline — also used by
- * the "backfill missing images" pass in useCollectionUpdateCheck.js,
- * which re-checks cards that had no image at import time in case the
- * provider's data has since been filled in (TCGdex, being an open,
- * community-maintained database, gets image contributions on an
- * ongoing basis — a card missing art today isn't necessarily missing
- * it forever).
+ * The actual fix needs the image to end up on OUR OWN domain (so
+ * html2canvas can read it) without ever doing the fetch in the
+ * browser (so CORS never blocks it in the first place) -- which
+ * means doing the fetch server-side. cache-shared-image does exactly
+ * that: fetches from TCGdex on the server, where browser CORS simply
+ * doesn't apply, and uploads to our own Storage, which already has
+ * the right CORS headers for html2canvas to read.
  */
-/**
- * Returns the card's own TCGdex image URL directly, unchanged.
- *
- * === CHANGED: real bug fixed. This used to fetch() the image bytes
- * client-side and re-upload them to our own Supabase Storage, to
- * build a shared, deduplicated cache. But assets.tcgdex.net has no
- * CORS headers at all -- not missing for this specific domain,
- * missing entirely -- so that fetch() was blocked by every browser,
- * on every origin, including localhost. It just hadn't been caught:
- * earlier testing mostly touched cards that already had an image
- * cached in Storage from before this migration, so the failure
- * never surfaced clearly until a genuinely fresh import, with a
- * completely empty cache, hit every single card at once.
- *
- * The actual fix is also simpler than patching around the CORS
- * block: TCGdex already serves one stable, public URL per card to
- * everyone — that IS the shared, deduplicated copy. Mirroring it into
- * our own Storage was never actually buying anything beyond reduced
- * dependency on TCGdex's own uptime, which isn't worth the tradeoff
- * of imports being broken outright.
- */
-export async function uploadCardImageIfAvailable(sourceImageUrl) {
-  return sourceImageUrl ?? null;
+export async function uploadCardImageIfAvailable(sourceImageUrl, cacheKey) {
+  if (!sourceImageUrl) return null;
+
+  // Namespaced by PROVIDER_KEY so a future second provider's cache
+  // never collides with this one, even if both happened to reuse the
+  // same card id.
+  const path = `${PROVIDER_KEY}-cache/${cacheKey}.jpg`;
+  const { data, error } = await supabase.functions.invoke('cache-shared-image', {
+    body: { imageUrl: sourceImageUrl, path },
+  });
+  if (error || data?.error) {
+    throw new Error(data?.error ?? error.message);
+  }
+  return data.url;
 }
 
 /**
@@ -113,7 +109,7 @@ export async function buildCollectionFromSet(set, { cards, onProgress } = {}) {
     const apiCard = cardList[i];
     try {
       const draft = mapCardToDraft(apiCard);
-      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl);
+      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl, apiCard.id);
 
       const { cardDef, errors } = createCardDefinition({
         collectionId: collection.id,
@@ -161,7 +157,7 @@ export async function importNewCardsForCollection(collectionId, apiCards) {
   for (const apiCard of apiCards) {
     try {
       const draft = mapCardToDraft(apiCard);
-      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl);
+      const image_url = await uploadCardImageIfAvailable(draft.sourceImageUrl, apiCard.id);
 
       const { cardDef, errors } = createCardDefinition({
         collectionId,
