@@ -165,7 +165,16 @@ async function fetchSetWithBriefCards(setId) {
   const res = await fetchWithRetry(`${API_BASE}/sets/${setId}`);
   if (!res.ok) throw new Error(`TCGdex API: fetch set failed (${res.status})`);
   const data = await res.json();
-  cachedSetDetails.set(setId, data);
+  // === Real bug fixed: only cache a response that actually has
+  // cards. This cache exists to avoid redundant re-fetches of a GOOD
+  // response across the preview step and the full import — it was
+  // never meant to lock in a BAD one. If the very first fetch for a
+  // set ever came back with an empty cards array (a transient API
+  // hiccup, anything), that broken result got cached permanently for
+  // the rest of the page session — every later attempt to import
+  // that same set, even a deliberate retry, just replayed the same
+  // empty cache entry instead of ever reaching the network again.
+  if ((data.cards ?? []).length > 0) cachedSetDetails.set(setId, data);
   return data;
 }
 
@@ -225,6 +234,15 @@ export async function fetchCardsForSet(setId, page = 1, pageSize = 24) {
 export async function fetchAllCardsForSet(setId, onProgress) {
   const set = await fetchSetWithBriefCards(setId);
   const briefCards = set.cards ?? [];
+  // === Real bug fixed: this used to just return an empty array here,
+  // which the import modal's own try/catch had no way to distinguish
+  // from "successfully imported a set with zero cards" — so it
+  // silently created a real-looking, completely empty collection
+  // instead of showing the "Could not load the full card list" error
+  // the modal already has ready for exactly this situation.
+  if (briefCards.length === 0) {
+    throw new Error(`TCGdex API: set ${setId} returned no cards`);
+  }
 
   const allCards = [];
   for (let i = 0; i < briefCards.length; i++) {

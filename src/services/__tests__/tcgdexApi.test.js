@@ -309,4 +309,37 @@ describe('fetchAllCardsForSet', () => {
     expect(onProgress).toHaveBeenCalledWith(2, 2);
     vi.unstubAllGlobals();
   });
+
+  it('real bug fixed: throws instead of silently succeeding with zero cards when the set genuinely has none — the import modal already has an error message ready for exactly this, but it was never triggered since this used to just return an empty array', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ id: 'empty-set', cards: [] }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { fetchAllCardsForSet } = await import('../tcgdexApi.js');
+
+    await expect(fetchAllCardsForSet('empty-set')).rejects.toThrow('empty-set');
+    vi.unstubAllGlobals();
+  });
+
+  it('real bug fixed: does NOT permanently cache a broken (empty-cards) set response — a later retry for the same set can genuinely reach the network again and succeed, instead of forever replaying the same broken cached result', async () => {
+    const mockFetch = vi.fn()
+      // First call: the set comes back with no cards at all (a
+      // transient API hiccup, in this test just simulated directly)
+      .mockResolvedValueOnce(jsonResponse({ id: 'flaky-set', cards: [] }))
+      // Second call (the retry): this time it has real cards
+      .mockResolvedValueOnce(jsonResponse({ id: 'flaky-set', cards: [{ id: 'flaky-1' }] }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'flaky-1', name: 'Pikachu' }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { fetchAllCardsForSet } = await import('../tcgdexApi.js');
+
+    await expect(fetchAllCardsForSet('flaky-set')).rejects.toThrow(); // first attempt fails
+    const cards = await fetchAllCardsForSet('flaky-set'); // retry succeeds
+
+    expect(cards.map(c => c.name)).toEqual(['Pikachu']);
+    // Confirms the retry genuinely hit the network a second time,
+    // rather than replaying a cached empty result from the first call
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    vi.unstubAllGlobals();
+  });
 });
