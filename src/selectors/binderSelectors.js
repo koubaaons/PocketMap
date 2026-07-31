@@ -166,3 +166,36 @@ export function filterCardsForBinder(cardDefinitions, placedCardIds, query, coll
 export function getSlotById(binderSlots, slotId) {
   return binderSlots.find(s => s.id === slotId) ?? null;
 }
+
+/**
+ * Builds the list of "spreads" for a binder — pairs of facing pages,
+ * exactly like opening a real physical binder: spread 1 is the inside
+ * of the front cover (blank — leftPageNum null) alongside page 1;
+ * spread 2 is pages 2 and 3; spread 3 is pages 4 and 5; and so on.
+ *
+ * Deliberately the exact same pairing formula as BinderBookFlip.jsx's
+ * own pagePairs/isFlipped logic (frontPageNum = 2n-1, backPageNum =
+ * 2n) — this represents the same physical binder two different ways
+ * (an interactive flip-through view vs. a static export), so the two
+ * must never drift apart from each other. Re-derived here rather than
+ * imported directly since that component's version is entangled with
+ * its own flip-animation state (spread position, transition tracking)
+ * that has no meaning for a one-shot export.
+ *
+ * An even page count leaves the very last page with no partner (a
+ * real physical binder has the same issue — the last sheet only has
+ * one side with a printed page on it) — that spread's rightPageNum is
+ * null instead.
+ *
+ * @param {number} totalPages
+ * @returns {{ spreadIndex: number, leftPageNum: number|null, rightPageNum: number|null }[]}
+ */
+export function buildSpreadList(totalPages) {
+  const spreads = [];
+  for (let n = 1; (2 * n - 2) <= totalPages; n++) {
+    const leftPageNum  = n === 1 ? null : (2 * n - 2);
+    const rightPageNum = (2 * n - 1) <= totalPages ? (2 * n - 1) : null;
+    spreads.push({ spreadIndex: n, leftPageNum, rightPageNum });
+  }
+  return spreads;
+}

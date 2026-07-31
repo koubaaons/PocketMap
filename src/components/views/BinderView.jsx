@@ -53,7 +53,7 @@ import { useBinderView } from '../../hooks/useBinderView.js';
 import { useBinderFullscreen } from '../../hooks/useBinderFullscreen.js';
 import { useCardInfoToggle } from '../../hooks/useCardInfoToggle.js';
 import { useStore, useDispatch } from '../../hooks/useStore.js';
-import { ACTIONS } from '../../store/index.js';
+import { ACTIONS, waitForPendingSyncs } from '../../store/index.js';
 import { DEFAULT_BINDER_COLOR } from '../../types/index.js';
 import { createBinderSlot, createBinderPanel } from '../../types/index.js';
 import { getSlotIndicesForPanel } from '../../store/reducers/binderPanelReducer.js';
@@ -388,7 +388,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     setIsLibraryPanelOpen(false);
   };
 
-  const handleSaveLayout = () => {
+  const handleSaveLayout = async () => {
     if (!view.previewSlots) return;
 
     view.previewSlots.forEach(previewSlot => {
@@ -417,6 +417,22 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         dispatch({ type: ACTIONS.BINDER_SLOT_REMOVE, payload: { slotId: original.id } });
       }
     });
+
+    // === Real bug fixed: binder_panels.insert_id has a genuine
+    // foreign-key constraint on binder_inserts.id. Dropping a
+    // freshly-uploaded library image onto a combined panel and
+    // immediately saving could dispatch the panel (referencing that
+    // insert's id) before the insert's OWN upsert had actually
+    // committed to the database — a race between two independent,
+    // unordered async syncs, same class of bug as an earlier fix this
+    // session where a card definition needed to exist before an
+    // inventory item could reference it. That failed foreign-key
+    // check came back as a 400, and since the panel was never
+    // actually saved, both the combination and the image appeared to
+    // vanish on the very next reload. Waiting for any currently
+    // in-flight syncs to finish first ensures a brand-new insert has
+    // genuinely landed before any panel tries to reference it. ===
+    await waitForPendingSyncs();
 
     // === Commits panel changes from the draft — additions (new
     // combines), removals (uncombines), and page-number changes

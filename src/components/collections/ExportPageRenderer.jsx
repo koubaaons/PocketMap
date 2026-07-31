@@ -23,6 +23,52 @@
  *   PNG export; see binderExport.js for why this can't apply to PDF.
  */
 
+/**
+ * === Real bug fixed: a combined panel's image can be repositioned
+ * and zoomed by the user (imageX/imageY/imageScale, set via dragging
+ * in BinderPanelSlot.jsx) — but the export always just rendered the
+ * plain image at its default centered position, ignoring any of
+ * that. This replicates the exact same positioning math as the real,
+ * live panel component, rather than inventing a different one that
+ * could drift out of sync with it: the wrap div's width is derived
+ * from the image's own NATURAL aspect ratio, not a fixed percentage.
+ *
+ * === CHANGED again: aspectRatio is now a required prop, pre-fetched
+ * by binderExport.js BEFORE rendering starts at all (see
+ * getImageNaturalAspectRatio there), not discovered here via
+ * useState + onLoad after the fact. The earlier version depended on
+ * a React state update (from onLoad) actually committing to the DOM
+ * before html2canvas ran — reported directly as still producing a
+ * gap around the image in practice, since that's an inherently
+ * fragile thing to guarantee in a one-shot, off-screen capture
+ * (waiting one extra animation frame wasn't consistently enough).
+ * Knowing the ratio before the very first render removes that race
+ * entirely rather than trying to win it more reliably. ===
+ */
+function ExportPanelImage({ imageUrl, imageX, imageY, imageScale, aspectRatio, alt, showGrey }) {
+  return (
+    <div
+      className="export-panel-image-wrap"
+      style={{
+        position: 'absolute',
+        left: `${imageX}%`,
+        top: `${imageY}%`,
+        height: '100%',
+        aspectRatio: `${aspectRatio}`,
+        transform: `translate(-50%, -50%) scale(${imageScale})`,
+      }}
+    >
+      <img
+        src={imageUrl}
+        alt={alt ?? ''}
+        crossOrigin="anonymous"
+        className={showGrey ? 'export-cell-image-grey' : ''}
+        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+      />
+    </div>
+  );
+}
+
 export function ExportPageRenderer({
   binder,
   pageNumber,
@@ -31,6 +77,7 @@ export function ExportPageRenderer({
   cardDefMap,
   binderInsertMap,
   inventoryGroupMap,
+  panelAspectRatios = {},
   hideSlotNumbers = false,
   hideQuantityBadges = false,
   hideBackground = false,
@@ -79,14 +126,32 @@ export function ExportPageRenderer({
             const showGrey = panel.panelType === 'card' && !isOwned;
             const quantity = panel.panelType === 'card' ? (inventoryGroupMap[panel.cardDefId]?.length ?? 0) : 0;
 
+            // Same 2.5/3.5 card-proportion ratio every normal slot
+            // uses, scaled by the panel's own span — matching
+            // BinderPanelSlot.jsx exactly. Without this override, the
+            // base .export-cell CSS rule's fixed single-card aspect
+            // ratio (2.5/3.5) got forced onto this cell even though it
+            // spans multiple columns/rows, distorting its real
+            // proportions compared to how it actually looks in the
+            // live binder.
+            const panelAspectRatio = (2.5 * panel.spanCols) / (3.5 * panel.spanRows);
+
             return (
               <div
                 key={panel.id}
                 className={`export-cell export-cell-filled ${cardsOnly ? 'export-cell-cardsonly' : ''}`}
-                style={{ ...cellStyle, gridColumn: `span ${panel.spanCols}`, gridRow: `span ${panel.spanRows}` }}
+                style={{ ...cellStyle, gridColumn: `span ${panel.spanCols}`, gridRow: `span ${panel.spanRows}`, aspectRatio: `${panelAspectRatio}` }}
               >
                 {imageUrl ? (
-                  <img src={imageUrl} alt={name ?? ''} crossOrigin="anonymous" className={`export-cell-image ${showGrey ? 'export-cell-image-grey' : ''}`} />
+                  <ExportPanelImage
+                    imageUrl={imageUrl}
+                    imageX={panel.imageX ?? 50}
+                    imageY={panel.imageY ?? 50}
+                    imageScale={panel.imageScale ?? 1}
+                    aspectRatio={panelAspectRatios[panel.id] ?? 1}
+                    alt={name}
+                    showGrey={showGrey}
+                  />
                 ) : (
                   !cardsOnly && <div className="export-cell-placeholder" />
                 )}

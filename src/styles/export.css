@@ -16,6 +16,31 @@
   box-sizing: border-box;
 }
 
+/* Two facing pages side by side, like an opened physical binder — a
+   small central gap stands in for the spine/binding. Each side is
+   exactly one export-page-wrapper's width, so a spread is simply two
+   real pages placed next to each other, not a differently-sized
+   layout of its own. */
+.export-spread-wrapper {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  width: fit-content;
+}
+
+.export-spread-wrapper-transparent {
+  gap: 24px;
+}
+
+.export-spread-side {
+  flex: 0 0 auto;
+}
+
+.export-spread-blank-side {
+  width: 1200px;
+  height: 100%;
+}
+
 .export-page-wrapper-plain {
   background: #ffffff;
 }
@@ -133,3 +158,4 @@
 .export-range-inputs input {
   width: 70px;
 }
+

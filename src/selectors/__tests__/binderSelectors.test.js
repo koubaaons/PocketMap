@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getFullyPlacedCardDefIds, getAllSlotsForCard, isSlotPositionFree,
   getTotalPlacedCount, getOwnedFilledSlotCount,
-  buildPageSlotMap, isCardInBinder, getFilledSlotCount, getSlotById, filterCardsForBinder,
+  buildPageSlotMap, isCardInBinder, getFilledSlotCount, getSlotById, filterCardsForBinder, buildSpreadList,
 } from '../binderSelectors.js';
 import { binderCapacity } from '../../utils/index.js';
 
@@ -260,5 +260,59 @@ describe('filterCardsForBinder', () => {
   it('respects the limit parameter', () => {
     const result = filterCardsForBinder(cards, new Set(), '', collectionMap, 2);
     expect(result).toHaveLength(2);
+  });
+});
+
+describe('buildSpreadList', () => {
+  it('spread 1 is the blank inside-cover on the left, page 1 on the right', () => {
+    const spreads = buildSpreadList(10);
+    expect(spreads[0]).toEqual({ spreadIndex: 1, leftPageNum: null, rightPageNum: 1 });
+  });
+
+  it('spread 2 is pages 2 and 3, matching a real binder\'s next sheet', () => {
+    const spreads = buildSpreadList(10);
+    expect(spreads[1]).toEqual({ spreadIndex: 2, leftPageNum: 2, rightPageNum: 3 });
+  });
+
+  it('spread 3 is pages 4 and 5, continuing the same pattern', () => {
+    const spreads = buildSpreadList(10);
+    expect(spreads[2]).toEqual({ spreadIndex: 3, leftPageNum: 4, rightPageNum: 5 });
+  });
+
+  it('an EVEN page count leaves the final page unpaired, with a blank on its right — matching a real binder\'s last sheet having only one printed side', () => {
+    const spreads = buildSpreadList(6);
+    // Spreads: (null,1), (2,3), (4,5), (6,null) -- 4 spreads total
+    expect(spreads).toHaveLength(4);
+    expect(spreads[3]).toEqual({ spreadIndex: 4, leftPageNum: 6, rightPageNum: null });
+  });
+
+  it('an ODD page count pairs every page cleanly, with no unpaired final page', () => {
+    const spreads = buildSpreadList(5);
+    // Spreads: (null,1), (2,3), (4,5) -- 3 spreads total, no trailing blank
+    expect(spreads).toHaveLength(3);
+    expect(spreads[2]).toEqual({ spreadIndex: 3, leftPageNum: 4, rightPageNum: 5 });
+  });
+
+  it('a 1-page binder is just spread 1 alone: blank left, page 1 right', () => {
+    const spreads = buildSpreadList(1);
+    expect(spreads).toEqual([{ spreadIndex: 1, leftPageNum: null, rightPageNum: 1 }]);
+  });
+
+  it('a 2-page binder needs exactly 2 spreads: (blank,1) then (2,blank)', () => {
+    const spreads = buildSpreadList(2);
+    expect(spreads).toEqual([
+      { spreadIndex: 1, leftPageNum: null, rightPageNum: 1 },
+      { spreadIndex: 2, leftPageNum: 2, rightPageNum: null },
+    ]);
+  });
+
+  it('every real page number from 1 to totalPages appears exactly once across all spreads, for a range of page counts', () => {
+    for (const totalPages of [1, 2, 3, 4, 5, 10, 11, 50, 100]) {
+      const spreads = buildSpreadList(totalPages);
+      const seenPages = spreads.flatMap(s => [s.leftPageNum, s.rightPageNum]).filter(p => p !== null);
+      const uniquePages = new Set(seenPages);
+      expect(uniquePages.size).toBe(seenPages.length); // no page appears twice
+      expect(uniquePages).toEqual(new Set(Array.from({ length: totalPages }, (_, i) => i + 1))); // every page 1..totalPages appears
+    }
   });
 });

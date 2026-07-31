@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { Modal, ModalActions, Button, Input } from '../ui/index.jsx';
+import { buildSpreadList } from '../../selectors/binderSelectors.js';
 
 export function ExportBinderModal({
   binder,
@@ -21,6 +22,14 @@ export function ExportBinderModal({
   const [fromPage, setFromPage] = useState('1');
   const [toPage, setToPage] = useState(String(binder.pages));
   const [singlePage, setSinglePage] = useState('1');
+  // === Requested directly: an option to export the binder the way it
+  // actually looks when open — two facing physical pages together on
+  // one sheet, exactly like flipping through the real thing, instead
+  // of one isolated page at a time. Always covers the whole binder
+  // when on (see buildSpreadList) — a partial physical page range
+  // doesn't map cleanly onto pairs of facing pages, so the page-range
+  // selector below is hidden rather than trying to reconcile the two.
+  const [spreadMode, setSpreadMode] = useState(false);
 
   const [hideSlotNumbers, setHideSlotNumbers] = useState(false);
   const [hideQuantityBadges, setHideQuantityBadges] = useState(false);
@@ -58,11 +67,32 @@ export function ExportBinderModal({
   };
 
   const handleExport = async () => {
-    const pageNumbers = getSelectedPageNumbers();
     setError('');
     setIsExporting(true);
-    setProgress({ current: 0, total: pageNumbers.length });
     try {
+      if (spreadMode) {
+        const spreads = buildSpreadList(binder.pages);
+        setProgress({ current: 0, total: spreads.length });
+        const { exportBinderSpreads } = await import('../../utils/binderExport.js');
+        await exportBinderSpreads({
+          binder,
+          spreads,
+          allBinderSlots,
+          allBinderPanels,
+          cardDefMap,
+          binderInsertMap,
+          inventoryGroupMap,
+          format,
+          options: { hideSlotNumbers, hideQuantityBadges, hideBackground, cardsOnly },
+          onProgress: (current, total) => setProgress({ current, total }),
+        });
+        toast(`Exported ${spreads.length} spread${spreads.length !== 1 ? 's' : ''}`);
+        onClose();
+        return;
+      }
+
+      const pageNumbers = getSelectedPageNumbers();
+      setProgress({ current: 0, total: pageNumbers.length });
       const { exportBinderPages } = await import('../../utils/binderExport.js');
       await exportBinderPages({
         binder,
@@ -92,34 +122,43 @@ export function ExportBinderModal({
       <p className="modal-step-intro">Rendered fresh at high resolution — nothing is saved to your account.</p>
 
       <div className="form-group">
-        <label>Pages</label>
-        <div className="export-range-options">
-          <label className="export-radio-option">
-            <input type="radio" checked={rangeType === 'all'} onChange={() => setRangeType('all')} />
-            All pages ({binder.pages})
-          </label>
-          <label className="export-radio-option">
-            <input type="radio" checked={rangeType === 'range'} onChange={() => setRangeType('range')} />
-            Page range
-          </label>
-          {rangeType === 'range' && (
-            <div className="export-range-inputs">
-              <Input id="export-from" type="number" min={1} max={binder.pages} value={fromPage} onChange={e => setFromPage(e.target.value)} />
-              <span>to</span>
-              <Input id="export-to" type="number" min={1} max={binder.pages} value={toPage} onChange={e => setToPage(e.target.value)} />
-            </div>
-          )}
-          <label className="export-radio-option">
-            <input type="radio" checked={rangeType === 'single'} onChange={() => setRangeType('single')} />
-            Single page
-          </label>
-          {rangeType === 'single' && (
-            <div className="export-range-inputs">
-              <Input id="export-single" type="number" min={1} max={binder.pages} value={singlePage} onChange={e => setSinglePage(e.target.value)} />
-            </div>
-          )}
-        </div>
+        <label className="export-checkbox-option">
+          <input type="checkbox" checked={spreadMode} onChange={e => setSpreadMode(e.target.checked)} />
+          Export as spreads — two facing pages together, like opening a real binder
+        </label>
       </div>
+
+      {!spreadMode && (
+        <div className="form-group">
+          <label>Pages</label>
+          <div className="export-range-options">
+            <label className="export-radio-option">
+              <input type="radio" checked={rangeType === 'all'} onChange={() => setRangeType('all')} />
+              All pages ({binder.pages})
+            </label>
+            <label className="export-radio-option">
+              <input type="radio" checked={rangeType === 'range'} onChange={() => setRangeType('range')} />
+              Page range
+            </label>
+            {rangeType === 'range' && (
+              <div className="export-range-inputs">
+                <Input id="export-from" type="number" min={1} max={binder.pages} value={fromPage} onChange={e => setFromPage(e.target.value)} />
+                <span>to</span>
+                <Input id="export-to" type="number" min={1} max={binder.pages} value={toPage} onChange={e => setToPage(e.target.value)} />
+              </div>
+            )}
+            <label className="export-radio-option">
+              <input type="radio" checked={rangeType === 'single'} onChange={() => setRangeType('single')} />
+              Single page
+            </label>
+            {rangeType === 'single' && (
+              <div className="export-range-inputs">
+                <Input id="export-single" type="number" min={1} max={binder.pages} value={singlePage} onChange={e => setSinglePage(e.target.value)} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="form-group">
         <label>Options</label>
@@ -148,7 +187,7 @@ export function ExportBinderModal({
         <div className="export-range-options">
           <label className="export-radio-option">
             <input type="radio" checked={format === 'png'} onChange={() => setFormat('png')} />
-            Images (PNG{getSelectedPageNumbers().length > 1 ? ', zipped' : ''})
+            Images (PNG{(spreadMode ? buildSpreadList(binder.pages).length : getSelectedPageNumbers().length) > 1 ? ', zipped' : ''})
           </label>
           <label className="export-radio-option">
             <input type="radio" checked={format === 'pdf'} disabled={cardsOnly} onChange={() => setFormat('pdf')} />
@@ -159,7 +198,7 @@ export function ExportBinderModal({
 
       {error && <p className="modal-step-error">{error}</p>}
       {isExporting && progress && (
-        <p className="modal-step-note">Rendering page {progress.current} of {progress.total}…</p>
+        <p className="modal-step-note">Rendering {spreadMode ? 'spread' : 'page'} {progress.current} of {progress.total}…</p>
       )}
 
       <ModalActions>

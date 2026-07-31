@@ -3,13 +3,15 @@
  * @fileoverview Tests for ExportBinderModal.jsx.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { ExportBinderModal } from '../ExportBinderModal.jsx';
 
 const mockExportBinderPages = vi.fn();
+const mockExportBinderSpreads = vi.fn();
 vi.mock('../../../utils/binderExport.js', () => ({
   exportBinderPages: (...args) => mockExportBinderPages(...args),
+  exportBinderSpreads: (...args) => mockExportBinderSpreads(...args),
 }));
 
 function renderModal(props) {
@@ -20,6 +22,11 @@ function renderModal(props) {
     {...props}
   />);
 }
+
+beforeEach(() => {
+  mockExportBinderPages.mockReset();
+  mockExportBinderSpreads.mockReset();
+});
 
 describe('ExportBinderModal — page range selection', () => {
   it('defaults to "All pages" showing the real page count', () => {
@@ -124,6 +131,61 @@ describe('ExportBinderModal — export flow', () => {
     await waitFor(() => expect(screen.getByText('Exporting…')).toBeInTheDocument());
     expect(screen.getByText('Exporting…')).toBeDisabled();
     expect(screen.getByText('Cancel')).toBeDisabled();
+
+    await act(async () => { resolveExport(); await Promise.resolve(); });
+  });
+});
+
+describe('ExportBinderModal — spread mode (real bug context: exporting the binder the way it actually looks when open)', () => {
+  it('checking spread mode hides the page-range picker entirely — a partial range doesn\'t map onto pairs of facing pages', () => {
+    renderModal();
+    expect(screen.getByText('Page range')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(/Export as spreads/));
+
+    expect(screen.queryByText('Page range')).not.toBeInTheDocument();
+  });
+
+  it('clicking Export in spread mode calls exportBinderSpreads (not exportBinderPages) with the full, correctly-paired spread list for the binder', async () => {
+    mockExportBinderSpreads.mockResolvedValue(undefined);
+    renderModal({ binder: { id: 'binder-1', pages: 5 } });
+
+    fireEvent.click(screen.getByText(/Export as spreads/));
+    fireEvent.click(screen.getByText('Export'));
+
+    await waitFor(() => expect(mockExportBinderSpreads).toHaveBeenCalled());
+    expect(mockExportBinderPages).not.toHaveBeenCalled();
+    const call = mockExportBinderSpreads.mock.calls[0][0];
+    // 5 pages -> spreads: (null,1), (2,3), (4,5) -- 3 spreads total
+    expect(call.spreads).toEqual([
+      { spreadIndex: 1, leftPageNum: null, rightPageNum: 1 },
+      { spreadIndex: 2, leftPageNum: 2, rightPageNum: 3 },
+      { spreadIndex: 3, leftPageNum: 4, rightPageNum: 5 },
+    ]);
+  });
+
+  it('toasts and closes using the spread count, not a leftover page count, after a successful spread export', async () => {
+    mockExportBinderSpreads.mockResolvedValue(undefined);
+    const toast = vi.fn();
+    const onClose = vi.fn();
+    renderModal({ binder: { id: 'binder-1', pages: 5 }, toast, onClose });
+
+    fireEvent.click(screen.getByText(/Export as spreads/));
+    fireEvent.click(screen.getByText('Export'));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(toast).toHaveBeenCalledWith('Exported 3 spreads');
+  });
+
+  it('shows "Rendering spread N of M" progress text, not "page", while a spread export is in progress', async () => {
+    let resolveExport;
+    mockExportBinderSpreads.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
+    renderModal({ binder: { id: 'binder-1', pages: 5 } });
+
+    fireEvent.click(screen.getByText(/Export as spreads/));
+    fireEvent.click(screen.getByText('Export'));
+
+    await waitFor(() => expect(screen.getByText(/Rendering spread/)).toBeInTheDocument());
 
     await act(async () => { resolveExport(); await Promise.resolve(); });
   });
