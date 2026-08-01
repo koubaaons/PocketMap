@@ -17,7 +17,7 @@
 import { useState } from 'react';
 import { supabase } from '../../services/supabase.js';
 
-export function LoginView({ onSwitchToRegister }) {
+export function LoginView({ onSwitchToRegister, onForgotPassword }) {
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors]   = useState({});
@@ -108,6 +108,14 @@ export function LoginView({ onSwitchToRegister }) {
             {errors.password && (
               <p className="auth-field-error" role="alert">{errors.password}</p>
             )}
+            <button
+              type="button"
+              className="auth-forgot-password-link"
+              onClick={onForgotPassword}
+              disabled={loading}
+            >
+              Forgot password?
+            </button>
           </div>
 
           <button

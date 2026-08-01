@@ -97,6 +97,29 @@
   cursor: not-allowed;
 }
 
+.auth-forgot-password-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 6px;
+  display: block;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-forgot-password-link:hover {
+  color: var(--accent);
+}
+
+.auth-forgot-password-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Success state icon */
 .auth-success-icon {
   font-size: 48px;

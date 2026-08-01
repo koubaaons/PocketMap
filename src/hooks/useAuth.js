@@ -7,10 +7,20 @@
  * only registered once regardless of how many components call this hook.
  *
  * Returns:
- *   user     — the Supabase User object, or null if not logged in
- *   loading  — true while the initial session check is in flight
- *              (prevents a flash of the login screen on page reload
- *               when the user is already logged in)
+ *   user             — the Supabase User object, or null if not logged in
+ *   loading          — true while the initial session check is in flight
+ *                       (prevents a flash of the login screen on page
+ *                        reload when the user is already logged in)
+ *   passwordRecovery — true when the current session exists specifically
+ *                       because the user just clicked a password-reset
+ *                       link, not a normal login. Requested directly:
+ *                       Supabase's PASSWORD_RECOVERY event still
+ *                       establishes a genuinely valid, truthy user
+ *                       session — without tracking this separately,
+ *                       AuthGate would have no way to tell that apart
+ *                       from an ordinary signed-in session, and would
+ *                       incorrectly show the full app instead of asking
+ *                       for a new password.
  */
 
 import { useState, useEffect } from 'react';
@@ -21,6 +31,7 @@ import { runImageSizeBackfillIfNeeded } from '../utils/backfillImageSizes.js';
 export function useAuth() {
   const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     // Get the current session immediately on mount — handles the case
@@ -42,11 +53,21 @@ export function useAuth() {
       }
     });
 
-    // Subscribe to future auth changes (login, logout, token refresh).
+    // Subscribe to future auth changes (login, logout, token refresh,
+    // and password recovery).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
         setLoading(false);
+
+        if (event === 'PASSWORD_RECOVERY') {
+          setPasswordRecovery(true);
+        }
+        // Deliberately never cleared back to false automatically —
+        // ResetPasswordView.jsx clears it explicitly once the user
+        // has actually finished setting a new password (or backed
+        // out), not on some other unrelated auth event that happens
+        // to fire in between.
 
         // === ISSUE #125: one-time base64→Storage image migration ===
         // Only on an actual sign-in, not every token refresh — the
@@ -63,5 +84,5 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  return { user, loading };
+  return { user, loading, passwordRecovery, clearPasswordRecovery: () => setPasswordRecovery(false) };
 }

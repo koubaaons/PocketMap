@@ -139,4 +139,68 @@ describe('useAuth', () => {
 
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
+
+  describe('passwordRecovery (real feature: password reset flow)', () => {
+    it('starts as false', async () => {
+      mockGetSession.mockResolvedValue({ data: { session: null } });
+      const { useAuth } = await import('../useAuth.js');
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.passwordRecovery).toBe(false);
+    });
+
+    it('becomes true specifically on the PASSWORD_RECOVERY event', async () => {
+      mockGetSession.mockResolvedValue({ data: { session: null } });
+      let authChangeCallback;
+      mockOnAuthStateChange.mockImplementation((cb) => {
+        authChangeCallback = cb;
+        return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
+      });
+
+      const { useAuth } = await import('../useAuth.js');
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      act(() => authChangeCallback('PASSWORD_RECOVERY', { user: { id: 'user-1' } }));
+
+      await waitFor(() => expect(result.current.passwordRecovery).toBe(true));
+    });
+
+    it('does NOT become true on an ordinary SIGNED_IN event', async () => {
+      mockGetSession.mockResolvedValue({ data: { session: null } });
+      let authChangeCallback;
+      mockOnAuthStateChange.mockImplementation((cb) => {
+        authChangeCallback = cb;
+        return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
+      });
+
+      const { useAuth } = await import('../useAuth.js');
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      act(() => authChangeCallback('SIGNED_IN', { user: { id: 'user-1' } }));
+
+      expect(result.current.passwordRecovery).toBe(false);
+    });
+
+    it('clearPasswordRecovery resets it back to false', async () => {
+      mockGetSession.mockResolvedValue({ data: { session: null } });
+      let authChangeCallback;
+      mockOnAuthStateChange.mockImplementation((cb) => {
+        authChangeCallback = cb;
+        return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
+      });
+
+      const { useAuth } = await import('../useAuth.js');
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      act(() => authChangeCallback('PASSWORD_RECOVERY', { user: { id: 'user-1' } }));
+      await waitFor(() => expect(result.current.passwordRecovery).toBe(true));
+
+      act(() => result.current.clearPasswordRecovery());
+
+      expect(result.current.passwordRecovery).toBe(false);
+    });
+  });
 });
