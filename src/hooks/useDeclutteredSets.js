@@ -17,7 +17,7 @@
  * different accounts genuinely stay independent. ===
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useAuth } from './useAuth.js';
 
 function storageKeyFor(userId) {
@@ -47,6 +47,26 @@ export function useDeclutteredSets() {
   const { user } = useAuth();
   const userId = user?.id;
   const [declutteredIds, setDeclutteredIds] = useState(() => loadStoredIds(userId));
+
+  // === Real bug fixed: useAuth resolves asynchronously, and every
+  // fresh mount of whatever calls this hook starts with a fresh,
+  // unresolved auth check (user:null) — meaning userId was reliably
+  // undefined at the exact moment the useState initializer above ran,
+  // on every single mount. It always loaded from the wrong, empty
+  // 'anonymous' key, even though the real user's own key genuinely
+  // had the correct, previously-saved data sitting there the whole
+  // time — it just never got loaded.
+  //
+  // Re-syncs from storage during render once the real userId actually
+  // becomes available, using React's own recommended pattern for
+  // "adjust state when a prop changes" (a ref comparison during
+  // render) rather than a useEffect that calls setState — the latter
+  // works too, but costs an extra, avoidable render cycle every time.
+  const loadedForUserId = useRef(userId);
+  if (loadedForUserId.current !== userId) {
+    loadedForUserId.current = userId;
+    if (userId) setDeclutteredIds(loadStoredIds(userId));
+  }
 
   const declutter = useCallback((ids) => {
     setDeclutteredIds(prev => {

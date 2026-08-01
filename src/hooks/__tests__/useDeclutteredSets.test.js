@@ -103,4 +103,34 @@ describe('useDeclutteredSets', () => {
       expect(localStorage.getItem('pinder:decluttered-set-ids')).toBe(null);
     });
   });
+
+  describe('real bug fixed: useAuth resolving asynchronously after mount', () => {
+    it('re-loads the correct account\'s saved data once a real userId arrives after starting as null — matching how useAuth genuinely behaves in practice (starts unresolved on every fresh mount, resolves moments later), not just the instant-userId case every other test here uses for simplicity', () => {
+      // Simulates the exact real-world sequence: account already has
+      // decluttered sets saved from an earlier session, then the
+      // consuming component mounts fresh (e.g. navigating back to
+      // this page) while auth hasn't resolved yet.
+      localStorage.setItem(keyFor('user-1'), JSON.stringify(['set-a', 'set-b']));
+
+      mockUserId = null; // auth not resolved yet at mount time
+      const { result, rerender } = renderHook(() => useDeclutteredSets());
+      expect(result.current.declutteredIds.size).toBe(0); // correct so far -- genuinely doesn't know who's logged in yet
+
+      mockUserId = 'user-1'; // auth resolves moments later
+      rerender();
+
+      expect(result.current.declutteredIds.has('set-a')).toBe(true);
+      expect(result.current.declutteredIds.has('set-b')).toBe(true);
+    });
+
+    it('does NOT reload (and does not lose in-progress changes) on a re-render where userId hasn\'t actually changed', () => {
+      mockUserId = 'user-1';
+      const { result, rerender } = renderHook(() => useDeclutteredSets());
+      act(() => result.current.declutter(['set-a']));
+
+      rerender(); // same userId as before
+
+      expect(result.current.declutteredIds.has('set-a')).toBe(true);
+    });
+  });
 });
