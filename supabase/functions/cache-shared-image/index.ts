@@ -85,7 +85,19 @@ Deno.serve(async (req) => {
 
     const { error: uploadError } = await supabase.storage
       .from(CARD_IMAGES_BUCKET)
-      .upload(path, imageBlob, { contentType: imageBlob.type || 'image/jpeg', upsert: true });
+      .upload(path, imageBlob, {
+        contentType: imageBlob.type || 'image/jpeg',
+        upsert: true,
+        // === Real gap fixed: this previously left cacheControl
+        // unset, defaulting to Supabase's own 1-hour cache. Shared
+        // card art (this is the ONLY path that creates it) never
+        // changes once cached here, and gets served repeatedly to
+        // every user who ever imports that same card -- almost
+        // certainly the single highest-volume image path in the
+        // whole app. One year directly cuts repeat cached-egress
+        // traffic for exactly the files most responsible for it.
+        cacheControl: '31536000',
+      });
     if (uploadError) {
       return jsonResponse({ error: uploadError.message }, 500);
     }
