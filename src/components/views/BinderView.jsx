@@ -44,6 +44,7 @@ import { useCardDefinitionActions } from '../../hooks/useCardDefinitionActions.j
 import { useBinderCoverEditor } from '../../hooks/useBinderCoverEditor.js';
 import { BinderCoverStickers } from './BinderCover.jsx';
 import { BinderCustomizePanel } from './BinderCustomizePanel.jsx';
+import { useFirstTimeHint } from '../../hooks/useFirstTimeHint.js';
 import { getOwnedFilledSlotCount } from '../../selectors/binderSelectors.js';
 import { binderCapacity } from '../../utils/index.js';
 import { buildOwnershipMap, buildInventoryGroupMap } from '../../selectors/inventorySelectors.js';
@@ -118,6 +119,11 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const isClosed = view.page === 0;
 
   const coverEditor = useBinderCoverEditor({ binder, toast });
+  // Requested directly: point out fullscreen mode the first time
+  // someone customizes a binder, since it makes the whole editing
+  // experience noticeably easier — shown once per account, then
+  // never again once dismissed.
+  const fullscreenHint = useFirstTimeHint('binder-customize-fullscreen');
   const { showCardInfo, toggle: toggleCardInfo } = useCardInfoToggle();
 
   // === Home's "Customize" shortcut sets nav.autoOpenCustomize so the
@@ -766,7 +772,14 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
               reserving separate flex space outside the binder, which
               was forcing the whole row wider and shrinking the binder
               itself to compensate. */}
-          {isCover && !isAnimatingCoverFlip && !isPreOpenSliding && <BinderCustomizePanel isCover={isCover} {...coverEditor} />}
+          {isCover && !isAnimatingCoverFlip && !isPreOpenSliding && (
+            <BinderCustomizePanel
+              isCover={isCover}
+              {...coverEditor}
+              showFullscreenHint={fullscreenHint.showHint}
+              onDismissFullscreenHint={fullscreenHint.dismiss}
+            />
+          )}
           <BinderDataProvider value={{ cardDefMap, ownershipMap, inventoryGroupMap, allBinderSlots, allBinderPanels }}>
             <BinderBookFlip
               binder={binder}

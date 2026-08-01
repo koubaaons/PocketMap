@@ -33,7 +33,7 @@ import { useCountUp } from './useCountUp.js';
 /**
  * @param {{ variant?: 'primary'|'ghost'|'danger'|'icon', size?: 'sm'|'md', children, onClick, disabled?, style?, title? }} props
  */
-export function Button({ variant = 'ghost', size = 'md', children, onClick, disabled, style, title, type = 'button', className = '' }) {
+export function Button({ variant = 'ghost', size = 'md', children, onClick, disabled, style, title, type = 'button', className = '', ariaLabel }) {
   return (
     <button
       type={type}
@@ -42,7 +42,15 @@ export function Button({ variant = 'ghost', size = 'md', children, onClick, disa
       disabled={disabled}
       style={style}
       title={title}
-      aria-label={typeof children === 'string' ? undefined : title}
+      // === Real bug fixed: an icon-only button whose children is
+      // just a symbol character (e.g. "✕"/"⛶" for fullscreen) still
+      // counted as a "string", so the auto-computed fallback below
+      // assumed it was already descriptive enough and skipped
+      // providing any accessible label at all -- a real gap for
+      // anyone using a screen reader. ariaLabel lets a caller state
+      // this explicitly, taking priority over the auto-computed
+      // guess.
+      aria-label={ariaLabel ?? (typeof children === 'string' ? undefined : title)}
     >
       {children}
     </button>

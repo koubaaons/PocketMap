@@ -148,18 +148,24 @@
   gap: var(--space-2);
 }
 
-/* Applied to .binder-topbar and .binder-page-nav while the cover is
-   closed — everything dims and stops responding to clicks EXCEPT
-   whatever carries .binder-topbar-always-live (the fullscreen
-   button), which stays fully live so fullscreen works even closed. */
+.binder-topbar-right-dimmable {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Applied directly to whichever specific wrapper should dim while the
+   cover is closed (binder-topbar-left, and each
+   binder-topbar-right-dimmable group) — never to the outer
+   .binder-topbar or .binder-topbar-right themselves. This is
+   deliberate: opacity composites down an entire subtree and can't be
+   reversed by a descendant's own override, so the fullscreen button
+   is kept as a genuine sibling of these dimmed wrappers, never their
+   descendant, rather than trying to carve out an exception inside
+   them. */
 .binder-topbar-disabled {
   opacity: 0.35;
   pointer-events: none;
-}
-
-.binder-topbar-disabled .binder-topbar-always-live {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 /* ── Plan Layout banner ───────────────────────────────────────────────────── */

@@ -107,7 +107,7 @@ export function HomeView({ toast, onNavigate, mode = 'dashboard' }) {
                 cardCount={getOwnedFilledSlotCount(binderSlots, b.id, inventory, binderPanels)}
                 capacity={binderCapacity(b, binderPanels)}
                 onClick={() => onNavigate('binder', b.id)}
-                onCustomizeCover={() => onNavigate('binder', b.id, null, true)}
+                onCustomizeCover={() => onNavigate('binder', b.id, 0, true)}
               />
             ))}
           </div>

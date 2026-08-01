@@ -44,6 +44,12 @@ export function BinderCustomizePanel({
   handleStickerFileSelected,
   stickerFileInputRef,
   MAX_STICKERS,
+  // Requested directly: point out fullscreen mode the first time
+  // someone customizes a binder, since it makes the whole editing
+  // experience noticeably easier on a small screen — shown once per
+  // account, then never again once dismissed.
+  showFullscreenHint,
+  onDismissFullscreenHint,
 }) {
   if (!isCover) return null;
 
@@ -65,6 +71,20 @@ export function BinderCustomizePanel({
   return (
     <div className="binder-customize-panel-wrap">
       <div className="binder-customize-panel animate-slide-up-fade-in">
+        {showFullscreenHint && (
+          <div className="binder-customize-hint">
+            <span>💡 Tip: customizing is easier in fullscreen — try the ⛶ button above.</span>
+            <button
+              type="button"
+              className="binder-customize-hint-dismiss"
+              onClick={onDismissFullscreenHint}
+              aria-label="Dismiss tip"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <label className="binder-customize-field">
           <span>Name</span>
           <input
