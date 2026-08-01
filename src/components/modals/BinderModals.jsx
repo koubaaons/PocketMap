@@ -20,7 +20,7 @@ import { Modal, ModalActions, Button, Input } from '../ui/index.jsx';
 import { createBinder, DEFAULT_BINDER_COLOR, MAX_BINDER_COLS, MAX_BINDER_ROWS, MAX_BINDER_PAGES } from '../../types/index.js';
 
 const GRID_OPTIONS = Array.from({ length: MAX_BINDER_COLS }, (_, i) => i + 1);
-const PAGE_OPTIONS = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100].filter(n => n <= MAX_BINDER_PAGES);
+const PAGE_OPTIONS = [5, 10, 15, 20, 25, 30, 36, 40, 50, 75, 100].filter(n => n <= MAX_BINDER_PAGES);
 
 export function CreateBinderModal({ onSubmit, onClose }) {
   const [fields, setFields] = useState({

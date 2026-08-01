@@ -52,6 +52,7 @@ export function AddCardsPanel({
   allBinderSlots,
   allBinderPanels,
   onClose,
+  onNavigate,
 }) {
   const [query, setQuery] = useState('');
   const [selectedCollectionId, setSelectedCollectionId] = useState(null); // null = All
@@ -274,6 +275,13 @@ export function AddCardsPanel({
   const tileWidth = Math.floor((availableWidth - GRID_GAP * (gridColumns - 1)) / gridColumns);
 
   const ownershipMap      = useMemo(() => buildOwnershipMap(inventory), [inventory]);
+  // Requested directly: a first-time user with zero owned cards
+  // anywhere in the app was seeing the exact same "every card you own
+  // is already placed" message shown to someone who owns plenty but
+  // has placed all of it -- confusing for someone who's never owned
+  // anything, since it doesn't explain the actual model at all (own a
+  // card in Collections first, then it becomes placeable here).
+  const ownsNothingAtAll = Object.keys(ownershipMap).length === 0;
   const inventoryGroupMap = useMemo(() => buildInventoryGroupMap(inventory), [inventory]);
 
   // A card is only unavailable once every owned copy already has a
@@ -462,9 +470,22 @@ export function AddCardsPanel({
 
       <div className="add-cards-panel-body">
         {groups.length === 0 && (
-          <p className="empty-results">
-            {query ? `No cards found for "${query}"` : 'Every card you own is already placed'}
-          </p>
+          ownsNothingAtAll && !query ? (
+            <div className="add-cards-panel-empty-account">
+              <p className="empty-results">
+                You don't own any cards yet. Own a card in Collections first, and it'll show up here ready to place.
+              </p>
+              {onNavigate && (
+                <Button variant="primary" size="sm" onClick={() => onNavigate('collections')}>
+                  Go to Collections
+                </Button>
+              )}
+            </div>
+          ) : (
+            <p className="empty-results">
+              {query ? `No cards found for "${query}"` : 'Every card you own is already placed'}
+            </p>
+          )
         )}
 
         {groups.map(({ collection, cards }) => (

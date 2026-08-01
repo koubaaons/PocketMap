@@ -813,6 +813,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           allBinderSlots={allBinderSlots}
           allBinderPanels={allBinderPanels}
           onClose={view.closeAddToSlot}
+          onNavigate={onNavigate}
         />
       )}
 
