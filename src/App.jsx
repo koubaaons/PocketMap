@@ -8,6 +8,7 @@ import { useCallback, lazy, Suspense, useEffect } from 'react';
 import { useStore, useDispatch } from './hooks/useStore.js';
 import { useToast } from './hooks/useToast.js';
 import { useSupabaseSync } from './hooks/useSupabaseSync.js';
+import { useAuth } from './hooks/useAuth.js';
 import { useNewSetCheck } from './hooks/useNewSetCheck.js';
 import { useCollectionUpdateCheck } from './hooks/useCollectionUpdateCheck.js';
 import { useTheme } from './hooks/useTheme.js';
@@ -49,6 +50,7 @@ export default function App() {
   const { toasts, toast, dismiss } = useToast();
   const { theme, toggleTheme, isDark } = useTheme();
   const { syncing, lastSynced } = useSupabaseSync();
+  const { user } = useAuth();
   const binders         = useStore(s => s.binders);
   const bin             = useStore(s => s.bin);
   const nav             = useStore(s => s.nav);
@@ -270,7 +272,7 @@ export default function App() {
   return (
     <Suspense fallback={<div className="sync-loading"><div className="sync-loading-inner"><div className="sync-spinner" /></div></div>}>
     <div className="app-shell">
-      <Sidebar nav={nav} bin={bin} onNavigate={navigate} />
+      <Sidebar nav={nav} bin={bin} onNavigate={navigate} user={user} />
       <div className="main-area">
         <header className="topbar">
           <div>
