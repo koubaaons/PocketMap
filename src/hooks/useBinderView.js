@@ -36,6 +36,24 @@ import { useState, useCallback } from 'react';
 export function useBinderView(binder, binderSlots, binderPanels = []) {
   const [page, setPage]                     = useState(0);
   const [addingToSlot, setAddingToSlot]     = useState(null);
+  // === Requested directly: after clicking a card to place it, the
+  // panel should stay open with nothing targeted, rather than
+  // closing or auto-advancing to some guessed "next" slot -- the
+  // user clicks wherever they want to place the next one themselves.
+  // Kept as its own, separate piece of state from addingToSlot (which
+  // panel is open vs. which specific slot is currently targeted)
+  // specifically to support that: clearing the target after a
+  // placement must not also close the panel.
+  const [isAddPanelOpen, setIsAddPanelOpen] = useState(false);
+  // === Requested directly: click a card, THEN click the slot to
+  // place it there — the reverse order from the existing "click an
+  // empty slot first" flow. Both are genuinely valid, independent
+  // ways to start a placement, so this exists alongside addingToSlot
+  // rather than replacing it: whichever one already has a value takes
+  // priority at the moment of the second click (see
+  // handleClickCardToPlace / the slot-click handler in
+  // BinderView.jsx).
+  const [selectedCardForPlacement, setSelectedCardForPlacement] = useState(null);
   const [activeSlot, setActiveSlot]         = useState(null);
   const [viewingCardDef, setViewingCardDef] = useState(null);
 
@@ -58,8 +76,19 @@ export function useBinderView(binder, binderSlots, binderPanels = []) {
   const activeSlots = isPreviewMode ? (previewSlots ?? binderSlots) : binderSlots;
   const activePanels = isPreviewMode ? (previewPanels ?? binderPanels) : binderPanels;
 
-  const openAddToSlot  = (slotIndex, pageNumber) => setAddingToSlot({ slotIndex, pageNumber });
-  const closeAddToSlot = () => setAddingToSlot(null);
+  const openAddToSlot  = (slotIndex, pageNumber) => { setAddingToSlot({ slotIndex, pageNumber }); setIsAddPanelOpen(true); };
+  const closeAddToSlot = () => { setAddingToSlot(null); setIsAddPanelOpen(false); setSelectedCardForPlacement(null); };
+  // Clears which slot is targeted WITHOUT closing the panel itself —
+  // used after a click-to-place placement succeeds, so the panel
+  // stays open and ready for the user to click a new slot, rather
+  // than guessing which one they want next.
+  const clearAddingToSlotTarget = () => setAddingToSlot(null);
+  // Card-first flow: select a card in the panel, waiting for a slot
+  // click. Clicking a different card while one is already selected
+  // just re-selects (switches which card is waiting), rather than
+  // requiring an explicit deselect first.
+  const selectCardForPlacement = (cardDef) => setSelectedCardForPlacement(cardDef);
+  const clearSelectedCardForPlacement = () => setSelectedCardForPlacement(null);
 
   const openSlotAction  = (slot, cardDef) => setActiveSlot({ slot, cardDef });
   const closeSlotAction = () => setActiveSlot(null);
@@ -240,6 +269,8 @@ export function useBinderView(binder, binderSlots, binderPanels = []) {
   return {
     page: safePage,
     addingToSlot,
+    isAddPanelOpen,
+    selectedCardForPlacement,
     activeSlot,
     viewingCardDef,
     isPreviewMode,
@@ -251,6 +282,9 @@ export function useBinderView(binder, binderSlots, binderPanels = []) {
 
     openAddToSlot,
     closeAddToSlot,
+    clearAddingToSlotTarget,
+    selectCardForPlacement,
+    clearSelectedCardForPlacement,
     openSlotAction,
     closeSlotAction,
     openCardDetail,

@@ -53,6 +53,8 @@ export function AddCardsPanel({
   allBinderPanels,
   onClose,
   onNavigate,
+  onClickCard,
+  selectedCardId,
 }) {
   const [query, setQuery] = useState('');
   const [selectedCollectionId, setSelectedCollectionId] = useState(null); // null = All
@@ -396,7 +398,11 @@ export function AddCardsPanel({
       <div className="add-cards-panel-header">
         <div>
           <h2 className="add-cards-panel-title">Add Cards</h2>
-          <p className="add-cards-panel-subtitle">Drag a card onto any empty slot</p>
+          <p className="add-cards-panel-subtitle">
+            {selectedCardId
+              ? 'Click an empty slot to place the selected card'
+              : 'Drag a card onto any empty slot, or click a card then a slot'}
+          </p>
         </div>
         <Button variant="primary" size="sm" onClick={onClose}>Done</Button>
       </div>
@@ -501,9 +507,18 @@ export function AddCardsPanel({
                 return (
                   <div
                     key={card.id}
-                    className={`card-grid-item add-cards-panel-tile ${isOwned ? 'card-grid-item-owned' : 'card-grid-item-not-owned'}`}
+                    className={`card-grid-item add-cards-panel-tile ${isOwned ? 'card-grid-item-owned' : 'card-grid-item-not-owned'} ${card.id === selectedCardId ? 'add-cards-panel-tile-selected' : ''}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, card)}
+                    onClick={() => onClickCard?.(card)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onClickCard?.(card);
+                      }
+                    }}
                     title={isOwned ? card.name : `${card.name} — not owned, will be placed as a grey placeholder`}
                   >
                     <div className="card-grid-item-image-wrapper">

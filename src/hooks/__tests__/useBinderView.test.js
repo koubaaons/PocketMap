@@ -411,3 +411,83 @@ describe('useBinderView — panel draft (Combine/Uncombine/Swap Pages staged in 
     expect(result.current.previewPanels.map(p => p.id)).toEqual(['new']);
   });
 });
+
+describe('useBinderView — isAddPanelOpen / addingToSlot (real feature: the add-cards panel staying open across multiple click-to-place placements)', () => {
+  it('openAddToSlot sets both isAddPanelOpen and addingToSlot together', () => {
+    const { result } = renderHook(() => useBinderView(makeBinder(10), []));
+
+    act(() => result.current.openAddToSlot(3, 1));
+
+    expect(result.current.isAddPanelOpen).toBe(true);
+    expect(result.current.addingToSlot).toEqual({ slotIndex: 3, pageNumber: 1 });
+  });
+
+  it('clearAddingToSlotTarget clears ONLY the targeted slot, leaving isAddPanelOpen true — the actual behavior requested: after placing a card, the panel stays open with nothing selected, rather than closing or guessing a next slot', () => {
+    const { result } = renderHook(() => useBinderView(makeBinder(10), []));
+    act(() => result.current.openAddToSlot(3, 1));
+
+    act(() => result.current.clearAddingToSlotTarget());
+
+    expect(result.current.isAddPanelOpen).toBe(true);
+    expect(result.current.addingToSlot).toBeNull();
+  });
+
+  it('closeAddToSlot (the explicit close, e.g. the ✕ button) clears both — a full close, not just clearing the target', () => {
+    const { result } = renderHook(() => useBinderView(makeBinder(10), []));
+    act(() => result.current.openAddToSlot(3, 1));
+
+    act(() => result.current.closeAddToSlot());
+
+    expect(result.current.isAddPanelOpen).toBe(false);
+    expect(result.current.addingToSlot).toBeNull();
+  });
+
+  it('after clearing the target, clicking a new empty slot re-targets it while the panel stays open the whole time — the actual multi-placement workflow requested, never needing to reopen the panel between cards', () => {
+    const { result } = renderHook(() => useBinderView(makeBinder(10), []));
+    act(() => result.current.openAddToSlot(3, 1));
+    act(() => result.current.clearAddingToSlotTarget());
+
+    act(() => result.current.openAddToSlot(7, 1));
+
+    expect(result.current.isAddPanelOpen).toBe(true);
+    expect(result.current.addingToSlot).toEqual({ slotIndex: 7, pageNumber: 1 });
+  });
+
+  it('closeAddToSlot also clears any pending card selection — otherwise a much-later slot click could unexpectedly place a card the user probably forgot they\'d selected', () => {
+    const { result } = renderHook(() => useBinderView(makeBinder(10), []));
+    act(() => result.current.selectCardForPlacement({ id: 'card-1' }));
+
+    act(() => result.current.closeAddToSlot());
+
+    expect(result.current.selectedCardForPlacement).toBeNull();
+  });
+});
+
+describe('useBinderView — selectedCardForPlacement (real feature: the actual card-first workflow requested — click a card, then click a slot)', () => {
+  it('selectCardForPlacement sets the selected card', () => {
+    const { result } = renderHook(() => useBinderView(makeBinder(10), []));
+    const card = { id: 'card-1', name: 'Pikachu' };
+
+    act(() => result.current.selectCardForPlacement(card));
+
+    expect(result.current.selectedCardForPlacement).toEqual(card);
+  });
+
+  it('clearSelectedCardForPlacement clears it', () => {
+    const { result } = renderHook(() => useBinderView(makeBinder(10), []));
+    act(() => result.current.selectCardForPlacement({ id: 'card-1' }));
+
+    act(() => result.current.clearSelectedCardForPlacement());
+
+    expect(result.current.selectedCardForPlacement).toBeNull();
+  });
+
+  it('selecting a different card while one is already selected simply switches which one is selected, without needing an explicit deselect first', () => {
+    const { result } = renderHook(() => useBinderView(makeBinder(10), []));
+    act(() => result.current.selectCardForPlacement({ id: 'card-1' }));
+
+    act(() => result.current.selectCardForPlacement({ id: 'card-2' }));
+
+    expect(result.current.selectedCardForPlacement).toEqual({ id: 'card-2' });
+  });
+});

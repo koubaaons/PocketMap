@@ -266,6 +266,23 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
 
   // ── Edit mode handlers ──────────────────────────────────────────────────
 
+  // === Requested directly: click-to-place, not just drag-and-drop.
+  // AddCardsPanel is only ever rendered while view.addingToSlot is
+  // set (see its render condition below), so there's always a real
+  // target slot the moment this panel is open -- clicking a card can
+  // always place it there directly. Reuses handleDropCardOnSlot
+  // exactly, the same placement path drag-and-drop already goes
+  // through, rather than a second, parallel implementation that could
+  // drift out of sync with it.
+  const handleClickCardToPlace = (cardDef) => {
+    if (view.addingToSlot) {
+      handleDropCardOnSlot(view.addingToSlot.pageNumber, view.addingToSlot.slotIndex, { cardDefId: cardDef.id });
+      view.clearAddingToSlotTarget();
+      return;
+    }
+    view.selectCardForPlacement(cardDef);
+  };
+
   const handleDropCardOnSlot = (pageNumber, slotIndex, dragPayload) => {
     const cardDef = cardDefMap[dragPayload?.cardDefId];
     if (!cardDef) return; // malformed or stale drag payload — nothing to place
@@ -379,11 +396,23 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     }
   };
 
+  // === Card-first flow: if a card is currently selected in the panel
+  // (clicked before any slot was targeted), clicking an empty slot
+  // places that card there directly, rather than opening the panel
+  // targeted at this slot. Shared between preview and normal mode
+  // rather than duplicated, since both need the exact same check.
+  const handleEmptyClickWithSelectedCard = (slotIndex, pageNumber) => {
+    if (!view.selectedCardForPlacement) return false;
+    handleDropCardOnSlot(pageNumber, slotIndex, { cardDefId: view.selectedCardForPlacement.id });
+    view.clearSelectedCardForPlacement();
+    return true;
+  };
+
   const handleEmptyClickInPreview = (slotIndex, pageNumber) => {
     if (view.selectedSlot) {
       // Empty destination — no swap partner, pass null explicitly.
       view.previewMoveSlot(view.selectedSlot.id, null, pageNumber, slotIndex);
-    } else {
+    } else if (!handleEmptyClickWithSelectedCard(slotIndex, pageNumber)) {
       view.openAddToSlot(slotIndex, pageNumber);
     }
   };
@@ -635,9 +664,9 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     interactions: {
       onClickEmpty: (slotIndex) => {
         if (view.isCombineMode) { view.toggleSlotForCombine(pageNumber, slotIndex); return; }
-        return view.isPreviewMode
-          ? handleEmptyClickInPreview(slotIndex, pageNumber)
-          : view.openAddToSlot(slotIndex, pageNumber);
+        if (view.isPreviewMode) return handleEmptyClickInPreview(slotIndex, pageNumber);
+        if (handleEmptyClickWithSelectedCard(slotIndex, pageNumber)) return;
+        return view.openAddToSlot(slotIndex, pageNumber);
       },
       // === Clicking a card in a binder now goes straight to the same
       // card-detail experience Collections uses (card floats, details
@@ -825,7 +854,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       )}
 
       {/* Modals */}
-      {view.addingToSlot && (
+      {view.isAddPanelOpen && (
         <AddCardsPanel
           cardDefinitions={cardDefinitions}
           collections={collections}
@@ -834,6 +863,8 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           allBinderPanels={allBinderPanels}
           onClose={view.closeAddToSlot}
           onNavigate={onNavigate}
+          onClickCard={handleClickCardToPlace}
+          selectedCardId={view.selectedCardForPlacement?.id}
         />
       )}
 

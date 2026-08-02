@@ -238,6 +238,16 @@
   cursor: grab;
 }
 
+.add-cards-panel-tile-selected {
+  outline: 3px solid var(--accent, #e85d75);
+  outline-offset: -3px;
+}
+
+.add-cards-panel-tile:hover {
+  outline: 2px solid var(--accent, #e85d75);
+  outline-offset: -2px;
+}
+
 .add-cards-panel-tile:active {
   cursor: grabbing;
 }

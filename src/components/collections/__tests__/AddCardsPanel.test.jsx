@@ -33,6 +33,79 @@ function renderPanel(props) {
   );
 }
 
+describe('AddCardsPanel — click-to-place (real feature: requested directly, click a card in addition to dragging one)', () => {
+  it('clicking a card calls onClickCard with that card', () => {
+    const onClickCard = vi.fn();
+    const card = makeCard({ id: 'card-1', name: 'Pikachu' });
+    renderPanel({ cardDefinitions: [card], onClickCard });
+
+    fireEvent.click(screen.getByText('Pikachu'));
+
+    expect(onClickCard).toHaveBeenCalledWith(card);
+  });
+
+  it('pressing Enter on a focused card also calls onClickCard — basic keyboard accessibility for what was otherwise a mouse/touch-only interaction', () => {
+    const onClickCard = vi.fn();
+    const card = makeCard({ id: 'card-1', name: 'Pikachu' });
+    renderPanel({ cardDefinitions: [card], onClickCard });
+
+    fireEvent.keyDown(screen.getByText('Pikachu').closest('[role="button"]'), { key: 'Enter' });
+
+    expect(onClickCard).toHaveBeenCalledWith(card);
+  });
+
+  it('pressing Space on a focused card also calls onClickCard', () => {
+    const onClickCard = vi.fn();
+    const card = makeCard({ id: 'card-1', name: 'Pikachu' });
+    renderPanel({ cardDefinitions: [card], onClickCard });
+
+    fireEvent.keyDown(screen.getByText('Pikachu').closest('[role="button"]'), { key: ' ' });
+
+    expect(onClickCard).toHaveBeenCalledWith(card);
+  });
+
+  it('clicking a card does not throw if onClickCard was never provided', () => {
+    const card = makeCard({ id: 'card-1', name: 'Pikachu' });
+    renderPanel({ cardDefinitions: [card] });
+
+    expect(() => fireEvent.click(screen.getByText('Pikachu'))).not.toThrow();
+  });
+
+  it('an unowned card can also be clicked to place — matches the existing drag behavior, which already allows placing unowned cards as a grey placeholder', () => {
+    const onClickCard = vi.fn();
+    const card = makeCard({ id: 'card-1', name: 'Missing Card' });
+    renderPanel({ cardDefinitions: [card], inventory: [], onClickCard });
+
+    fireEvent.click(screen.getByText('Missing Card'));
+
+    expect(onClickCard).toHaveBeenCalledWith(card);
+  });
+
+  it('highlights the currently selected card with a distinct class', () => {
+    const card = makeCard({ id: 'card-1', name: 'Pikachu' });
+    renderPanel({ cardDefinitions: [card], selectedCardId: 'card-1' });
+
+    expect(screen.getByText('Pikachu').closest('[role="button"]')).toHaveClass('add-cards-panel-tile-selected');
+  });
+
+  it('does not highlight a card that is not the selected one', () => {
+    const card = makeCard({ id: 'card-1', name: 'Pikachu' });
+    renderPanel({ cardDefinitions: [card], selectedCardId: 'card-2' });
+
+    expect(screen.getByText('Pikachu').closest('[role="button"]')).not.toHaveClass('add-cards-panel-tile-selected');
+  });
+
+  it('shows guidance to click a slot once a card is selected', () => {
+    renderPanel({ selectedCardId: 'card-1' });
+    expect(screen.getByText(/Click an empty slot to place the selected card/)).toBeInTheDocument();
+  });
+
+  it('shows the default drag-or-click guidance when nothing is selected', () => {
+    renderPanel({ selectedCardId: undefined });
+    expect(screen.getByText(/Drag a card onto any empty slot, or click a card then a slot/)).toBeInTheDocument();
+  });
+});
+
 describe('AddCardsPanel — ownership tabs', () => {
   it('defaults to the "Cards" tab, showing both owned and unowned cards', () => {
     renderPanel({
