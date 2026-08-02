@@ -154,6 +154,42 @@
   gap: var(--space-2);
 }
 
+.binder-topbar-hint-anchor {
+  position: relative;
+}
+
+.binder-topbar-hint {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(255, 200, 87, 0.95);
+  color: #1a1a1a;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.binder-topbar-hint-dismiss {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #1a1a1a;
+  opacity: 0.6;
+  font-size: var(--text-xs);
+  flex-shrink: 0;
+}
+
+.binder-topbar-hint-dismiss:hover {
+  opacity: 1;
+}
+
 /* Applied directly to whichever specific wrapper should dim while the
    cover is closed (binder-topbar-left, and each
    binder-topbar-right-dimmable group) — never to the outer

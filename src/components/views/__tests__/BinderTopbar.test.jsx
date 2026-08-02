@@ -15,8 +15,8 @@
  * structural claim directly, which is what these tests check.
  */
 
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { BinderTopbar } from '../BinderTopbar.jsx';
 
 function renderTopbar(props) {
@@ -77,5 +77,72 @@ describe('BinderTopbar — fullscreen button while closed (real bug fix)', () =>
     renderTopbar({ isClosed: true, isFullscreen: true });
 
     expect(screen.getByLabelText('Exit fullscreen')).toHaveTextContent('✕');
+  });
+});
+
+describe('BinderTopbar — Plan Layout hint (real feature: pointing out the Michi Method combine feature)', () => {
+  it('shows the hint next to Plan Layout when showPlanLayoutHint is true', () => {
+    renderTopbar({ showPlanLayoutHint: true });
+    expect(screen.getByText(/Combine slots and add photos here/)).toBeInTheDocument();
+  });
+
+  it('does not show the hint when showPlanLayoutHint is false — the normal, already-dismissed case', () => {
+    renderTopbar({ showPlanLayoutHint: false });
+    expect(screen.queryByText(/Combine slots and add photos here/)).not.toBeInTheDocument();
+  });
+
+  it('does not show the hint while the binder is closed, even if showPlanLayoutHint is true — Plan Layout itself is disabled while closed, so pointing at it then would be actively misleading', () => {
+    renderTopbar({ showPlanLayoutHint: true, isClosed: true });
+    expect(screen.queryByText(/Combine slots and add photos here/)).not.toBeInTheDocument();
+  });
+
+  it('dismissing the hint calls onDismissPlanLayoutHint', () => {
+    const onDismiss = vi.fn();
+    renderTopbar({ showPlanLayoutHint: true, onDismissPlanLayoutHint: onDismiss });
+
+    fireEvent.click(screen.getByLabelText('Dismiss tip'));
+
+    expect(onDismiss).toHaveBeenCalled();
+  });
+
+  it('the Plan Layout button itself gets the highlight animation while the hint is showing, so the hint visibly connects to a specific button rather than floating unanchored nearby', () => {
+    renderTopbar({ showPlanLayoutHint: true });
+
+    expect(screen.getByText('Plan Layout')).toHaveClass('animate-button-highlight');
+  });
+
+  it('the highlight does NOT apply once the hint has been dismissed', () => {
+    renderTopbar({ showPlanLayoutHint: false });
+
+    expect(screen.getByText('Plan Layout')).not.toHaveClass('animate-button-highlight');
+  });
+});
+
+describe('BinderTopbar — combine-workflow hint (real feature: explaining HOW to actually combine slots, not just that Plan Layout exists)', () => {
+  it('shows the combine hint while actively in combine mode', () => {
+    renderTopbar({ isPreviewMode: true, isCombineMode: true, showCombineHint: true });
+
+    expect(screen.getByText(/Click the slots you want to combine/)).toBeInTheDocument();
+  });
+
+  it('does not show the combine hint before entering combine mode, even with showCombineHint true — the hint is only relevant once slots are actually clickable for combining', () => {
+    renderTopbar({ isPreviewMode: true, isCombineMode: false, showCombineHint: true });
+
+    expect(screen.queryByText(/Click the slots you want to combine/)).not.toBeInTheDocument();
+  });
+
+  it('does not show the combine hint once dismissed', () => {
+    renderTopbar({ isPreviewMode: true, isCombineMode: true, showCombineHint: false });
+
+    expect(screen.queryByText(/Click the slots you want to combine/)).not.toBeInTheDocument();
+  });
+
+  it('dismissing the combine hint calls onDismissCombineHint', () => {
+    const onDismiss = vi.fn();
+    renderTopbar({ isPreviewMode: true, isCombineMode: true, showCombineHint: true, onDismissCombineHint: onDismiss });
+
+    fireEvent.click(screen.getByLabelText('Dismiss tip'));
+
+    expect(onDismiss).toHaveBeenCalled();
   });
 });

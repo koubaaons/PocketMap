@@ -34,6 +34,18 @@ export function BinderTopbar({
   showCardInfo,
   onToggleCardInfo,
   onExportBinder,
+  // Requested directly: point out that Plan Layout is where combining
+  // slots and adding library photos actually happens, since that
+  // whole feature is deliberately hidden behind this mode to keep the
+  // normal toolbar decluttered -- easy to miss entirely otherwise.
+  showPlanLayoutHint,
+  onDismissPlanLayoutHint,
+  // Second, follow-up hint: once someone has actually entered Plan
+  // Layout, they still need to know HOW combining actually works --
+  // click slots to select them, then click the Combine button that
+  // appears once a valid rectangle forms.
+  showCombineHint,
+  onDismissCombineHint,
 }) {
   const percentComplete = capacity > 0 ? Math.round((filled / capacity) * 100) : 0;
 
@@ -73,9 +85,24 @@ export function BinderTopbar({
                 </Button>
               )}
               {isCombineMode && (
-                <Button variant="ghost" size="sm" onClick={onExitCombineMode}>
-                  Exit Combine Mode
-                </Button>
+                <div className="binder-topbar-hint-anchor">
+                  <Button variant="ghost" size="sm" onClick={onExitCombineMode}>
+                    Exit Combine Mode
+                  </Button>
+                  {showCombineHint && (
+                    <div className="binder-topbar-hint">
+                      <span>💡 Click the slots you want to combine, then click the Combine button that appears.</span>
+                      <button
+                        type="button"
+                        className="binder-topbar-hint-dismiss"
+                        onClick={onDismissCombineHint}
+                        aria-label="Dismiss tip"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
               <Button variant={isLibraryPanelOpen ? 'primary' : 'ghost'} size="sm" onClick={onToggleLibraryPanel}>
                 Library
@@ -85,9 +112,30 @@ export function BinderTopbar({
               <Button variant="primary" size="sm" onClick={onSaveLayout}>Save Layout</Button>
             </div>
           ) : (
-            <Button variant="ghost" size="sm" onClick={onEnterPreviewMode} disabled={isClosed}>
-              Plan Layout
-            </Button>
+            <div className="binder-topbar-hint-anchor">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onEnterPreviewMode}
+                disabled={isClosed}
+                className={showPlanLayoutHint && !isClosed ? 'animate-button-highlight' : ''}
+              >
+                Plan Layout
+              </Button>
+              {showPlanLayoutHint && !isClosed && (
+                <div className="binder-topbar-hint">
+                  <span>💡 Combine slots and add photos here.</span>
+                  <button
+                    type="button"
+                    className="binder-topbar-hint-dismiss"
+                    onClick={onDismissPlanLayoutHint}
+                    aria-label="Dismiss tip"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           <Button variant="ghost" size="sm" onClick={onAddPage} disabled={isClosed}>+ Page</Button>

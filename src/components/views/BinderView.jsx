@@ -124,6 +124,8 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   // experience noticeably easier — shown once per account, then
   // never again once dismissed.
   const fullscreenHint = useFirstTimeHint('binder-customize-fullscreen');
+  const planLayoutHint = useFirstTimeHint('binder-plan-layout');
+  const combineHint = useFirstTimeHint('binder-combine-howto');
   const { showCardInfo, toggle: toggleCardInfo } = useCardInfoToggle();
 
   // === Home's "Customize" shortcut sets nav.autoOpenCustomize so the
@@ -595,6 +597,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
     if (!panel) { console.error('Panel creation failed:', errors); return; }
 
     view.previewAddPanel(panel);
+    combineHint.dismiss();
     toast('Slots combined');
     view.clearCombineSelection();
     // Stay in combine mode (so the user can combine another group
@@ -690,7 +693,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         capacity={capacity}
         isPreviewMode={view.isPreviewMode}
         onExitPreviewMode={handleDiscardLayout}
-        onEnterPreviewMode={view.enterPreviewMode}
+        onEnterPreviewMode={() => { view.enterPreviewMode(); planLayoutHint.dismiss(); }}
         onSaveLayout={handleSaveLayout}
         onAddPage={() => handleAddPage(binder.id, binder.pages)}
         onSwapPages={() => setIsSwapPagesOpen(true)}
@@ -706,6 +709,10 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
         onToggleLibraryPanel={() => setIsLibraryPanelOpen(v => !v)}
         showCardInfo={showCardInfo}
         onToggleCardInfo={toggleCardInfo}
+        showPlanLayoutHint={planLayoutHint.showHint}
+        onDismissPlanLayoutHint={planLayoutHint.dismiss}
+        showCombineHint={combineHint.showHint}
+        onDismissCombineHint={combineHint.dismiss}
       />
 
       {/* Page navigation — greyed out while closed, same as topbar. */}
