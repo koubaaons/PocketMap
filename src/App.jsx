@@ -221,8 +221,27 @@ export default function App() {
         );
 
       case 'account':
-      case 'settings':
         return <AccountView toast={toast} theme={theme} onToggleTheme={toggleTheme} lastSynced={lastSynced} />;
+
+      // === Requested directly: Settings previously rendered the
+      // exact same AccountView as the "View profile" link, with no
+      // content of its own at all — genuinely confusing, since two
+      // different nav entries showed identical pages. Kept as its own
+      // nav item (Profile stays the account/session page), but now a
+      // real, honest placeholder for the eventual social features
+      // (choosing which binders are visible to others, etc.),
+      // matching the same in-progress pattern already used for
+      // Statistics below.
+      case 'settings':
+        return (
+          <div className="view">
+            <EmptyState
+              icon="⚙️"
+              title="Settings — coming soon"
+              subtitle="This will be developed when the social part of the website is developed."
+            />
+          </div>
+        );
 
       // === Deliberately just a placeholder for now — real statistics
       // are deferred until the app's main features are stable and no
