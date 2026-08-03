@@ -36,6 +36,13 @@ export function BinderSlot({
   onToggleOwned,
   onRemove,
   onDropCard,
+  // === Requested directly: drag an already-placed card to
+  // reposition it, in addition to the existing click-select-then-
+  // click-target way of moving one. Called on drop with the SOURCE
+  // slot's id, on whichever slot (empty or filled -- filled means a
+  // swap) receives the drop. Distinct from onDropCard, which is only
+  // for a brand-new card coming from the Add Cards panel.
+  onMoveSlotHere,
 }) {
   const hasCard = !!(slot && cardDef);
 
@@ -43,12 +50,18 @@ export function BinderSlot({
   // is only ever passed while that panel is open (see BinderPage.jsx),
   // so an empty slot elsewhere in the app just ignores drag events
   // entirely — no dead handlers doing nothing on every slot always.
+  //
+  // Also now a target for repositioning an already-placed card
+  // (onMoveSlotHere) — this is available any time a card is placed
+  // somewhere in the binder, independent of whether the Add Cards
+  // panel happens to be open, unlike onDropCard.
   const [isDragOver, setIsDragOver] = useState(false);
+  const canAcceptDrag = !!(onDropCard || onMoveSlotHere);
 
   const handleDragOver = (e) => {
-    if (!onDropCard) return;
+    if (!canAcceptDrag) return;
     e.preventDefault(); // required for onDrop to fire at all
-    e.dataTransfer.dropEffect = 'copy';
+    e.dataTransfer.dropEffect = onDropCard ? 'copy' : 'move';
     if (!isDragOver) setIsDragOver(true);
   };
 
@@ -57,13 +70,20 @@ export function BinderSlot({
   };
 
   const handleDrop = (e) => {
-    if (!onDropCard) return;
+    if (!canAcceptDrag) return;
     e.preventDefault();
     setIsDragOver(false);
     const raw = e.dataTransfer.getData('application/json');
     if (!raw) return;
     try {
-      onDropCard(JSON.parse(raw));
+      const payload = JSON.parse(raw);
+      if (payload.type === 'move-slot') {
+        // Dropping this on the SAME slot it was dragged from is a
+        // no-op, not an error — nothing to move.
+        if (onMoveSlotHere && payload.slotId !== slot?.id) onMoveSlotHere(payload.slotId);
+      } else if (onDropCard) {
+        onDropCard(payload);
+      }
     } catch {
       // Malformed/foreign drag payload (e.g. dragged in from outside
       // the app) — silently ignore rather than crash the drop.
@@ -156,13 +176,21 @@ export function BinderSlot({
   return (
     <div
       ref={activeHolo ? holoRef : undefined}
-      className={`binder-slot ${showGrey ? 'binder-slot-placeholder' : 'binder-slot-filled'} ${isSelected ? 'binder-slot-selected' : ''} ${justFilled ? 'binder-slot-reveal' : ''} ${isCombineSelected ? 'binder-slot-combine-selected' : ''}`}
+      className={`binder-slot ${showGrey ? 'binder-slot-placeholder' : 'binder-slot-filled'} ${isSelected ? 'binder-slot-selected' : ''} ${justFilled ? 'binder-slot-reveal' : ''} ${isCombineSelected ? 'binder-slot-combine-selected' : ''} ${isDragOver ? 'binder-slot-drag-over' : ''}`}
       style={{ gridColumnStart, gridRowStart, cursor: 'pointer' }}
       data-holo={activeHolo ?? undefined}
       onClick={() => onClickSlot(slot)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClickSlot(slot); } }}
       onPointerMove={activeHolo ? handlePointerMove : undefined}
       onPointerLeave={activeHolo ? handlePointerLeave : undefined}
+      draggable={!!onMoveSlotHere}
+      onDragStart={onMoveSlotHere ? (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'move-slot', slotId: slot.id }));
+      } : undefined}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       role="button"
       tabIndex={0}
       aria-label={cardDef.name}

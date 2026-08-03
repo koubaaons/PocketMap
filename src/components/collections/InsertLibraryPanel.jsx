@@ -28,7 +28,7 @@ import { Button } from '../ui/index.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBinderInsertActions } from '../../hooks/useBinderInsertActions.js';
 
-export function InsertLibraryPanel({ binderInserts, toast, onClose }) {
+export function InsertLibraryPanel({ binderInserts, toast, onClose, showDragHint, onDismissDragHint }) {
   const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -59,6 +59,12 @@ export function InsertLibraryPanel({ binderInserts, toast, onClose }) {
 
   const handleDragHandlePointerDown = (e) => {
     if (window.innerWidth <= 768) return;
+    // === Requested directly (matching AddCardsPanel.jsx's identical
+    // fix): the whole panel background should be draggable, not just
+    // the dedicated handle bar — but only the background. Anything
+    // actually interactive needs to keep working normally rather than
+    // starting a drag every time it's clicked.
+    if (e.target.closest('button, input, [role="button"], a, select, textarea, [draggable="true"]')) return;
     if (!e.touches) e.preventDefault();
     const el = panelRef.current;
     if (!el) return;
@@ -210,6 +216,8 @@ export function InsertLibraryPanel({ binderInserts, toast, onClose }) {
       role="complementary"
       aria-label="Image library"
       style={Object.keys(inlineStyle).length > 0 ? inlineStyle : undefined}
+      onMouseDown={handleDragHandlePointerDown}
+      onTouchStart={handleDragHandlePointerDown}
     >
       <div
         className="add-cards-panel-drag-handle"
@@ -231,6 +239,20 @@ export function InsertLibraryPanel({ binderInserts, toast, onClose }) {
         </div>
         <Button variant="primary" size="sm" onClick={onClose}>Done</Button>
       </div>
+
+      {showDragHint && (
+        <div className="add-cards-panel-hint">
+          <span>💡 This panel can be dragged from anywhere, and resized from its right/bottom edges.</span>
+          <button
+            type="button"
+            className="add-cards-panel-hint-dismiss"
+            onClick={onDismissDragHint}
+            aria-label="Dismiss tip"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="add-cards-panel-search" style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <div className="search-bar-wrapper" style={{ flex: 1 }}>

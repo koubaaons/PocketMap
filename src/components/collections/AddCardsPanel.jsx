@@ -55,6 +55,12 @@ export function AddCardsPanel({
   onNavigate,
   onClickCard,
   selectedCardId,
+  // Requested directly: a one-time hint pointing out this panel can
+  // be dragged (from anywhere on its background) and resized (from
+  // its right/bottom edges) — shown once per account, then never
+  // again once dismissed.
+  showDragHint,
+  onDismissDragHint,
 }) {
   const [query, setQuery] = useState('');
   const [selectedCollectionId, setSelectedCollectionId] = useState(null); // null = All
@@ -99,6 +105,15 @@ export function AddCardsPanel({
     // only affordance (matches the CSS override that ignores position
     // on narrow viewports anyway).
     if (window.innerWidth <= 768) return;
+    // === Requested directly: the whole panel background should be
+    // draggable, not just the dedicated handle bar — but only the
+    // background. Anything actually interactive (search input, tabs,
+    // the favorites toggle, a card tile) needs to keep working
+    // normally rather than starting a drag every time it's clicked.
+    // closest(...) walks up from the real click target, so this
+    // correctly ignores a click that lands on, say, text inside a
+    // button, not just the button element itself.
+    if (e.target.closest('button, input, [role="button"], a, select, textarea, [draggable="true"]')) return;
     if (!e.touches) e.preventDefault(); // avoid selecting page text mid-drag
     const el = panelRef.current;
     if (!el) return;
@@ -363,6 +378,8 @@ export function AddCardsPanel({
       role="complementary"
       aria-label="Add cards to binder"
       style={Object.keys(inlineStyle).length > 0 ? inlineStyle : undefined}
+      onMouseDown={handleDragHandlePointerDown}
+      onTouchStart={handleDragHandlePointerDown}
     >
       <div
         className="add-cards-panel-drag-handle"
@@ -406,6 +423,20 @@ export function AddCardsPanel({
         </div>
         <Button variant="primary" size="sm" onClick={onClose}>Done</Button>
       </div>
+
+      {showDragHint && (
+        <div className="add-cards-panel-hint">
+          <span>💡 This panel can be dragged from anywhere, and resized from its right/bottom edges.</span>
+          <button
+            type="button"
+            className="add-cards-panel-hint-dismiss"
+            onClick={onDismissDragHint}
+            aria-label="Dismiss tip"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="add-cards-panel-collection-tabs" role="tablist" aria-label="Filter by ownership">
         {[

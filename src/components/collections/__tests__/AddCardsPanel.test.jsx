@@ -9,7 +9,7 @@
  * thing jsdom meaningfully validates.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AddCardsPanel } from '../AddCardsPanel.jsx';
 
@@ -103,6 +103,90 @@ describe('AddCardsPanel — click-to-place (real feature: requested directly, cl
   it('shows the default drag-or-click guidance when nothing is selected', () => {
     renderPanel({ selectedCardId: undefined });
     expect(screen.getByText(/Drag a card onto any empty slot, or click a card then a slot/)).toBeInTheDocument();
+  });
+});
+
+describe('AddCardsPanel — drag from anywhere on the background (real feature: requested directly, the whole panel should be draggable, not just the top handle)', () => {
+  const originalInnerWidth = window.innerWidth;
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { value: 1200, configurable: true, writable: true });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, 'innerWidth', { value: originalInnerWidth, configurable: true, writable: true });
+  });
+
+  it('mousedown on the panel\'s own background starts dragging', () => {
+    renderPanel();
+
+    fireEvent.mouseDown(screen.getByRole('complementary'));
+
+    expect(screen.getByRole('complementary')).toHaveClass('add-cards-panel-dragging');
+  });
+
+  it('mousedown on a button inside the panel does NOT start dragging — it should keep working normally instead', () => {
+    renderPanel();
+
+    fireEvent.mouseDown(screen.getByText('Done'));
+
+    expect(screen.getByRole('complementary')).not.toHaveClass('add-cards-panel-dragging');
+  });
+
+  it('mousedown on the search input does NOT start dragging', () => {
+    renderPanel();
+
+    fireEvent.mouseDown(screen.getByPlaceholderText(/search/i));
+
+    expect(screen.getByRole('complementary')).not.toHaveClass('add-cards-panel-dragging');
+  });
+
+  it('mousedown on a card tile (role="button") does NOT start a panel drag — that\'s the card\'s own drag-to-place gesture instead', () => {
+    const card = makeCard({ id: 'card-1', name: 'Pikachu' });
+    renderPanel({ cardDefinitions: [card] });
+
+    fireEvent.mouseDown(screen.getByText('Pikachu'));
+
+    expect(screen.getByRole('complementary')).not.toHaveClass('add-cards-panel-dragging');
+  });
+
+  it('mousedown on the dedicated drag handle still works too, same as before', () => {
+    renderPanel();
+
+    fireEvent.mouseDown(screen.getByTitle('Drag to move this panel'));
+
+    expect(screen.getByRole('complementary')).toHaveClass('add-cards-panel-dragging');
+  });
+
+  it('real bug fixed while applying this to InsertLibraryPanel.jsx: any element that is itself draggable is also excluded from starting a panel drag, not just role="button" elements — otherwise dragging a card tile (draggable, but this component\'s tiles specifically also have role="button") would risk starting both the card\'s own drag AND a panel-move drag simultaneously', () => {
+    const card = makeCard({ id: 'card-1', name: 'Pikachu' });
+    renderPanel({ cardDefinitions: [card] });
+
+    expect(screen.getByText('Pikachu').closest('[role="button"]')).toHaveAttribute('draggable', 'true');
+    fireEvent.mouseDown(screen.getByText('Pikachu'));
+
+    expect(screen.getByRole('complementary')).not.toHaveClass('add-cards-panel-dragging');
+  });
+});
+
+describe('AddCardsPanel — drag/resize discoverability hint (real feature)', () => {
+  it('shows the hint when showDragHint is true', () => {
+    renderPanel({ showDragHint: true });
+    expect(screen.getByText(/This panel can be dragged from anywhere/)).toBeInTheDocument();
+  });
+
+  it('does not show the hint when showDragHint is false', () => {
+    renderPanel({ showDragHint: false });
+    expect(screen.queryByText(/This panel can be dragged from anywhere/)).not.toBeInTheDocument();
+  });
+
+  it('dismissing the hint calls onDismissDragHint', () => {
+    const onDismiss = vi.fn();
+    renderPanel({ showDragHint: true, onDismissDragHint: onDismiss });
+
+    fireEvent.click(screen.getByLabelText('Dismiss tip'));
+
+    expect(onDismiss).toHaveBeenCalled();
   });
 });
 

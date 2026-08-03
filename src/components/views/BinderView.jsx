@@ -126,6 +126,8 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
   const fullscreenHint = useFirstTimeHint('binder-customize-fullscreen');
   const planLayoutHint = useFirstTimeHint('binder-plan-layout');
   const combineHint = useFirstTimeHint('binder-combine-howto');
+  const addCardsPanelDragHint = useFirstTimeHint('add-cards-panel-draggable');
+  const libraryPanelDragHint = useFirstTimeHint('library-panel-draggable');
   const { showCardInfo, toggle: toggleCardInfo } = useCardInfoToggle();
 
   // === Home's "Customize" shortcut sets nav.autoOpenCustomize so the
@@ -281,6 +283,26 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       return;
     }
     view.selectCardForPlacement(cardDef);
+  };
+
+  // === Requested directly: drag an already-placed card to reposition
+  // it. Reuses BINDER_SLOT_MOVE directly in normal mode -- that
+  // reducer action already atomically swaps the two cards if the
+  // target slot is occupied, exactly the behavior wanted here, so
+  // there's no need to reimplement that logic. In Plan mode, routes
+  // through the existing previewMoveSlot draft function instead,
+  // matching how the existing click-select-then-click-target move
+  // already works there -- same underlying action, just reached via
+  // a drag instead of two clicks.
+  const handleMoveSlot = (sourceSlotId, targetPageNumber, targetSlotIndex) => {
+    if (view.isPreviewMode) {
+      const targetSlot = displaySlots.find(
+        s => s.binderId === binder.id && s.pageNumber === targetPageNumber && s.slotIndex === targetSlotIndex
+      );
+      view.previewMoveSlot(sourceSlotId, targetSlot?.id ?? null, targetPageNumber, targetSlotIndex);
+    } else {
+      dispatch({ type: ACTIONS.BINDER_SLOT_MOVE, payload: { slotId: sourceSlotId, pageNumber: targetPageNumber, slotIndex: targetSlotIndex } });
+    }
   };
 
   const handleDropCardOnSlot = (pageNumber, slotIndex, dragPayload) => {
@@ -688,6 +710,7 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
       onDropEmpty: (view.addingToSlot && !view.isCombineMode)
         ? (slotIndex, payload) => handleDropCardOnSlot(pageNumber, slotIndex, payload)
         : undefined,
+      onMoveSlot: handleMoveSlot,
     },
     panels: {
       pagePanels: view.activePanels.filter(p => p.pageNumber === pageNumber),
@@ -865,6 +888,8 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           onNavigate={onNavigate}
           onClickCard={handleClickCardToPlace}
           selectedCardId={view.selectedCardForPlacement?.id}
+          showDragHint={addCardsPanelDragHint.showHint}
+          onDismissDragHint={addCardsPanelDragHint.dismiss}
         />
       )}
 
@@ -873,6 +898,8 @@ export function BinderView({ toast, onNavigate, initialPage = null }) {
           binderInserts={binderInserts}
           toast={toast}
           onClose={() => setIsLibraryPanelOpen(false)}
+          showDragHint={libraryPanelDragHint.showHint}
+          onDismissDragHint={libraryPanelDragHint.dismiss}
         />
       )}
 
