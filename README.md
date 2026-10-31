@@ -44,55 +44,52 @@ Full dark/light theme support across all views with seamless layout previews and
 
 ## What makes it different
 
-* **Physical binder UI** — Cards live in binders with configurable rows, columns, and pages. Navigate page by page or spread by spread with a 3D book-flip animation. Cards occupy specific slots via a `binderId / pageNumber / slotIndex` structure.
-* **The Michi Method (Combined Slots & Inserts)** — Merge adjacent slots into custom rectangular spaces to house jumbo cards or decorative custom image inserts from an image library, complete with drag-and-resize positioning.
-* **Quantity Tracking & Copy-Based Placement** — Own multiple physical copies of the same card. Each copy tracks its own condition, language, and notes independently, and can be placed into binders up to your owned count.
-* **Holographic card effects** — Eight rarity effects ported from the open-source `simeydotme/pokemon-cards-css` technique: Regular, Holo, Galaxy, Rainbow, Gold, V, VStar, and Off. Pointer tracking writes directly to DOM CSS custom properties, bypassing React's re-render cycle.
-* **TCGdex API Integration** — Bulk-import sets directly from TCGdex with automatic rarity-to-holo mapping, shared-image server caching to prevent storage duplication, and automated daily update checks for new card releases.
-* **Real backend** — Supabase PostgreSQL with Row Level Security, Edge Functions for account deletion, real-time sync across devices, and a strict 10MB private storage quota with WebP compression.
-* **Soft delete with 3-section trash** — Binders, collections, cards, and image library assets go to a structured trash bin for selective or full-state restoration before permanent deletion.
-
----
+- **Physical binder UI.** Cards live in binders with configurable rows, columns, and pages (up to 36). Navigate page by page or spread by spread with a 3D book-flip animation. Cards occupy specific slots via a `binderId / pageNumber / slotIndex` structure.
+- **The Michi Method (combined slots and inserts).** Merge adjacent slots into custom rectangular spaces to house jumbo cards or decorative image inserts from an image library, with drag-and-resize positioning.
+- **Quantity tracking and copy-based placement.** Own multiple physical copies of the same card. Each copy tracks its own condition, language, and notes, and can be placed into binders up to your owned count.
+- **Holographic card effects.** Eight rarity effects ported from the open-source [simeydotme/pokemon-cards-css](https://github.com/simeydotme/pokemon-cards-css) technique: Regular, Holo, Galaxy, Rainbow, Gold, V, VStar, and Off. Pointer tracking writes directly to DOM CSS custom properties, bypassing React's re-render cycle.
+- **TCGdex API integration.** Bulk-import sets from TCGdex with automatic rarity-to-holo mapping, server-side shared image caching to prevent storage duplication, and automated daily checks for new releases.
+- **Real backend.** Supabase PostgreSQL with Row Level Security, Edge Functions, real-time sync across devices, and a strict 10 MB private storage quota with WebP compression.
+- **Soft delete with a three-section trash.** Binders, collections, cards, and image-library assets go to a structured trash bin for selective or full restoration before permanent deletion.
 
 ## Features
 
-### Collections & Cards
-* Create collections with custom template fields (text, number, boolean, select) for any franchise.
-* Import card data automatically via the TCGdex API set browser.
-* Track multiple physical copies per card with individual language, condition, acquisition date, and notes.
-* Apply holographic effects (8 types).
-* Multiselect bulk actions (bulk own, favorite, declutter) and attribute/entity filters.
-* Declutter items to hide them from main views without deleting them.
+### Collections and cards
+- Create collections with custom template fields (text, number, boolean, select) for any franchise.
+- Import card data through the TCGdex set browser.
+- Track multiple physical copies per card, each with its own language, condition, acquisition date, and notes.
+- Apply holographic effects (8 types).
+- Multiselect bulk actions (own, favorite, declutter) and attribute/entity filters.
+- Declutter items to hide them from main views without deleting them.
 
-### Binders & Layouts
-* Customisable covers with live sticker placement (drag, rotate, resize, percentage-based sizing).
-* **Plan Layout Mode** — Make speculative layout changes, card swaps, or page swaps locally and commit or discard them safely.
-* **Binder Export** — Export individual pages, page ranges, or full facing-page spreads to PNG or multi-page PDF via html2canvas/jsPDF (with transparency, slot-number, and badge toggles).
-* Persistent drag-and-drop **Add Cards Panel** for fast placement.
+### Binders and layouts
+- Customisable covers with live sticker placement (drag, rotate, resize, percentage-based sizing).
+- **Plan Layout mode:** make speculative layout changes, card swaps, or page swaps locally, then commit or discard them safely.
+- **Three ways to place cards:** drag a card onto a slot, or click a card and then a slot (or a slot and then a card). The Add Cards panel stays open so you can place many in a row. Placed cards can be dragged to another slot, and swap with whatever is there.
+- Add Cards and Library panels can be dragged from any empty area and resized.
+- First-time hints guide new users through customizing, Plan Layout, and combining slots.
+- **Binder export:** individual pages, page ranges, or full facing-page spreads to PNG or multi-page PDF via html2canvas, jsPDF, and jszip, with transparency, slot-number, and badge toggles.
 
-### Organisation & Dashboard
-* Home dashboard with count-up animations, recent activity feed, and recently added card strip.
-* Favorites view and multi-type search view (Cards, Collections, Binders) with deep-linking directly to binder slots.
-* Image library for managing decorative background inserts.
+### Organisation and dashboard
+- Home dashboard with count-up animations, a recent activity feed, and a recently added card strip.
+- Favorites view and multi-type search (cards, collections, binders) with deep links straight to binder slots.
+- Image library for managing decorative background inserts.
 
-### Auth, Account & Safety
-* Supabase Auth with session persistence, password reset flow, and secure account deletion via Edge Functions.
-* Automated test suite (Vitest, 650+ tests covering hooks, reducers, and validators).
-
----
+### Auth, account, and safety
+- Supabase Auth with session persistence, a forgot/reset password flow, and secure account deletion via an Edge Function.
+- Automated test suite (Vitest and Testing Library, **960+ tests**) covering hooks, reducers, validators, and components.
 
 ## Tech stack
 
 | Layer | Technology |
-| :--- | :--- |
-| **Framework** | React 18 + Vite |
-| **State** | Custom Redux-style store (reducer/actions pattern) |
-| **Backend** | Supabase (PostgreSQL + Auth + Realtime + Storage + Edge Functions) |
-| **Styling** | Feature-scoped CSS modules and design tokens |
-| **Testing** | Vitest |
-| **Export/Utils** | html2canvas, jsPDF, jszip |
-
----
+|---|---|
+| Framework | React 18 + Vite |
+| State | Custom Redux-style store (reducer/actions pattern) |
+| Backend | Supabase (PostgreSQL, Auth, Realtime, Storage, Edge Functions) |
+| Styling | Feature-scoped CSS and design tokens |
+| Testing | Vitest, Testing Library |
+| Export / utils | html2canvas, jsPDF, jszip |
+| Hosting | Vercel |
 
 ## Architecture
 
@@ -108,27 +105,117 @@ Storage (dual write)
   └── Supabase        (source of truth)
        ├── supabaseSync.js     (write router)
        └── supabaseStorage.js  (row converters)
-The storage abstraction was designed in Milestone 1 so that swapping localStorage for Supabase required modifying only one file. The user_id field was embedded on every entity from inception to ensure seamless multi-user capability upon introducing authentication.Database schemaManaged via version-controlled migration files in supabase/migrations/. All tables enforce Row Level Security (RLS) policies (auth.uid() = user_id).Plaintextauth.users ──┬──→ binders ──────────┬──→ binder_slots
+```
+
+The storage abstraction was designed in Milestone 1 so that swapping localStorage for Supabase required modifying only one file. A `user_id` field was embedded on every entity from the start, so multi-user support was possible once authentication arrived.
+
+### Database schema
+
+Managed through version-controlled migration files in `supabase/migrations/`. All tables enforce Row Level Security (`auth.uid() = user_id`).
+
+```text
+auth.users ──┬──→ binders ──────────┬──→ binder_slots
              │                      └──→ binder_panels ──→ binder_inserts
              ├──→ collections ──┬───→ template_fields
              │                  ├───→ card_definitions ──→ user_inventory
              │                  │                      └──→ binder_slots
              ├──→ user_preferences
              └──→ bin (JSONB snapshots for soft-delete recovery)
-Getting startedPrerequisitesNode.js 18+A free Supabase account1. Clone and installBashgit clone [https://github.com/koubaaons/PocketMap.git](https://github.com/koubaaons/PocketMap.git)
+```
+
+## Getting started
+
+### Prerequisites
+- Node.js 18+
+- A free [Supabase](https://supabase.com) account
+- The [Supabase CLI](https://supabase.com/docs/guides/cli) (for Edge Functions)
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/koubaaons/PocketMap.git
 cd PocketMap
 npm install
-2. Configure environment variablesCreate .env.local in the project root:Extrait de codeVITE_SUPABASE_URL=[https://your-project.supabase.co](https://your-project.supabase.co)
+```
+
+### 2. Configure environment variables
+
+Create `.env.local` in the project root:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-publishable-key
-3. Run database migrationsExecute the SQL migration scripts sequentially in your Supabase dashboard SQL Editor (supabase/migrations/): from 0001 through the latest schema updates.4. Run tests and start development serverBashnpm run test     # Run Vitest test suite
-npm run dev      # Start local dev server at http://localhost:5173
-Project structurePlaintextsrc/
-├── components/          # Feature views, modals, card grids, binder UI
-├── hooks/               # Custom hooks (useStore, useDraggable, useBinderView...)
-├── selectors/           # Pure derived state and search/stats aggregators
-├── services/            # TCGdex API integration, Supabase client configuration
-├── store/               # Store setup, reducers, and Supabase sync routing
-├── styles/              # Feature-scoped CSS stylesheets
-├── types/               # Factory functions and strict schema validators
-└── utils/               # Image compression utilities, WebP converters, export helpers
-Milestone historyMilestoneWhat shipped1 — Core ArchitectureCustom store, validation/factory pattern, abstract storage layer2 — CollectionsCollection model, custom template fields, stats selector3 — TemplatesType-safe dynamic attributes, rule enforcement4 — Card DefinitionsDynamic form generation, management lists5 — OwnershipUSER_INVENTORY relation model, condition ratings, favorites6 — Collection ViewsTab filtering (Owned/Missing/Unorganised)7 — Binder V2Slot architecture, grey placeholder logic, schema v2 migration8 — UI FoundationCSS token architecture, theme switcher, layout shell9 — Component PolishHolographic system, 3D book cover flips, sticker customization10 — Auth & ProfileSupabase Auth integration, profile management, feedback form11 — Backend MigrationPostgreSQL tables, RLS policies, Realtime multi-device sync12 — Version 0.3.0 PrepSupabase Storage bucket migration, schema version control, API spikes13 — Import & Advanced UXTCGdex API, quantity tracking, Michi Method combined panels, test suite14 — Production ReadinessStorage quotas, account deletion Edge Function, export engine, Vercel deploymentEngineering journalThe complete record of architectural decisions, iterative dead ends, bug diagnoses, and lessons learned is compiled in Pinder_Development_Journal.pdf (included in release assets).
+```
+
+### 3. Set up the database
+
+Run the SQL scripts in `supabase/migrations/` **in order** in your Supabase SQL Editor, from `0001` through the latest. Check each one completed before running the next.
+
+### 4. Deploy the Edge Functions
+
+Edge Functions deploy separately from the app (pushing to Git does not update them):
+
+```bash
+supabase login
+supabase link --project-ref your-project-ref
+supabase functions deploy
+```
+
+These power account deletion and the shared card-image cache.
+
+### 5. Run tests and start the dev server
+
+```bash
+npm run test     # run the Vitest suite
+npm run dev      # http://localhost:5173
+```
+
+## Project structure
+
+```text
+src/
+├── components/   # Feature views, modals, card grids, binder UI
+├── hooks/        # Custom hooks (useStore, useDraggable, useBinderView...)
+├── selectors/    # Pure derived state and search/stats aggregators
+├── services/     # TCGdex API integration, Supabase client configuration
+├── store/        # Store setup, reducers, and Supabase sync routing
+├── styles/       # Feature-scoped CSS
+├── types/        # Factory functions and schema validators
+└── utils/        # Image compression, WebP conversion, export helpers
+```
+
+## Milestone history
+
+| # | Milestone | What shipped |
+|---|---|---|
+| 1 | Core Architecture | Custom store, validation/factory pattern, abstract storage layer |
+| 2 | Collections | Collection model, custom template fields, stats selector |
+| 3 | Templates | Type-safe dynamic attributes, rule enforcement |
+| 4 | Card Definitions | Dynamic form generation, management lists |
+| 5 | Ownership | User inventory relation model, condition ratings, favorites |
+| 6 | Collection Views | Tab filtering (Owned / Missing / Unorganised) |
+| 7 | Binder V2 | Slot architecture, grey placeholder logic, schema v2 migration |
+| 8 | UI Foundation | CSS token architecture, theme switcher, layout shell |
+| 9 | Component Polish | Holographic system, 3D book cover flips, sticker customization |
+| 10 | Auth and Profile | Supabase Auth integration, profile management, feedback form |
+| 11 | Backend Migration | PostgreSQL tables, RLS policies, Realtime multi-device sync |
+| 12 | Version 0.3.0 Prep | Storage bucket migration, schema version control, API spikes |
+| 13 | Import and Advanced UX | TCGdex API, quantity tracking, Michi Method combined panels, test suite |
+| 14 | Production Readiness | Storage quotas, account deletion Edge Function, export engine, Vercel deployment |
+| 15 | Tester Feedback and Polish | Click-to-place, drag-to-reposition, whole-panel dragging, onboarding hints, 36-page binders |
+
+## Roadmap
+
+- Social features (profiles, sharing binders), which will also fill the Settings page
+- Mobile app
+- IoT integration
+- A guided first-run welcome for brand-new accounts
+
+## Known limitations
+
+- The backend runs on Supabase's free tier: projects pause after a period of inactivity, and there are monthly bandwidth and email limits.
+- Private image uploads are capped at 10 MB per account.
+
+## Engineering journal
+
+The complete record of architectural decisions, dead ends, bug diagnoses, and lessons learned is in `Pinder_Development_Journal.pdf` (included in the release assets).
