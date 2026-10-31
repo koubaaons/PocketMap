@@ -27,7 +27,8 @@ Browse sets, track completion rates, filter owned vs. missing cards, and import 
 ### 3. Add & Browse Card Collections
 Explore imported TCG sets, management templates, and add custom cards with ease.
 
-![addcollection](https://github.com/user-attachments/assets/a1b8940a-d832-4d64-95e2-aceb7fe573d7)
+<img width="1710" height="910" alt="addcollection (1)" src="https://github.com/user-attachments/assets/8418f640-bf0e-4947-a098-7b812ab0c05f" />
+
 
 ### 4. Customizer Studio & High-Resolution Export
 Create Binder and Customise it: Choose pastel cover themes, position stickers.
